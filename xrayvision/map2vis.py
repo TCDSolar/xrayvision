@@ -72,13 +72,8 @@ def hsi_vis_map2vis(map_data : np.array, xy : np.array, uv: np.array):
         raise ValueError("Empty map")
     for j, i in enumerate(ok[0]):
         phase = twopi * (uv[0,:] * (xy[0, i] - mapcenterx) + uv[1,:] * (xy[1, ok[1][j]] - mapcentery))
-<<<<<<< HEAD
         for k, l in enumerate(visout):
             l.obsvis += map_data[i, ok[1][j]] * (np.cos(phase[k]) + 1j * np.sin(phase[k]))
-=======
-        for k in visout:
-            k.obsvis += map_data[i, ok[1][j]] * (np.cos(phase) + 1j * np.sin(phase))
->>>>>>> ed17c87... Adding hsi_vis_map2vis
     sigamp = 0.
     for i in visout:
         for j in i.obsvis:
