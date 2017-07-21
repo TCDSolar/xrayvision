@@ -16,4 +16,4 @@ if not _ASTROPY_SETUP_:
     from .example_mod import *
 from .hsi_vis import *
 from .map2vis import *
-
+from .vis2map import *
