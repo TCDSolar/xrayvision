@@ -76,6 +76,8 @@ def vis_bpmap_get_spatial_weights(visin = np.ones((visin.shape[0],)), spatial_fr
         
     Returns
     -------
+        spatial_frequency_weight: np.array
+            The value of spatial_frequency_weight will be modified, but it will be returned also
     
     See Also
     --------
@@ -87,19 +89,51 @@ def vis_bpmap_get_spatial_weights(visin = np.ones((visin.shape[0],)), spatial_fr
     ----------
     | https://darts.isas.jaxa.jp/pub/ssw/gen/idl/image/vis/vis_bpmap.pro
     """
-    spatial_frequency_weight = np.di
-    vide(spatial_frequency_weight, np.array(np.sum(spatial_frequency_weight)))
-    vis_spatial_frequency_weighting.
+    spatial_frequency_weight = np.divide(np.sum(spatial_frequency_weight))
+    return spatial_frequency_weight
 
-def vis_bpmap_get_xypi( npx, pixel, verbose = False):
-        """
+def pixel_coord(image_dim = (64,64)):
+    """
+    This function converts image dimensions into a 2d array
+    of x and y coordinates in pixel units relative to the center of the image.
+
+    Parameters
+    ----------
+    image_dim : tuple
+        (Number of pixels in x, number of pixels in y), default is (64, 64)
+        
+    Returns
+    -------
+    mapindex : np.array
+        Two dimensional numpy array which is containing x, y coordinates
+        relative to the image center
+    
+    See Also
+    --------
+
+    Notes
+    -----
+    
+    Reference
+    ----------
+    | https://darts.isas.jaxa.jp/pub/ssw/gen/idl/image/pixel_coord.pro
+    """
+    data = np.ones(image_dim)
+    mapindex = np.nonzero(data)
+    npixel = np.nonzero_count(data)
+    mapindex[0] = np.subtract(mapindex[0], float(image_dim[0]-1.) / 2.)
+    mapindex[1] = np.subtract(mapindex[1], float(image_dim[1]-1.) / 2.)
+    return mapindex
+
+def vis_bpmap_get_xypi( npx, pixel):
+    """
     Calculate sthe spatial weights for the visibilities
 
     Parameters
     ----------
-    visin : np.array
-        np.array of hsi_vis visibility structure (Visibility bag)
-    
+    npx : long
+        x size of the image
+    pixel : float
         
     Returns
     -------
@@ -120,7 +154,11 @@ def vis_bpmap_get_xypi( npx, pixel, verbose = False):
     global npx_sav
     global pixel_sav
     if !(npx != npx_sav) or !(pixel_sav != pixel):
-        xypi = 
+        xypi = np.reshape(np.pixel_coord((npx, npx)), (2, npx, npx))
+        xypi = np.multiply(xypi, 2. * np.pi * pixel)
+        pixel_sav = float(pixel)
+        npx_sav = long(npx)
+    return xypi
     
 def vis_bpmap():
     
