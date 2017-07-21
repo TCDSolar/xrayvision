@@ -16,7 +16,7 @@ import numpy as np
 def vis_spatial_frequency_weighting(vis, spatial_frequency_weight = 1.0, uniform_weighting = True):
     """
     This function returns the spatial_frequency_weighting factor for
-    each visibility in the input vis bag. The weights are not normalized. That's
+    each visibility in the input vis visibility bag. The weights are not normalized. That's
     left for the task that uses them
 
     Parameters
@@ -160,5 +160,55 @@ def vis_bpmap_get_xypi( npx, pixel):
         npx_sav = long(npx)
     return xypi
     
-def vis_bpmap():
+def vis_bpmap(visin, bp_fov = 80., pixel = 0., uniform_weighting = False,
+              spatial_frequency_weight):
+    """
+    This procedure makes a backprojection map from a visibility bag
+
+    Parameters
+    ----------
+    visin : np.array
+        np.array of hsi_vis visibility structure (Visibility bag)
+    bp_fov : float
+        field of view (arcsec) Default = 80. arcsec
+    pixel : float
+        size of a pixel
+    uniform_weighting : bool
+        If true, changes subcollimator weighting from default (NATURAL) to UNIFORM
+        Default if false.
+    spatial_frequency_weight : weighting for each collimator, set by
+        UNIFORM_WEIGHTING if used. The number of weights should either equal the number of
+        unique sub-collimators or the number of visibilities
+        
+    Returns
+    -------
+        Backprojection map of the given visibility bag
+    
+    See Also
+    --------
+
+    Notes
+    -----
+    
+    Reference
+    ----------
+    | https://darts.isas.jaxa.jp/pub/ssw/gen/idl/image/vis/vis_spatial_frequency_weighting.pro
+    """
+    fov = float(bp_fov)
+    pixel = fov / 200.
+    npx = fov / pixel
+    MAP = np.zeros((npx, npx))
+    # For RHESSI case, preserve 9 spatial weights if they are passed
+    spatial_frequency_weight = vis_bpmap_get_spatial_weights(visin,
+                                                             spatial_frequency_weight,
+                                                             uniform_weighting)
+    xypi = vis_bpmap_get_xypi(npx, pixel)
+    ic = 1.0+1.0j
+    nvis = visin.shape[0]
+    for nv in range(nvis):
+        uv = np.add(np.multiply(xypi[0, :, :], visin[nv].u ),
+                    np.multiply(xypi[1, :, :], visin[nv].v ))
+        MAP += np.multiply((np.cos(uv), np.multiply(np.sin(uv), 1j)),
+                           spatial_frequency_weight[nv] * visin[nv].obsvis)
+    return MAP
     
