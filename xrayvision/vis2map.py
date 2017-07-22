@@ -64,7 +64,7 @@ def vis_spatial_frequency_weighting(vis, spatial_frequency_weight = 1.0, uniform
     if nsfw != nvis:
         raise ValueError("Visibility bag, vis, and SPATIAL_FREQUENCY_WEIGHTs cannot be reconciled.")
 
-def vis_bpmap_get_spatial_weights(visin = np.ones((visin.shape[0],)), spatial_frequency_weight, uniform_weighting = False):
+def vis_bpmap_get_spatial_weights(visin, spatial_frequency_weight = 0, uniform_weighting = False):
     """
     Calculate sthe spatial weights for the visibilities
 
@@ -89,7 +89,9 @@ def vis_bpmap_get_spatial_weights(visin = np.ones((visin.shape[0],)), spatial_fr
     ----------
     | https://darts.isas.jaxa.jp/pub/ssw/gen/idl/image/vis/vis_bpmap.pro
     """
-    spatial_frequency_weight = np.divide(np.sum(spatial_frequency_weight))
+    if type(spatial_frequency_weight) == int:
+         spatial_frequency_weight = np.ones((visin.shape[0],))
+    spatial_frequency_weight = np.divide(spatial_frequency_weight, np.sum(spatial_frequency_weight))
     return spatial_frequency_weight
 
 def pixel_coord(image_dim = (64,64)):
@@ -119,19 +121,19 @@ def pixel_coord(image_dim = (64,64)):
     | https://darts.isas.jaxa.jp/pub/ssw/gen/idl/image/pixel_coord.pro
     """
     data = np.ones(image_dim)
-    mapindex = np.nonzero(data)
-    npixel = np.nonzero_count(data)
+    mapindex = np.asarray(np.nonzero(data))
+    npixel = np.count_nonzero(data)
     mapindex[0] = np.subtract(mapindex[0], float(image_dim[0]-1.) / 2.)
     mapindex[1] = np.subtract(mapindex[1], float(image_dim[1]-1.) / 2.)
     return mapindex
 
-def vis_bpmap_get_xypi( npx, pixel):
+def vis_bpmap_get_xypi(npx : int, pixel):
     """
     Calculate sthe spatial weights for the visibilities
 
     Parameters
     ----------
-    npx : long
+    npx : int
         x size of the image
     pixel : float
         
@@ -153,15 +155,20 @@ def vis_bpmap_get_xypi( npx, pixel):
     global xypi
     global npx_sav
     global pixel_sav
-    if !(npx != npx_sav) or !(pixel_sav != pixel):
-        xypi = np.reshape(np.pixel_coord((npx, npx)), (2, npx, npx))
+    if 'xypi_com' not in globals():
+        xypi_com = 0.
+        xypi = 0.
+        npx_sav = 0.
+        pixel_sav = 0.
+    if (npx != npx_sav) or (pixel_sav != pixel):
+        xypi = np.reshape(pixel_coord((npx, npx)), (2, npx, npx))
         xypi = np.multiply(xypi, 2. * np.pi * pixel)
         pixel_sav = float(pixel)
-        npx_sav = long(npx)
+        npx_sav = int(npx)
     return xypi
     
 def vis_bpmap(visin, bp_fov = 80., pixel = 0., uniform_weighting = False,
-              spatial_frequency_weight):
+              spatial_frequency_weight = 0):
     """
     This procedure makes a backprojection map from a visibility bag
 
@@ -194,9 +201,11 @@ def vis_bpmap(visin, bp_fov = 80., pixel = 0., uniform_weighting = False,
     ----------
     | https://darts.isas.jaxa.jp/pub/ssw/gen/idl/image/vis/vis_spatial_frequency_weighting.pro
     """
+    if type(spatial_frequency_weight) == int:
+        spatial_frequency_weight = np.ones((visin.shape[0],))
     fov = float(bp_fov)
     pixel = fov / 200.
-    npx = fov / pixel
+    npx = int(fov / pixel)
     MAP = np.zeros((npx, npx))
     # For RHESSI case, preserve 9 spatial weights if they are passed
     spatial_frequency_weight = vis_bpmap_get_spatial_weights(visin,
@@ -208,7 +217,7 @@ def vis_bpmap(visin, bp_fov = 80., pixel = 0., uniform_weighting = False,
     for nv in range(nvis):
         uv = np.add(np.multiply(xypi[0, :, :], visin[nv].u ),
                     np.multiply(xypi[1, :, :], visin[nv].v ))
-        MAP += np.multiply((np.cos(uv), np.multiply(np.sin(uv), 1j)),
-                           spatial_frequency_weight[nv] * visin[nv].obsvis)
+        MAP = np.add(MAP, np.multiply(np.add(np.cos(uv), np.multiply(np.sin(uv), (0+1j))),
+                           spatial_frequency_weight[nv] * visin[nv].obsvis))
     return MAP
     

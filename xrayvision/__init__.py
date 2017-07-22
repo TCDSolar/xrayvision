@@ -17,3 +17,4 @@ if not _ASTROPY_SETUP_:
 from .hsi_vis import *
 from .map2vis import *
 from .vis2map import *
+from .tests import *

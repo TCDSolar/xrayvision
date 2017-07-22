@@ -23,15 +23,15 @@ def hsi_vis_map2vis(map_data : np.array, xy : np.array, uv: np.array):
     Parameters
     ----------
     map_data : np.array
-        2D array with the fluc
+        2D array with the flux (must be square)
     xy : np.array
         Determine the resolution of the data
-    uv : np,array
+    uv : np.array
         The list of the u, v points where we want to get the data.
 
     Returns
     -------
-    visout : hsi_vis visiibility array
+    visout : hsi_vis visibility array
 
     See Also
     --------
@@ -39,7 +39,6 @@ def hsi_vis_map2vis(map_data : np.array, xy : np.array, uv: np.array):
     Notes
     -----
     """
-    
     twopi = 2 * np.pi
     nxy = xy.shape[1] #The count of the displacements
     nuv = uv.shape[1] #The count of the uv coordinates where we want the visibilities
@@ -47,13 +46,11 @@ def hsi_vis_map2vis(map_data : np.array, xy : np.array, uv: np.array):
         raise ValueError("Dimension mismatch between map_data and xy! Please read the docs.")
     visout = []
     spatfreq2 = 0.0
-    tmp = []
     for i in range(nuv):
         visout.append(hsi_vis())
         visout[-1].u = uv[0, i]
         visout[-1].v = uv[1, i]
         spatfreq2 += uv[0, i] ** 2.0 + uv[1, i] ** 2.0
-        tmp.append(0+0j)
     visout = np.array(visout)
     spatfreq2 *= 2.33 ** 2.0
     scn = np.round(-np.log(spatfreq2) / np.log(3.0))
@@ -64,7 +61,7 @@ def hsi_vis_map2vis(map_data : np.array, xy : np.array, uv: np.array):
         i.harm = 1
         i.chi2 = 1.
         i.xyoffset = np.array([mapcenterx, mapcentery])
-        i.obsvis = np.array(copy.deepcopy(tmp))        
+        i.obsvis = 0+0j   
         
     ok = np.nonzero(map_data)
     nok = len(ok[0])
@@ -76,10 +73,9 @@ def hsi_vis_map2vis(map_data : np.array, xy : np.array, uv: np.array):
             l.obsvis += map_data[i, ok[1][j]] * (np.cos(phase[k]) + 1j * np.sin(phase[k]))
     sigamp = 0.
     for i in visout:
-        for j in i.obsvis:
-            tmp = np.abs(j)
-            if (tmp > sigamp):
-                sigamp = tmp
+        tmp = np.abs(i.obsvis)
+        if (tmp > sigamp):
+            sigamp = tmp
     for i in visout:
         i.sigamp = sigamp
     return visout
