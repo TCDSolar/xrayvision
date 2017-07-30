@@ -1,8 +1,9 @@
 import numpy as np
 import random
-import sys    
+import sys  
 from xrayvision import *
-    
+
+
 def test_mapvis():
 
     random.seed()
@@ -13,7 +14,7 @@ def test_mapvis():
     for i in range(size):
         map_data[random.randint(0, size-1), random.randint(0, size-1)] += 1.
     # Creating an xy array
-    xy = [[],[]]
+    xy = [[], []]
     for i in range(int(-size/2), int(-size/2) + size):
         xy[0].append(i)
         xy[1].append(i)
@@ -33,5 +34,4 @@ def test_mapvis():
             sys.stdout.write("\n")
         sys.stdout.write("{} ".format(vis.obsvis.item(1)))
     """
-    return vis_bpmap(visout, uniform_weighting = True), map_data
-        
+    return vis_bpmap(visout, uniform_weighting=True), map_data

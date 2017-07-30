@@ -15,9 +15,9 @@ import numpy as np
 import copy
 from .hsi_vis import *
 
-def hsi_vis_map2vis(map_data : np.array, xy : np.array, uv: np.array):
+def hsi_vis_map2vis(map_data: np.array, xy: np.array, uv: np.array):
     """
-    Returns with hsi_vis visibility array with the computed 
+    Returns with hsi_vis visibility array with the computed
     visibilities for the given point.
 
     Parameters
@@ -40,10 +40,13 @@ def hsi_vis_map2vis(map_data : np.array, xy : np.array, uv: np.array):
     -----
     """
     twopi = 2 * np.pi
-    nxy = xy.shape[1] #The count of the displacements
-    nuv = uv.shape[1] #The count of the uv coordinates where we want the visibilities
+    #The count of the displacements
+    nxy = xy.shape[1]
+    #The count of the uv coordinates where we want the visibilities
+    nuv = uv.shape[1]
     if (map_data.shape[0] * map_data.shape[1] != nxy ** 2.0):
-        raise ValueError("Dimension mismatch between map_data and xy! Please read the docs.")
+        raise ValueError("Dimension mismatch between map_data and xy!"
+                         "Please read the docs.")
     visout = []
     spatfreq2 = 0.0
     for i in range(nuv):
@@ -68,9 +71,11 @@ def hsi_vis_map2vis(map_data : np.array, xy : np.array, uv: np.array):
     if nok == 0:
         raise ValueError("Empty map")
     for j, i in enumerate(ok[0]):
-        phase = twopi * (uv[0,:] * (xy[0, i] - mapcenterx) + uv[1,:] * (xy[1, ok[1][j]] - mapcentery))
+        phase = twopi * (uv[0, :] * (xy[0, i] - mapcenterx)
+                         + uv[1, :] * (xy[1, ok[1][j]] - mapcentery))
         for k, l in enumerate(visout):
-            l.obsvis += map_data[i, ok[1][j]] * (np.cos(phase[k]) + 1j * np.sin(phase[k]))
+            l.obsvis += map_data[i, ok[1][j]] * (np.cos(phase[k]) +
+                                                 1j * np.sin(phase[k]))
     sigamp = 0.
     for i in visout:
         tmp = np.abs(i.obsvis)
