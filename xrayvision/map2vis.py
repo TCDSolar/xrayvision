@@ -15,6 +15,7 @@ import numpy as np
 import copy
 from .hsi_vis import *
 
+
 def hsi_vis_map2vis(map_data: np.array, xy: np.array, uv: np.array):
     """
     Returns with hsi_vis visibility array with the computed
@@ -40,9 +41,9 @@ def hsi_vis_map2vis(map_data: np.array, xy: np.array, uv: np.array):
     -----
     """
     twopi = 2 * np.pi
-    #The count of the displacements
+#The count of the displacements
     nxy = xy.shape[1]
-    #The count of the uv coordinates where we want the visibilities
+#The count of the uv coordinates where we want the visibilities
     nuv = uv.shape[1]
     if (map_data.shape[0] * map_data.shape[1] != nxy ** 2.0):
         raise ValueError("Dimension mismatch between map_data and xy!"
@@ -64,8 +65,8 @@ def hsi_vis_map2vis(map_data: np.array, xy: np.array, uv: np.array):
         i.harm = 1
         i.chi2 = 1.
         i.xyoffset = np.array([mapcenterx, mapcentery])
-        i.obsvis = 0+0j   
-        
+        i.obsvis = 0+0j
+
     ok = np.nonzero(map_data)
     nok = len(ok[0])
     if nok == 0:

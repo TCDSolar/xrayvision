@@ -25,7 +25,7 @@ def vis_spatial_frequency_weighting(vis, spatial_frequency_weight=1.0,
     ----------
     vis : np.array
         np.array of hsi_vis visibility structure (Visibility bag)
-    
+
     spatial_frequency_weight : np.array, float
         If uniform_weighting is not true., and if this is a single scalar it
         will use natural weighting, if this is an array of values the
@@ -46,10 +46,11 @@ def vis_spatial_frequency_weighting(vis, spatial_frequency_weight=1.0,
 
     Notes
     -----
-    
+
     Reference
     ----------
-    | https://darts.isas.jaxa.jp/pub/ssw/gen/idl/image/vis/vis_spatial_frequency_weighting.pro
+    | https://darts.isas.jaxa.jp/pub/ssw/gen/idl/image/vis/
+    |                   vis_spatial_frequency_weighting.pro
     """
     nvis = vis.shape[0]
     u = []
@@ -86,7 +87,7 @@ def vis_bpmap_get_spatial_weights(visin, spatial_frequency_weight=0,
         spatial_frequency_weight: np.array
             The value of spatial_frequency_weight will be modified, but it
             will be returned also
-    
+
     See Also
     --------
 
@@ -98,13 +99,13 @@ def vis_bpmap_get_spatial_weights(visin, spatial_frequency_weight=0,
     | https://darts.isas.jaxa.jp/pub/ssw/gen/idl/image/vis/vis_bpmap.pro
     """
     if type(spatial_frequency_weight) == int:
-         spatial_frequency_weight = np.ones((visin.shape[0], ))
+        spatial_frequency_weight = np.ones((visin.shape[0], ))
     spatial_frequency_weight = np.divide(spatial_frequency_weight,
                                          np.sum(spatial_frequency_weight))
     return spatial_frequency_weight
 
 
-def pixel_coord(image_dim =(64, 64)):
+def pixel_coord(image_dim=(64, 64)):
     """
     This function converts image dimensions into a 2d array
     of x and y coordinates in pixel units relative to the center of the image.
@@ -211,7 +212,8 @@ def vis_bpmap(visin, bp_fov=80., pixel=0., uniform_weighting=False,
 
     Reference
     ----------
-    | https://darts.isas.jaxa.jp/pub/ssw/gen/idl/image/vis/vis_spatial_frequency_weighting.pro
+    | https://darts.isas.jaxa.jp/pub/ssw/gen/idl/image/vis/
+    |                   vis_spatial_frequency_weighting.pro
     """
     if type(spatial_frequency_weight) == int:
         spatial_frequency_weight = np.ones((visin.shape[0],))
@@ -221,18 +223,17 @@ def vis_bpmap(visin, bp_fov=80., pixel=0., uniform_weighting=False,
     MAP = np.zeros((npx, npx))
     # For RHESSI case, preserve 9 spatial weights if they are passed
     spatial_frequency_weight = vis_bpmap_get_spatial_weights(visin,
-                                                             spatial_frequency_weight,
-                                                             uniform_weighting)
+                                        spatial_frequency_weight,
+                                        uniform_weighting)
     xypi = vis_bpmap_get_xypi(npx, pixel)
     ic = 1.0+1.0j
     nvis = visin.shape[0]
     for nv in range(nvis):
         uv = np.add(np.multiply(xypi[0, :, :], visin[nv].u),
                     np.multiply(xypi[1, :, :], visin[nv].v))
-        MAP = np.add(MAP, np.multiply(np.add(np.cos(uv),
-                                             np.multiply(np.sin(uv), (0+1j))),
-                                      spatial_frequency_weight[nv] *
-                                      visin[nv].obsvis
-                                     )
-                    )
+        realp = np.cos(uv)
+        imagp = np.multiply(np.sin(uv), (0+1j))
+        weight = spatial_frequency_weight[nv]
+        vis = visin[nv].obsvis
+        MAP = np.add(MAP, np.multiply(np.add(realp, imagp), weight * vis))
     return MAP

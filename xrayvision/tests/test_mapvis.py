@@ -1,6 +1,6 @@
 import numpy as np
 import random
-import sys  
+import sys
 from xrayvision import *
 
 
