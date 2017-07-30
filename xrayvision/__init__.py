@@ -12,6 +12,8 @@ from ._sunpy_init import *
 
 if not _ASTROPY_SETUP_:
     # For egg_info test builds to pass, put package imports here.
-
     from .example_mod import *
-
+    from .hsi_vis import *
+    from .map2vis import *
+    from .vis2map import *
+    from .tests import *
