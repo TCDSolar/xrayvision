@@ -222,9 +222,9 @@ def vis_bpmap(visin, bp_fov=80., pixel=0., uniform_weighting=False,
     npx = int(fov / pixel)
     MAP = np.zeros((npx, npx))
     # For RHESSI case, preserve 9 spatial weights if they are passed
-    spatial_frequency_weight = vis_bpmap_get_spatial_weights(visin,
-                                        spatial_frequency_weight,
+    tmp = vis_bpmap_get_spatial_weights(visin, spatial_frequency_weight,
                                         uniform_weighting)
+    spatial_frequency_weight = tmp
     xypi = vis_bpmap_get_xypi(npx, pixel)
     ic = 1.0+1.0j
     nvis = visin.shape[0]
