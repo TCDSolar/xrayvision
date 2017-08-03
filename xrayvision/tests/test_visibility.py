@@ -50,8 +50,25 @@ class TestVisibility(object):
 
         # Create a map with Gaussian and calculate FFT for comparision
         gaussian_map = Gaussian2DKernel(stddev=5, x_size=N, y_size=M)
-        gaussian_vis = vis.from_map(gaussian_map.array)
+        vis.from_map(gaussian_map.array)
 
         # The back projection should match exactly
         gaussian_bp = vis.to_map(empty_map)
         assert np.allclose(gaussian_map.array, gaussian_bp)
+
+    def test_dftmap(self):
+        M, N = 64, 64
+        data = Gaussian2DKernel(stddev=5, x_size=M, y_size=N).array
+        # data = np.zeros((M, N))
+        # data[32, 32] = 1.0
+        # Fake map
+
+        ut = (np.arange(M) - M / 2 + 0.5) * (1 / M)
+        vt = -1.0 * (np.arange(M) - N / 2 + 0.5) * (1 / N)
+        u, v = np.meshgrid(ut, vt)
+        uv = np.array([u, v]).reshape(2, M * N)
+
+        visout = Visibility.dft_map(data, uv)
+        imout = Visibility.idft_map(visout, np.zeros((M, N)), uv)
+
+        assert np.allclose(data, imout)
