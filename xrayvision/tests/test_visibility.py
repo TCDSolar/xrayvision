@@ -1,9 +1,8 @@
-from ..Visibillity import Visibility
-
 import numpy as np
 import pytest
-
 from astropy.convolution import Gaussian2DKernel
+
+from ..Visibillity import Visibility
 
 
 class TestVisibility(object):
@@ -56,19 +55,33 @@ class TestVisibility(object):
         gaussian_bp = vis.to_map(empty_map)
         assert np.allclose(gaussian_map.array, gaussian_bp)
 
-    def test_dftmap(self):
-        M, N = 64, 64
-        data = Gaussian2DKernel(stddev=5, x_size=M, y_size=N).array
+    @pytest.mark.parametrize("size", [1.0, 1.5, 2.0])
+    def test_generate_xy(self, size):
+        n_even = 64
+        n_odd = 65
+
+        even = np.arange(-32, 32) * size
+        res_even = Visibility.generate_xy(n_even, size)
+        assert np.array_equal(res_even, even)
+
+        odd = np.arange(-32, 33)*size
+        res_odd = Visibility.generate_xy(n_odd, size)
+        assert np.array_equal(res_odd, odd)
+
+    @pytest.mark.parametrize("xs,ys", [(65, 65), [64, 64]])
+    def test_dftmap(self, xs, ys):
+        m, n = xs, ys
+        data = Gaussian2DKernel(stddev=5, x_size=m, y_size=n).array
         # data = np.zeros((M, N))
         # data[32, 32] = 1.0
         # Fake map
 
-        ut = (np.arange(M) - M / 2 + 0.5) * (1 / M)
-        vt = -1.0 * (np.arange(M) - N / 2 + 0.5) * (1 / N)
+        ut = (np.arange(m) - m / 2 + 0.5) * (1 / m)
+        vt = -1.0 * (np.arange(n) - n / 2 + 0.5) * (1 / n)
         u, v = np.meshgrid(ut, vt)
-        uv = np.array([u, v]).reshape(2, M * N)
+        uv = np.array([u, v]).reshape(2, m * n)
 
         visout = Visibility.dft_map(data, uv)
-        imout = Visibility.idft_map(visout, np.zeros((M, N)), uv)
+        imout = Visibility.idft_map(visout, np.zeros((m, n)), uv)
 
         assert np.allclose(data, imout)

@@ -1,9 +1,15 @@
+"""Visibility relates things.
+
+Visibility.
+
+"""
+
 import numpy as np
 
 
 class Visibility(object):
     """
-    A set of visibilities
+    A set of visibilities.
 
     Parameters
     ----------
@@ -25,9 +31,29 @@ class Visibility(object):
         print(self.uv, self.vis)
 
     def from_map(self, inmap):
+        """
+
+        Parameters
+        ----------
+        inmap
+
+        Returns
+        -------
+
+        """
         return self._dft(inmap)
 
     def to_map(self, outmap):
+        """
+
+        Parameters
+        ----------
+        outmap
+
+        Returns
+        -------
+
+        """
         return self._idft(outmap)
 
     def _dft(self, im):
@@ -103,7 +129,7 @@ class Visibility(object):
 
         """
         if number_pixels % 2 == 0:
-            x = np.linspace(-number_pixels * pixel_size / 2, number_pixels * pixel_size / 2 - 1,
+            x = np.linspace(-number_pixels * pixel_size / 2, (number_pixels / 2 - 1) * pixel_size,
                             number_pixels)
         else:
             x = np.linspace(-(number_pixels - 1) * pixel_size / 2,
