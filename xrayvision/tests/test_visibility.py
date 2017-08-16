@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 from astropy.convolution import Gaussian2DKernel
 
-from ..Visibillity import Visibility
+from ..Visibility import Visibility
 
 
 class TestVisibility(object):
