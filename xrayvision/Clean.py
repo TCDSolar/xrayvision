@@ -58,7 +58,7 @@ class Hogbom(object):
             return True
         if not gain:
             gain = self.gain
-        clean_vis = complex(gain*max_intesity)
-        for i in self.vis.vis:
-            i -= clean_vis
+        clean_vis = complex(gain*self.vis.vis[pos])
+        for i in range(self.vis.vis.shape[0]):
+            self.vis.vis[i] -= clean_vis
         return False
