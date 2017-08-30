@@ -5,6 +5,7 @@ Visibility.
 """
 
 import numpy as np
+import sunpy.map
 from .Transform import Transform
 
 
@@ -43,6 +44,22 @@ class Visibility(object):
 
         """
         return Transform.dft(inmap, self.uv, self.vis)
+
+    def from_sunpy_map(self, inmap: sunpy.map):
+        """
+        Calculates the visibilities for the preset UV coordinates
+        from a sunpy map
+
+        Parameters
+        ----------
+        inmap
+
+        Returns
+        -------
+
+        """
+        Transform.dft(inmap.data, self.uv, self.vis)
+        return self.vis
 
     def to_map(self, outmap):
         """
