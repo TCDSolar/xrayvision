@@ -1,6 +1,7 @@
 import numpy as np
 import pytest
 from astropy.convolution import Gaussian2DKernel
+import sunpy.map
 
 from ..Visibillity import Visibility
 
@@ -54,6 +55,27 @@ class TestVisibility(object):
         # The back projection should match exactly
         gaussian_bp = vis.to_map(empty_map)
         assert np.allclose(gaussian_map.array, gaussian_bp)
+
+    @pytest.mark.parametrize("N,M", [(65, 65), [64, 64]])
+    def test_to_sunpy_map(self, N, M):
+        # Calculate full u, v coverage so will be equivalent to a discrete Fourier transform (DFT)
+        u, v = np.meshgrid(np.arange(M), np.arange(M))
+        uv_in = np.array([u, v]).reshape(2, N * M)
+        vis_in = np.zeros(N * M, dtype=complex)
+
+        vis = Visibility(uv_in, vis_in)
+
+        # Create a map with Gaussian and calculate FFT for comparision
+        gaussian_map = Gaussian2DKernel(stddev=5, x_size=N, y_size=M)
+        vis.from_map(gaussian_map.array)
+
+        data = np.zeros((N, M), dtype=complex)
+        header = {'cdelt1': 10, 'cdelt2': 10, 'telescop': 'sunpy'}
+        sunpy_map = sunpy.map.Map(data, header)
+
+        # The back projection should match exactly
+        gaussian_bp = vis.to_sunpy_map(sunpy_map)
+        assert np.allclose(gaussian_map.array, gaussian_bp.data)
 
     @pytest.mark.parametrize("size", [1.0, 1.5, 2.0])
     def test_generate_xy(self, size):

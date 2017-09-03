@@ -5,6 +5,7 @@ Visibility.
 """
 
 import numpy as np
+import sunpy.map
 from .Transform import Transform
 
 
@@ -56,6 +57,23 @@ class Visibility(object):
 
         """
         return Transform.idft(outmap, self.uv, self.vis)
+
+    def to_sunpy_map(self, outmap: sunpy.map):
+        """
+        Converts the visibility data into an actual image (specified by
+        the given outmap sunpy map
+
+        Parameters
+        ----------
+        outmap
+
+        Returns
+        -------
+
+        """
+        data = Transform.idft(outmap.data, self.uv, self.vis)
+        outmap = sunpy.map.Map(data, outmap.meta)
+        return outmap
 
     @staticmethod
     def generate_xy(number_pixels, pixel_size=1):
