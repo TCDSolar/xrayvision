@@ -47,7 +47,7 @@ class TestVisibility(object):
         fft = np.fft.fft2(gaussian_map.array)
 
         # Creating a sunpy generic map
-        data = gaussian_map
+        data = gaussian_map.array
         header = {'cdelt1': 10, 'cdelt2': 10, 'telescop': 'sunpy'}
         sunpy_map = sunpy.map.Map(data, header)
 
