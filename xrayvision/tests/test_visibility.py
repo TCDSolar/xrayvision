@@ -1,5 +1,6 @@
 import numpy as np
 import pytest
+import sunpy.map
 from astropy.convolution import Gaussian2DKernel
 
 from ..Visibillity import Visibility
@@ -30,6 +31,28 @@ class TestVisibility(object):
 
         # Our DFT should match inbuilt FFT
         gaussian_vis = vis.from_map(gaussian_map.array)
+        assert np.allclose(fft.reshape(N*M), gaussian_vis)
+
+    # Typical map sizes even, odd
+    @pytest.mark.parametrize("N,M", [(65, 65), [64, 64]])
+    def test_from_sunpy_map(self, N, M):
+        # Calculate full u, v coverage so will be equivalent to a discrete Fourier transform (DFT)
+        u, v = np.meshgrid(np.arange(M), np.arange(M))
+        uv_in = np.array([u, v]).reshape(2, N*M)
+        vis_in = np.zeros(N*M, dtype=complex)
+        vis = Visibility(uv_in, vis_in)
+
+        # Create a map with Gaussian and calculate FFT for comparision
+        gaussian_map = Gaussian2DKernel(stddev=5, x_size=N, y_size=M)
+        fft = np.fft.fft2(gaussian_map.array)
+
+        # Creating a sunpy generic map
+        data = gaussian_map.array
+        header = {'cdelt1': 10, 'cdelt2': 10, 'telescop': 'sunpy'}
+        sunpy_map = sunpy.map.Map(data, header)
+
+        # Our DFT should match inbuilt FFT
+        gaussian_vis = vis.from_sunpy_map(sunpy_map)
         assert np.allclose(fft.reshape(N*M), gaussian_vis)
 
     @pytest.mark.parametrize("N,M", [(65, 65), [64, 64]])
