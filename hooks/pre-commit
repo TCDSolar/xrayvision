@@ -1,9 +1,0 @@
-#!/bin/sh
-PY_TEST=py.test
-BASE_DIR="$(git rev-parse --show-toplevel)"
-
-NUM_SUNPY=$(git diff --name-only --stat HEAD $BASE_DIR/xrayvision | wc -l)
-#IF code has changed run the tests:
-if [ $NUM_SUNPY -gt  0 ]; then
-    $PY_TEST --pylama $BASE_DIR/xrayvision
-fi
