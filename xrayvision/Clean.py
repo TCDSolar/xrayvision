@@ -3,10 +3,7 @@
 from scipy.ndimage.interpolation import shift
 from scipy import signal
 import numpy as np
-import copy
 from astropy.convolution import Gaussian2DKernel
-
-from .Visibility import Visibility
 
 
 class Hogbom(object):
@@ -27,6 +24,8 @@ class Hogbom(object):
     ----------
     visibility: Visibility
         The processed visibility bag
+    psf:
+        The dirty beam
     threshold: float
         If the highest value is smaller, it stops
     image_dimensions: tuple
@@ -40,7 +39,7 @@ class Hogbom(object):
     -----
 
     """
-    def __init__(self, visibility, threshold: float, image_dimensions: tuple,
+    def __init__(self, visibility, psf, threshold: float, image_dimensions: tuple,
                  gain=0.01, niter: int = 1000):
         self.vis = visibility
         self.thres = threshold
@@ -56,21 +55,20 @@ class Hogbom(object):
         self.point_source_map = np.zeros(image_dimensions)
         # #1
         self.dirty_map = np.zeros(self.dim)
-        print("Shape: ", self.dirty_map.shape)
-        print(self.vis.vis.shape)
-        print(self.vis.uv.shape)
         temp = self.vis.to_map(self.dirty_map)
-        self.dirty_map = temp 	
-        
-        # #2 Creating the dirty beam
-        uv_in_d = copy.deepcopy(self.vis.uv)
-        g_vis = np.ones((uv_in_d.shape[1]), dtype=complex)
-        g_vis[:] = 1j
+        self.dirty_map = temp
 
-        db_vis = Visibility(uv_in_d, g_vis)
-        self.dirty_beam = np.zeros(self.dim) 
-        temp = db_vis.to_map(self.dirty_beam)
-        self.dirty_beam = temp
+        # Padding the psf to fit with the size
+        padding_distance_x_before = int((self.dim[0] - psf.shape[0])/2)
+        padding_distance_y_before = int((self.dim[1] - psf.shape[1])/2)
+        padding_distance_x_after = self.dim[0] - psf.shape[0] - padding_distance_x_before
+        padding_distance_y_after = self.dim[1] - psf.shape[1] - padding_distance_y_before
+        self.dirty_beam = np.lib.pad(psf,
+                                     ((padding_distance_x_before,
+                                       padding_distance_x_after),
+                                     (padding_distance_y_before,
+                                      padding_distance_y_after)),
+                                     'constant', constant_values=(0, 0))
 
     def iterate(self, gain=False):
         """
