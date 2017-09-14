@@ -41,10 +41,11 @@ class Hogbom(object):
 
     """
     def __init__(self, visibility, threshold: float, image_dimensions: tuple,
-                 gain=0.25):
+                 gain=0.01, niter: int = 1000):
         self.vis = visibility
         self.thres = threshold
         self.gain = gain
+        self.niter = niter
         # Check the validity of the image_dimensions input
         if not len(image_dimensions) == 2:
             raise ValueError("image_dimensions: incorrect tuple length! "
@@ -58,15 +59,18 @@ class Hogbom(object):
         print("Shape: ", self.dirty_map.shape)
         print(self.vis.vis.shape)
         print(self.vis.uv.shape)
-        self.dirty_map = self.vis.to_map(self.dirty_map)
-
+        temp = self.vis.to_map(self.dirty_map)
+        self.dirty_map = temp 	
+        
         # #2 Creating the dirty beam
         uv_in_d = copy.deepcopy(self.vis.uv)
-        g_vis = np.ones((uv_in_d.shape[0]), dtype=complex)
+        g_vis = np.ones((uv_in_d.shape[1]), dtype=complex)
+        g_vis[:] = 1j
 
         db_vis = Visibility(uv_in_d, g_vis)
-        self.dirty_beam = np.zeros(self.dim)
-        self.dirty_beam = db_vis.to_map(self.dirty_beam)
+        self.dirty_beam = np.zeros(self.dim) 
+        temp = db_vis.to_map(self.dirty_beam)
+        self.dirty_beam = temp
 
     def iterate(self, gain=False):
         """
@@ -86,6 +90,9 @@ class Hogbom(object):
 
         """
         # #3
+        if self.niter < 1:
+            return True
+
         max_intesity = 0.0
         pos = (0, 0)
         summarized = 0.0
@@ -110,8 +117,10 @@ class Hogbom(object):
         # Centering the the dirty_beam on the position of the max intensity
         centered_dirty_beam = shift(self.dirty_beam, (pos[0]-int(self.dim[0]/2),
                                                       pos[1]-int(self.dim[1]/2)))
-        self.dirty_map = np.substract(self.dirty_map,
+        self.dirty_map = np.subtract(self.dirty_map,
                                       centered_dirty_beam * max_intesity * gain)
+        self.niter -= 1
+        print(self.niter)
         return False
 
     def finish(self, stddev: float):
@@ -133,7 +142,7 @@ class Hogbom(object):
         # #6
         gaussian_map = Gaussian2DKernel(stddev=stddev, x_size=self.dim[0],
                                         y_size=self.dim[1])
-        result = signal.convolve2d(self.point_source_visibility, gaussian_map)
+        result = signal.convolve2d(self.point_source_map, gaussian_map, mode='same')
 
         # 7
         return np.add(result, self.dirty_map)

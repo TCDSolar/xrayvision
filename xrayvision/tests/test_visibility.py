@@ -37,7 +37,7 @@ class TestVisibility(object):
         empty_map = np.zeros((N, M))
 
         # Calculate full u, v coverage so will be equivalent to a discrete Fourier transform (DFT)
-        u, v = np.meshgrid(np.arange(M), np.arange(M))
+        u, v = np.meshgrid(np.arange(N), np.arange(M))
         uv_in = np.array([u, v]).reshape(2, N * M)
         vis_in = np.zeros(N * M, dtype=complex)
 
