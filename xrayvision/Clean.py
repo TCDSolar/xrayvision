@@ -5,6 +5,10 @@ from scipy import signal
 import numpy as np
 from astropy.convolution import Gaussian2DKernel
 
+import matplotlib
+matplotlib.use('TkAgg')
+from matplotlib import pyplot as plt
+
 
 class Hogbom(object):
     """
@@ -144,3 +148,36 @@ class Hogbom(object):
 
         # 7
         return np.add(result, self.dirty_map)
+
+    @staticmethod
+    def clean(dirty_map, dirty_beam, gain=0.1, thres=0.01, niter=1000):
+        orig = np.copy(dirty_map)
+        # Assume bear center is in middle
+        beam_center = (dirty_beam.shape[0] - 1)/2.0, (dirty_beam.shape[1] - 1)/2.0
+        
+        # Model for sources
+        model = np.zeros(dirty_map.shape)
+        for i in range(niter):
+            print(i)
+            # Find max in dirty map and save to point source
+            mx, my = np.unravel_index(dirty_map.argmax(), dirty_map.shape)
+            Imax = dirty_map[mx, my]
+            model[mx, my] += gain*Imax
+
+            comp = Imax * gain * shift(dirty_beam, (mx - beam_center[0], my - beam_center[1]), order=0)
+ 
+            dirty_map = np.subtract(dirty_map, comp)
+
+            if dirty_map.max() <= thres or dirty_map.min() < 0.0:
+                print("Break")
+                break
+        
+        # For testing turned off
+        #signal.convolve2d(model, Gaussian2DKernel(stddev=1), mode='same')
+        return model + dirty_map
+
+
+
+
+
+

@@ -1,9 +1,13 @@
 import numpy as np
 import pytest
+from scipy import signal
 
 from ..Clean import Hogbom
 from ..Visibility import Visibility
 
+import matplotlib
+matplotlib.use('TkAgg')
+from matplotlib import pyplot as plt
 
 class TestClean(object):
     # Typical map sizes even, odd and two point sources
@@ -33,3 +37,33 @@ class TestClean(object):
         # assert np.allclose(final_image, clean_map)
         # Just pass the test for the moment
         assert True
+
+    def test_clean2(self):
+        N = M = 65
+        pos1 = [15, 30]
+        pos2 = [40, 32]
+
+        clean_map = np.zeros((N, M))
+        clean_map[pos1[0], pos1[1]] = 10.
+        clean_map[pos2[0], pos2[1]] = 7.
+
+        dirty_beam = np.zeros((N, M))
+        dirty_beam[(N-1)//4:(N-1)//4 + (N-1)//2, (M-1)//2] = 0.75
+        dirty_beam[(N-1)//2, (M-1)//4:(M-1)//4 + (M-1)//2,] = 0.75
+        dirty_beam[(N-1)//2, (M-1)//2] = 1.0
+
+        dirty_map = signal.convolve2d(clean_map, dirty_beam, mode='same')
+
+        # f, (ax1, ax2, ax3) = plt.subplots(1, 3)
+        # ax1.imshow(clean_map, label='Orig')
+        # ax2.imshow(dirty_beam, label='Dirty Beam')
+        # ax3.imshow(dirty_map, label='Dirty Map')
+        # plt.show()
+
+        out_map = Hogbom.clean(dirty_map, dirty_beam)
+        
+        # Within threshold set
+        assert np.allclose(clean_map, out_map, atol=2*0.01)
+        max_loccations = np.dstack(np.unravel_index(np.argsort(out_map.ravel())[-2:], out_map.shape))
+        assert max_loccations[0][1].tolist() == pos1
+        assert max_loccations[0][0].tolist() == pos2
