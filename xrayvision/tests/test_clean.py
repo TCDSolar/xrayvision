@@ -1,13 +1,10 @@
 import numpy as np
-import pytest
+# import pytest
 from scipy import signal
 
 from ..Clean import Hogbom
 from ..Visibility import Visibility
 
-import matplotlib
-matplotlib.use('TkAgg')
-from matplotlib import pyplot as plt
 
 class TestClean(object):
     # Typical map sizes even, odd and two point sources
@@ -30,13 +27,11 @@ class TestClean(object):
         vis = Visibility(uv_in, vis_in)
         vist = vis.from_map(clean_map)
         vis.vis = vist
-        clean = Hogbom(vis, np.array([[1.0]]), 1., (N, M))
+        clean = Hogbom(vis, np.array([[1.]]), 1., (N, M))
         while not clean.iterate():
             pass
         final_image = np.add(clean.dirty_map, clean.point_source_map)
-        # assert np.allclose(final_image, clean_map)
-        # Just pass the test for the moment
-        assert True
+        assert np.allclose(final_image, clean_map)
 
     def test_clean2(self):
         N = M = 65
@@ -49,7 +44,7 @@ class TestClean(object):
 
         dirty_beam = np.zeros((N, M))
         dirty_beam[(N-1)//4:(N-1)//4 + (N-1)//2, (M-1)//2] = 0.75
-        dirty_beam[(N-1)//2, (M-1)//4:(M-1)//4 + (M-1)//2,] = 0.75
+        dirty_beam[(N-1)//2, (M-1)//4:(M-1)//4 + (M-1)//2, ] = 0.75
         dirty_beam[(N-1)//2, (M-1)//2] = 1.0
 
         dirty_map = signal.convolve2d(clean_map, dirty_beam, mode='same')
@@ -61,9 +56,10 @@ class TestClean(object):
         # plt.show()
 
         out_map = Hogbom.clean(dirty_map, dirty_beam)
-        
+
         # Within threshold set
         assert np.allclose(clean_map, out_map, atol=2*0.01)
-        max_loccations = np.dstack(np.unravel_index(np.argsort(out_map.ravel())[-2:], out_map.shape))
+        temp = np.argsort(out_map.ravel())[-2:]
+        max_loccations = np.dstack(np.unravel_index(temp, out_map.shape))
         assert max_loccations[0][1].tolist() == pos1
         assert max_loccations[0][0].tolist() == pos2

@@ -1,13 +1,10 @@
 """CLEAN algorithms"""
 
+
 from scipy.ndimage.interpolation import shift
 from scipy import signal
 import numpy as np
 from astropy.convolution import Gaussian2DKernel
-
-import matplotlib
-matplotlib.use('TkAgg')
-from matplotlib import pyplot as plt
 
 
 class Hogbom(object):
@@ -28,8 +25,8 @@ class Hogbom(object):
     ----------
     visibility: Visibility
         The processed visibility bag
-    psf:
-        The dirty beam
+    psf: np.array
+        The dirty beam. It can not have a bigger size than the image
     threshold: float
         If the highest value is smaller, it stops
     image_dimensions: tuple
@@ -43,18 +40,25 @@ class Hogbom(object):
     -----
 
     """
-    def __init__(self, visibility, psf, threshold: float, image_dimensions: tuple,
-                 gain=0.01, niter: int = 1000):
+    def __init__(self, visibility, psf: np.array, threshold: float,
+                 image_dimensions: tuple, gain=0.01, niter: int = 1000):
         self.vis = visibility
         self.thres = threshold
         self.gain = gain
         self.niter = niter
+        self.iterated = 0
         # Check the validity of the image_dimensions input
         if not len(image_dimensions) == 2:
             raise ValueError("image_dimensions: incorrect tuple length! "
                              "Example: (100x100)")
         if image_dimensions[0] == 0 or image_dimensions[1] == 0:
             raise ValueError("image_dimensions: 0 is not a valid size!")
+        if psf.shape[0] > image_dimensions[0]:
+            raise ValueError("The x dimension size of the psf is greater "
+                             "than the image size!")
+        if psf.shape[1] > image_dimensions[1]:
+            raise ValueError("The y dimension size of the psf is greater "
+                             "than the image size!")
         self.dim = image_dimensions
         self.point_source_map = np.zeros(image_dimensions)
         # #1
@@ -62,16 +66,17 @@ class Hogbom(object):
         temp = self.vis.to_map(self.dirty_map)
         self.dirty_map = temp
 
+        # #2 Creating the dirty beam
         # Padding the psf to fit with the size
-        padding_distance_x_before = int((self.dim[0] - psf.shape[0])/2)
-        padding_distance_y_before = int((self.dim[1] - psf.shape[1])/2)
-        padding_distance_x_after = self.dim[0] - psf.shape[0] - padding_distance_x_before
-        padding_distance_y_after = self.dim[1] - psf.shape[1] - padding_distance_y_before
-        self.dirty_beam = np.lib.pad(psf,
-                                     ((padding_distance_x_before,
-                                       padding_distance_x_after),
-                                     (padding_distance_y_before,
-                                      padding_distance_y_after)),
+        # Padding distance before data - x
+        pdxb = int((self.dim[0] - psf.shape[0])/2)
+        # Padding distance before data - y
+        pdyb = int((self.dim[1] - psf.shape[1])/2)
+        # Padding distance after data - x
+        pdxa = self.dim[0] - psf.shape[0] - pdxb
+        # Padding distance after data - y
+        pdya = self.dim[1] - psf.shape[1] - pdyb
+        self.dirty_beam = np.lib.pad(psf, ((pdxb, pdxa), (pdyb, pdya)),
                                      'constant', constant_values=(0, 0))
 
     def iterate(self, gain=False):
@@ -114,15 +119,15 @@ class Hogbom(object):
             gain = self.gain
 
         # Updating the point source map
-        self.point_source_map[pos[0], pos[1]] += max_intesity
+        self.point_source_map[pos[0], pos[1]] += max_intesity * gain
         # #4
         # Centering the the dirty_beam on the position of the max intensity
         centered_dirty_beam = shift(self.dirty_beam, (pos[0]-int(self.dim[0]/2),
                                                       pos[1]-int(self.dim[1]/2)))
         self.dirty_map = np.subtract(self.dirty_map,
-                                      centered_dirty_beam * max_intesity * gain)
+                                     centered_dirty_beam * max_intesity * gain)
         self.niter -= 1
-        print(self.niter)
+        self.iterated += 1
         return False
 
     def finish(self, stddev: float):
@@ -151,10 +156,9 @@ class Hogbom(object):
 
     @staticmethod
     def clean(dirty_map, dirty_beam, gain=0.1, thres=0.01, niter=1000):
-        orig = np.copy(dirty_map)
         # Assume bear center is in middle
         beam_center = (dirty_beam.shape[0] - 1)/2.0, (dirty_beam.shape[1] - 1)/2.0
-        
+
         # Model for sources
         model = np.zeros(dirty_map.shape)
         for i in range(niter):
@@ -164,20 +168,17 @@ class Hogbom(object):
             Imax = dirty_map[mx, my]
             model[mx, my] += gain*Imax
 
-            comp = Imax * gain * shift(dirty_beam, (mx - beam_center[0], my - beam_center[1]), order=0)
- 
+            comp = Imax * gain * shift(dirty_beam,
+                                       (mx - beam_center[0],
+                                        my - beam_center[1]),
+                                       order=0)
+
             dirty_map = np.subtract(dirty_map, comp)
 
             if dirty_map.max() <= thres or dirty_map.min() < 0.0:
                 print("Break")
                 break
-        
+
         # For testing turned off
-        #signal.convolve2d(model, Gaussian2DKernel(stddev=1), mode='same')
+        #signal.convolve2d(model, Gaussian2DKernel(stddev=1), mode='same')  # noqa
         return model + dirty_map
-
-
-
-
-
-
