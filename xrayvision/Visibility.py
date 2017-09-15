@@ -46,6 +46,23 @@ class Visibility(object):
         """
         return Transform.dft(inmap, self.uv, self.vis)
 
+    def from_map_v2(self, inmap, center=(0, 0)):
+        """
+
+        Parameters
+        ----------
+        inmap: np.array
+            The input image
+        center: array-like
+            Where should be the origin in the Fourier-transformation
+
+        Returns
+        -------
+
+        """
+        self.vis = Visibility.dft_map(inmap, self.uv, center)
+        return self.vis
+
     def to_map(self, outmap):
         """
 
@@ -58,6 +75,23 @@ class Visibility(object):
 
         """
         return Transform.idft(outmap, self.uv, self.vis)
+
+    def to_map_v2(self, outmap, center=(0, 0)):
+        """
+
+        Parameters
+        ----------
+        outmap: np.array
+            An empty array with the same dimensions as
+            the output image should have
+        center: array-like
+            Where should be the origin in the Fourier-transformation
+
+        Returns
+        -------
+
+        """
+        return Visibility.idft_map(self.vis, outmap, self.uv, center)
 
     @staticmethod
     def generate_xy(number_pixels, pixel_size=1):

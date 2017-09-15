@@ -105,3 +105,15 @@ class TestVisibility(object):
         idft_data2 = Visibility.idft_map(dft_data2, np.zeros((m, n)), uv,
                                          (-int(m/2)+pos[0], int(n/2)-pos[1]))
         assert np.allclose(idft_data2, data2)
+
+    @pytest.mark.parametrize("m,n", [(65, 65)])
+    def test_v2_functions(self, m, n):
+        data = Gaussian2DKernel(stddev=2, x_size=m, y_size=n).array
+        ut = (np.arange(m) - m / 2 + 0.5) * (1 / m)
+        vt = -1.0 * (np.arange(n) - n / 2 + 0.5) * (1 / n)
+        u, v = np.meshgrid(ut, vt)
+        uv = np.array([u, v]).reshape(2, m * n)
+        vis = Visibility(uv, np.zeros(uv.shape[1], dtype=complex))
+        vis.from_map_v2(data)
+        res = vis.to_map_v2(np.zeros((m, n)))
+        assert np.allclose(res, data)
