@@ -3,9 +3,12 @@
 Visibility.
 
 """
+from datetime import datetime
 
 import numpy as np
+
 from .Transform import Transform
+
 
 
 class Visibility(object):
@@ -163,3 +166,109 @@ class Visibility(object):
                     2j * np.pi * (input_uv[0, :] * x[i] + input_uv[1, :] * y[i])))
 
         return im.reshape(m, n)
+
+
+class RHESSIVisibility(Visibility):
+    """
+    A set of RHESSI visibilities.
+
+    Parameters
+    ----------
+    uv: `numpy.ndarray`
+        The u, v coordinates of the visibilities
+    vis: `numpy.ndarray`
+        The complex visibility
+    isc: `int`
+        Related to the grid/detector
+    harm: `int`
+        Harmonic used
+    erange: `numpy.ndarray`
+        Energy range
+    trange: `numpy.ndarray`
+        Time range
+    totflux: `float`
+        Total flux
+    sigamp: `float`
+        Sigma or error on visibility
+    chi2: `float`
+        Chi squared from fit
+    xyoffset: `np.ndarray`
+        Offset from Sun centre
+    type_string: `str`
+        count, photon, electron
+    units: `str`
+        If it is in idl format it will be converted
+    atten_state: `int`
+        State of the attenuator
+    count: `float`
+        detector counts
+    Examples
+    --------
+
+    Notes
+    -----
+
+    """
+
+    def __init__(self, uv, vis, isc: int=0, harm: int=1,
+                 erange: np.array=np.array([0.0, 0.0]),
+                 trange: np.array=np.array([datetime.now(), datetime.now()]),
+                 totflux: float=0.0, sigamp: float=0.0,
+                 chi2: float=0.0,
+                 xyoffset: np.array=np.array([0.0, 0.0]),
+                 type_string: str="photon",
+                 units: str="Photons cm!u-2!n s!u-1!n",
+                 atten_state: int=1,
+                 count: float=0.0):
+        super().__init__(uv, vis)
+        self.isc = isc
+        self.harm = harm
+        self.erange = erange
+        self.trange = trange
+        self.totflux = totflux
+        self.sigamp = sigamp
+        self.chi2 = chi2
+        self.xyoffset = xyoffset
+        self.type_string = type_string
+        self.units = RHESSIVisibility.convert_units_to_tex(units)
+        self.atten_state = atten_state
+        self.count = count
+
+    @staticmethod
+    def convert_units_to_tex(string: str):
+        """
+        String is converted from idl format to tex, if it alredy is there will be
+        no conversation
+
+        Parameters
+        ----------
+        string: str
+            The string what should be converted
+
+        Examples
+        --------
+
+        Notes
+        -----
+        """
+        final_string = ""
+        opened = 0
+        check_for_instruction = False
+        for i in range(len(string)):
+            if check_for_instruction:
+                if string[i] == 'n':
+                    final_string += opened * "}"
+                    opened = 0
+                elif string[i] == 'u':
+                    final_string += "^{"
+                    opened += 1
+                elif string[i] == 's':
+                    final_string += "_{"
+                    opened += 1
+                check_for_instruction = False
+            elif string[i] == '!':
+                check_for_instruction = True
+            else:
+                final_string += string[i]
+        final_string += opened * "}"
+        return final_string
