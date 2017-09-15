@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from ..Visibillity import RHESSIVisibility
+from ..Visibility import RHESSIVisibility
 
 
 class TestRHESSIVisibility(object):

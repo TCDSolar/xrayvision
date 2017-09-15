@@ -10,7 +10,6 @@ import numpy as np
 from .Transform import Transform
 
 
-
 class Visibility(object):
     """
     A set of visibilities.
@@ -90,7 +89,7 @@ class Visibility(object):
         return x
 
     @staticmethod
-    def dft_map(input_map, input_uv):
+    def dft_map(input_map, input_uv, center=(0.0, 0.0)):
         """
         Calculate the visibilities for the given map using a discrete fourier transform
 
@@ -101,6 +100,11 @@ class Visibility(object):
 
         input_uv : array-like
             The u, v coordinate to calculate the visibilities at
+
+        center: array-like
+            Position of the center of the transformation. The center
+            of the image is (0,0) and the direction of the x axis is ->
+            and the direction of the y axis is ^
 
         Returns
         -------
@@ -118,6 +122,8 @@ class Visibility(object):
         x, y = np.meshgrid(x, y)
         x = x.reshape(size)
         y = y.reshape(size)
+        x = x - center[0]
+        y = y + center[1]
 
         for i in range(size):
             vis[i] = np.sum(
@@ -127,7 +133,7 @@ class Visibility(object):
         return vis
 
     @staticmethod
-    def idft_map(input_visibilities, output_map, input_uv):
+    def idft_map(input_visibilities, output_map, input_uv, center=(0.0, 0.0)):
         r"""
         Calculate a map from the given visibilities using a discrete fourier transform
 
@@ -142,6 +148,11 @@ class Visibility(object):
         input_uv : array-like
             The corresponding u, v coordiante to the map
 
+        center: array-like
+            Position of the center of the transformation. The center
+            of the result image is (0,0) and the direction of the x axis is ->
+            and the direction of the y axis is ^
+
         Returns
         -------
         array-like
@@ -155,8 +166,8 @@ class Visibility(object):
         y = Visibility.generate_xy(n, 1)
 
         x, y = np.meshgrid(x, y)
-        x = x.reshape(size)
-        y = y.reshape(size)
+        x = x.reshape(size) - center[0]
+        y = y.reshape(size) + center[1]
 
         im = np.zeros(size)
 
