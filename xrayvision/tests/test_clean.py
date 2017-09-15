@@ -16,7 +16,7 @@ class TestClean(object):
         pos1 = [15, 30]
         pos2 = [40, 32]
         # Creating a "clean" map as a base with 2 point sources
-        clean_map = np.zeros((N, M), dtype=complex)
+        clean_map = np.zeros((N, M))
         clean_map[pos1[0], pos1[1]] = 1.
         clean_map[pos2[0], pos2[1]] = 0.8
 
@@ -24,13 +24,22 @@ class TestClean(object):
         uv_in = np.array([u, v]).reshape(2, N * M)
         vis_in = np.zeros(N * M, dtype=complex)
 
+        dirty_beam = np.zeros((N, M))
+        dirty_beam[(N-1)//4:(N-1)//4 + (N-1)//2, (M-1)//2] = 0.75
+        dirty_beam[(N-1)//2, (M-1)//4:(M-1)//4 + (M-1)//2, ] = 0.75
+        dirty_beam[(N-1)//2, (M-1)//2] = 1.0
+
+        dirty_map = signal.convolve2d(clean_map, dirty_beam, mode='same')
+
         vis = Visibility(uv_in, vis_in)
-        vist = vis.from_map(clean_map)
+        vist = vis.from_map(dirty_map)
         vis.vis = vist
-        clean = Hogbom(vis, np.array([[1.]]), 1., (N, M))
+
+        clean = Hogbom(vis, dirty_beam, 1., (N, M))
         while not clean.iterate():
             pass
         final_image = np.add(clean.dirty_map, clean.point_source_map)
+        import ipdb; ipdb.set_trace()
         assert np.allclose(final_image, clean_map)
 
     def test_clean2(self):
