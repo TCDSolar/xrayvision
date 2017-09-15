@@ -36,3 +36,11 @@ class TestRHESSIVisibility(object):
         assert vis.units == units
         assert vis.atten_state == atten_state
         assert vis.count == count
+
+    @pytest.mark.parametrize("in_str,out_str",
+                             [("cm!u-2!n s!u-1!n", "cm^{-2} s^{-1}"),
+                              ("m!s4", "m_{4}"),
+                              ("m!n", "m"),
+                              ("m!u1!u-2!n", "m^{1^{-2}}")])
+    def test_unit_string_conversation(self, in_str, out_str):
+        assert out_str == RHESSIVisibility.convert_units_to_tex(in_str)
