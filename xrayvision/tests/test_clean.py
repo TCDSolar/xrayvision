@@ -35,7 +35,7 @@ class TestClean(object):
         vist = vis.from_map(dirty_map)
         vis.vis = vist
 
-        clean = Hogbom(vis, dirty_beam, 1., (N, M), gain=0.5)
+        clean = Hogbom(vis, dirty_beam, 1e-8, (N, M), gain=0.5)
         while not clean.iterate():
             pass
         final_image = np.add(clean.dirty_map, clean.point_source_map)
