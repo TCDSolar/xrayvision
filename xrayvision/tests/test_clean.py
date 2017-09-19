@@ -35,11 +35,10 @@ class TestClean(object):
         vist = vis.from_map(dirty_map)
         vis.vis = vist
 
-        clean = Hogbom(vis, dirty_beam, 1., (N, M))
+        clean = Hogbom(vis, dirty_beam, 1., (N, M), gain=0.5)
         while not clean.iterate():
             pass
         final_image = np.add(clean.dirty_map, clean.point_source_map)
-        import ipdb; ipdb.set_trace()
         assert np.allclose(final_image, clean_map)
 
     def test_clean2(self):
