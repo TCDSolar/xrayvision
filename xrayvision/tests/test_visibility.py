@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 from astropy.convolution import Gaussian2DKernel
 from scipy.ndimage.interpolation import shift
+import matplotlib.pyplot as plt
 
 from ..Visibility import Visibility
 
@@ -56,18 +57,25 @@ class TestVisibility(object):
         gaussian_bp = vis.to_map(empty_map)
         assert np.allclose(gaussian_map.array, gaussian_bp)
 
-    @pytest.mark.parametrize("size", [1.0, 1.5, 2.0])
-    def test_generate_xy(self, size):
+    @pytest.mark.parametrize("size, displace",
+                             [(1.0, -7.0), (1.5, 8.5), (2.0, 9.5)])
+    def test_generate_xy(self, size, displace):
         n_even = 64
         n_odd = 65
 
         even = np.arange(-32, 32) * size
-        res_even = Visibility.generate_xy(n_even, size)
+        res_even = Visibility.generate_xy(n_even, pixel_size=size)
         assert np.array_equal(res_even, even)
 
-        odd = np.arange(-32, 33)*size
-        res_odd = Visibility.generate_xy(n_odd, size)
+        odd = np.arange(-32, 33) * size
+        res_odd = Visibility.generate_xy(n_odd, pixel_size=size)
         assert np.array_equal(res_odd, odd)
+
+        res_even_displaced = Visibility.generate_xy(n_even, displace, size)
+        assert np.array_equal(even - displace, res_even_displaced)
+
+        res_odd_displaced = Visibility.generate_xy(n_odd, displace, size)
+        assert np.array_equal(odd - displace, res_odd_displaced)
 
     @pytest.mark.parametrize("xs,ys", [(65, 65), [64, 64]])
     def test_dftmap(self, xs, ys):
@@ -90,20 +98,20 @@ class TestVisibility(object):
     @pytest.mark.parametrize("m,n", [(65, 65), [64, 64]])
     def test_dftmap_decentered(self, m, n):
         data = Gaussian2DKernel(stddev=2, x_size=m, y_size=n).array
-        pos = (15, 30)
-        data2 = shift(data, (pos[1]-int(data.shape[1]/2), pos[0]-int(data.shape[0]/2)))
+        pos = (17, 10)
+        data2 = shift(data, (pos[1], pos[0]))
 
         ut = (np.arange(m) - m / 2 + 0.5) * (1 / m)
         vt = -1.0 * (np.arange(n) - n / 2 + 0.5) * (1 / n)
         u, v = np.meshgrid(ut, vt)
         uv = np.array([u, v]).reshape(2, m * n)
-        dft_data = Visibility.dft_map(data2, uv, center=(-int(m/2)+pos[0], int(n/2)-pos[1]))
+        dft_data = Visibility.dft_map(data2, uv, center=pos)
         idft_data = Visibility.idft_map(dft_data, np.zeros((m, n)), uv)
         assert np.allclose(data, idft_data)
 
         dft_data2 = Visibility.dft_map(data, uv)
         idft_data2 = Visibility.idft_map(dft_data2, np.zeros((m, n)), uv,
-                                         (-int(m/2)+pos[0], int(n/2)-pos[1]))
+                                         pos)
         assert np.allclose(idft_data2, data2)
 
     @pytest.mark.parametrize("m,n", [(65, 65)])

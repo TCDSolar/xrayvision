@@ -94,7 +94,7 @@ class Visibility(object):
         return Visibility.idft_map(self.vis, outmap, self.uv, center)
 
     @staticmethod
-    def generate_xy(number_pixels, pixel_size=1):
+    def generate_xy(number_pixels, center=0., pixel_size=1.):
         """
         Generate the x or y image/map coordinates given the number of pixels and pixel size
 
@@ -102,6 +102,11 @@ class Visibility(object):
         ----------
         number_pixels : int
             Number of pixels in the map
+
+        center: float
+            The center of the image is (0,0) and the direction of
+            the x axis is -> and the direction of the y axis is ^.
+            You have to give the displacement based on this.
 
         pixel_size : float
             Size of pixel
@@ -120,10 +125,11 @@ class Visibility(object):
                             (number_pixels - 1) * pixel_size / 2,
                             number_pixels)
 
+        x -= center
         return x
 
     @staticmethod
-    def dft_map(input_map, input_uv, center=(0.0, 0.0)):
+    def dft_map(input_map, input_uv, center=(0.0, 0.0), pixel_size=(1.0, 1.0)):
         """
         Calculate the visibilities for the given map using a discrete fourier transform
 
@@ -140,6 +146,9 @@ class Visibility(object):
             of the image is (0,0) and the direction of the x axis is ->
             and the direction of the y axis is ^
 
+        pixel_size: array-like
+            The size of a pixel in (x_size, y_size) format
+
         Returns
         -------
         array-like
@@ -150,14 +159,12 @@ class Visibility(object):
         size = m * n
         vis = np.zeros(input_uv.shape[1], dtype=complex)
 
-        x = Visibility.generate_xy(m, 1)
-        y = Visibility.generate_xy(n, 1)
+        x = Visibility.generate_xy(m, center[0], pixel_size[0])
+        y = Visibility.generate_xy(n, center[1], pixel_size[1])
 
         x, y = np.meshgrid(x, y)
         x = x.reshape(size)
         y = y.reshape(size)
-        x = x - center[0]
-        y = y + center[1]
 
         for i in range(size):
             vis[i] = np.sum(
@@ -167,7 +174,7 @@ class Visibility(object):
         return vis
 
     @staticmethod
-    def idft_map(input_visibilities, output_map, input_uv, center=(0.0, 0.0)):
+    def idft_map(input_visibilities, output_map, input_uv, center=(0.0, 0.0), pixel_size=(1.0, 1.0)):
         r"""
         Calculate a map from the given visibilities using a discrete fourier transform
 
@@ -187,6 +194,9 @@ class Visibility(object):
             of the result image is (0,0) and the direction of the x axis is ->
             and the direction of the y axis is ^
 
+        pixel_size: array-like
+            The size of a pixel in (x_size, y_size) format
+
         Returns
         -------
         array-like
@@ -196,12 +206,12 @@ class Visibility(object):
         m, n = output_map.shape
         size = m * n
 
-        x = Visibility.generate_xy(m, 1)
-        y = Visibility.generate_xy(n, 1)
+        x = Visibility.generate_xy(m, center[0], pixel_size[0])
+        y = Visibility.generate_xy(n, center[1], pixel_size[1])
 
         x, y = np.meshgrid(x, y)
-        x = x.reshape(size) - center[0]
-        y = y.reshape(size) + center[1]
+        x = x.reshape(size)
+        y = y.reshape(size)
 
         im = np.zeros(size)
 
