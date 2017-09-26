@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 from astropy.convolution import Gaussian2DKernel
 from scipy.ndimage.interpolation import shift
+from sunpy.map import Map
 
 from ..Visibility import Visibility
 
@@ -149,7 +150,7 @@ class TestVisibility(object):
         assert np.allclose(res, data)
 
     @pytest.mark.parametrize("m,n,pos,pixel", [(65, 65, (10., -5.), (2., 3.)),
-                                              (64, 64, (-12, -19), (1., 5.))])
+                                               (64, 64, (-12, -19), (1., 5.))])
     def test_v2_functions_with_extra_params(self, m, n, pos, pixel):
         data = Gaussian2DKernel(stddev=2, x_size=m, y_size=n).array
         data2 = shift(data, (pos[1], pos[0]))
@@ -163,3 +164,45 @@ class TestVisibility(object):
         assert np.allclose(res, data2)
         res = vis.to_map_v2(np.zeros((m, n)), center=(0., 0.))
         assert np.allclose(res, data)
+
+    @pytest.mark.parametrize("m,n,pos,pixel", [(65, 65, (10., -5.), (2., 3.)),
+                                               (64, 64, (-12, -19), (1., 5.))])
+    def test_from_sunpy_map(self, m, n, pos, pixel):
+        ut = (np.arange(m) - m / 2 + 0.5) * (1 / m)
+        vt = -1.0 * (np.arange(n) - n / 2 + 0.5) * (1 / n)
+        u, v = np.meshgrid(ut, vt)
+        uv = np.array([u, v]).reshape(2, m * n)
+
+        header = {'crval1': pos[0], 'crval2': pos[1],
+                  'cdelt1': pixel[0], 'cdelt2': pixel[1]}
+        data = Gaussian2DKernel(stddev=2, x_size=m, y_size=n).array
+        mp =  Map((data, header))
+
+        vis = Visibility(uv, np.zeros(uv.shape[1], dtype=complex))
+        vis.from_sunpy_map(mp)
+
+        res = vis.to_map_v2(np.zeros((m, n)))
+        assert np.allclose(res, data)
+
+    @pytest.mark.parametrize("m,n,pos,pixel", [(65, 65, (10., -5.), (2., 3.)),
+                                               (64, 64, (-12, -19), (1., 5.))])
+    def test_to_sunpy_map(self, m, n, pos, pixel):
+        ut = (np.arange(m) - m / 2 + 0.5) * (1 / m)
+        vt = -1.0 * (np.arange(n) - n / 2 + 0.5) * (1 / n)
+        u, v = np.meshgrid(ut, vt)
+        uv = np.array([u, v]).reshape(2, m * n)
+
+        header = {'crval1': pos[0], 'crval2': pos[1],
+                  'cdelt1': pixel[0], 'cdelt2': pixel[1]}
+        data = Gaussian2DKernel(stddev=2, x_size=m, y_size=n).array
+        mp =  Map((data, header))
+
+        vis = Visibility(uv, np.zeros(uv.shape[1], dtype=complex))
+        vis.from_sunpy_map(mp)
+
+        res = vis.to_sunpy_map((m, n))
+        assert np.allclose(res.data, data)
+        assert res.meta['crval1'] == pos[0]
+        assert res.meta['crval2'] == pos[1]
+        assert res.meta['cdelt1'] == pixel[0]
+        assert res.meta['cdelt2'] == pixel[1]

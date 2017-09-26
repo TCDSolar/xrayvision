@@ -6,6 +6,7 @@ Visibility.
 from datetime import datetime
 
 import numpy as np
+from sunpy.map import Map
 
 from .Transform import Transform
 
@@ -22,6 +23,8 @@ class Visibility(object):
         The center of the image is (0,0) and the direction of
         the x axis is -> and the direction of the y axis is ^.
         You have to give the displacement based on this.
+    pixel_size: array-like
+        What is the size of one pixel in the given direction (x, y)
     Examples
     --------
 
@@ -54,14 +57,14 @@ class Visibility(object):
 
     def from_map_v2(self, inmap, center=None, pixel_size=None):
         """
-
         Parameters
         ----------
         inmap: np.array
             The input image
         center: array-like
             Where should be the origin in the Fourier-transformation
-
+        pixel_size: array-like
+            What is the size of one pixel in the given direction (x, y)
         Returns
         -------
 
@@ -77,9 +80,34 @@ class Visibility(object):
         self.vis = Visibility.dft_map(inmap, self.uv, center, pixel_size)
         return self.vis
 
+    def from_sunpy_map(self, sunpy_map):
+        """
+        Parameters
+        ----------
+        sunpy_map: sunpy.map
+            The data will be converted from the Sunpy Map and
+            the center and pixel meta information will be taken
+            into account.        
+        Returns
+        -------
+
+        """
+        meta = sunpy_map.meta
+        new_pos = [0., 0.]
+        if "crval1" in meta:
+            new_pos[0] = float(meta["crval1"])
+        if "crval2" in meta:
+            new_pos[1] = float(meta["crval2"])
+
+        new_psize = [0., 0.]
+        if "cdelt1" in meta:
+            new_psize[0] = float(meta["cdelt1"])
+        if "cdelt2" in meta:
+            new_psize[1] = float(meta["cdelt2"])
+        return self.from_map_v2(sunpy_map.data, new_pos, new_psize)
+
     def to_map(self, outmap):
         """
-
         Parameters
         ----------
         outmap
@@ -92,7 +120,6 @@ class Visibility(object):
 
     def to_map_v2(self, outmap, center=None, pixel_size=None):
         """
-
         Parameters
         ----------
         outmap: np.array
@@ -100,6 +127,8 @@ class Visibility(object):
             the output image should have
         center: array-like
             Where should be the origin in the Fourier-transformation
+        pixel_size: array-like
+            What is the size of one pixel in the given direction (x, y)
 
         Returns
         -------
@@ -111,6 +140,28 @@ class Visibility(object):
             pixel_size = self.pixel_size
         
         return Visibility.idft_map(self.vis, outmap, self.uv, center, pixel_size)
+
+    def to_sunpy_map(self, dim):
+        """
+
+        Parameters
+        ----------
+        dim: array-like
+            (m, n) dimension of the output map
+
+        Returns
+        -------
+        A Sunpy Map object with the map created from the visibilities
+        and the meta data will contain the offset and the pixel's size
+
+        """
+        header = {'crval1': self.xyoffset[0],
+                  'crval2': self.xyoffset[1],
+                  'cdelt1': self.pixel_size[0],
+                  'cdelt2': self.pixel_size[1]}
+        data = np.zeros(dim)
+        data = self.to_map_v2(data)
+        return Map((data, header))
 
     @staticmethod
     def generate_xy(number_pixels, center=0., pixel_size=1.):
