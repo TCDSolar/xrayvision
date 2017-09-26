@@ -112,7 +112,7 @@ class TestVisibility(object):
         idft_data2 = Visibility.idft_map(dft_data2, np.zeros((m, n)), uv,
                                          pos)
         assert np.allclose(idft_data2, data2)
-        
+
     @pytest.mark.parametrize("m,n,pos,pixel",
                             [(65, 65, (17, 10), (2, 1)),
                              [64, 64, (12, 19), (1, 3)]])
@@ -146,4 +146,20 @@ class TestVisibility(object):
         vis = Visibility(uv, np.zeros(uv.shape[1], dtype=complex))
         vis.from_map_v2(data)
         res = vis.to_map_v2(np.zeros((m, n)))
+        assert np.allclose(res, data)
+
+    @pytest.mark.parametrize("m,n,pos,pixel", [(65, 65, (10., -5.), (2., 3.)),
+                                              (64, 64, (-12, -19), (1., 5.))])
+    def test_v2_functions_with_extra_params(self, m, n, pos, pixel):
+        data = Gaussian2DKernel(stddev=2, x_size=m, y_size=n).array
+        data2 = shift(data, (pos[1], pos[0]))
+        ut = (np.arange(m) - m / 2 + 0.5) * (1 / m)
+        vt = -1.0 * (np.arange(n) - n / 2 + 0.5) * (1 / n)
+        u, v = np.meshgrid(ut, vt)
+        uv = np.array([u, v]).reshape(2, m * n)
+        vis = Visibility(uv, np.zeros(uv.shape[1], dtype=complex), xyoffset=pos)
+        vis.from_map_v2(data2)
+        res = vis.to_map_v2(np.zeros((m, n)))
+        assert np.allclose(res, data2)
+        res = vis.to_map_v2(np.zeros((m, n)), center=(0., 0.))
         assert np.allclose(res, data)

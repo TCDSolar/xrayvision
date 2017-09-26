@@ -18,6 +18,10 @@ class Visibility(object):
     ----------
     uv: `numpy.ndarray` The u, v coordinates of the visibilities
     vis: `numpy.ndarray` The complex visibility
+    xyoffset: array-like
+        The center of the image is (0,0) and the direction of
+        the x axis is -> and the direction of the y axis is ^.
+        You have to give the displacement based on this.
     Examples
     --------
 
@@ -26,9 +30,11 @@ class Visibility(object):
 
     """
 
-    def __init__(self, uv, vis):
+    def __init__(self, uv, vis, xyoffset=(0., 0.), pixel_size=(1., 1.)):
         self.uv = np.array(uv)
         self.vis = np.array(vis, dtype=complex)
+        self.xyoffset = xyoffset
+        self.pixel_size = pixel_size
 
     def __repr__(self):
         print(self.uv, self.vis)
@@ -46,7 +52,7 @@ class Visibility(object):
         """
         return Transform.dft(inmap, self.uv, self.vis)
 
-    def from_map_v2(self, inmap, center=(0, 0)):
+    def from_map_v2(self, inmap, center=None, pixel_size=None):
         """
 
         Parameters
@@ -60,7 +66,15 @@ class Visibility(object):
         -------
 
         """
-        self.vis = Visibility.dft_map(inmap, self.uv, center)
+        if not center:
+            center = self.xyoffset
+        else:
+            self.xyoffset = center
+        if not pixel_size:
+            pixel_size = self.pixel_size
+        else:
+            self.pixel_size = pixel_size
+        self.vis = Visibility.dft_map(inmap, self.uv, center, pixel_size)
         return self.vis
 
     def to_map(self, outmap):
@@ -76,7 +90,7 @@ class Visibility(object):
         """
         return Transform.idft(outmap, self.uv, self.vis)
 
-    def to_map_v2(self, outmap, center=(0, 0)):
+    def to_map_v2(self, outmap, center=None, pixel_size=None):
         """
 
         Parameters
@@ -91,7 +105,12 @@ class Visibility(object):
         -------
 
         """
-        return Visibility.idft_map(self.vis, outmap, self.uv, center)
+        if not center:
+            center = self.xyoffset
+        if not pixel_size:
+            pixel_size = self.pixel_size
+        
+        return Visibility.idft_map(self.vis, outmap, self.uv, center, pixel_size)
 
     @staticmethod
     def generate_xy(number_pixels, center=0., pixel_size=1.):
@@ -257,6 +276,8 @@ class RHESSIVisibility(Visibility):
         State of the attenuator
     count: `float`
         detector counts
+    pixel_size: `array-like`
+        size of a pixel in arcseconds
     Examples
     --------
 
@@ -274,8 +295,9 @@ class RHESSIVisibility(Visibility):
                  type_string: str="photon",
                  units: str="Photons cm!u-2!n s!u-1!n",
                  atten_state: int=1,
-                 count: float=0.0):
-        super().__init__(uv, vis)
+                 count: float=0.0,
+                 pixel_size: np.array=np.array([1.0, 1.0])):
+        super().__init__(uv, vis, xyoffset, pixel_size)
         self.isc = isc
         self.harm = harm
         self.erange = erange
@@ -283,7 +305,6 @@ class RHESSIVisibility(Visibility):
         self.totflux = totflux
         self.sigamp = sigamp
         self.chi2 = chi2
-        self.xyoffset = xyoffset
         self.type_string = type_string
         self.units = RHESSIVisibility.convert_units_to_tex(units)
         self.atten_state = atten_state
@@ -292,8 +313,8 @@ class RHESSIVisibility(Visibility):
     @staticmethod
     def convert_units_to_tex(string: str):
         """
-        String is converted from idl format to tex, if it alredy is there will be
-        no conversation
+        String is converted from idl format to tex, if it already is,
+        there will be no conversation
 
         Parameters
         ----------
