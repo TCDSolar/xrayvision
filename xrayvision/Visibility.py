@@ -87,7 +87,7 @@ class Visibility(object):
         sunpy_map: sunpy.map
             The data will be converted from the Sunpy Map and
             the center and pixel meta information will be taken
-            into account.        
+            into account.
         Returns
         -------
 
@@ -138,7 +138,7 @@ class Visibility(object):
             center = self.xyoffset
         if not pixel_size:
             pixel_size = self.pixel_size
-        
+
         return Visibility.idft_map(self.vis, outmap, self.uv, center, pixel_size)
 
     def to_sunpy_map(self, dim):
@@ -244,7 +244,8 @@ class Visibility(object):
         return vis
 
     @staticmethod
-    def idft_map(input_visibilities, output_map, input_uv, center=(0.0, 0.0), pixel_size=(1.0, 1.0)):
+    def idft_map(input_visibilities, output_map, input_uv,
+                 center=(0.0, 0.0), pixel_size=(1.0, 1.0)):
         r"""
         Calculate a map from the given visibilities using a discrete fourier transform
 

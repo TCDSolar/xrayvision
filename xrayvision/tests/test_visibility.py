@@ -115,8 +115,8 @@ class TestVisibility(object):
         assert np.allclose(idft_data2, data2)
 
     @pytest.mark.parametrize("m,n,pos,pixel",
-                            [(65, 65, (17, 10), (2, 1)),
-                             [64, 64, (12, 19), (1, 3)]])
+                             [(65, 65, (17, 10), (2, 1)),
+                              [64, 64, (12, 19), (1, 3)]])
     def test_dftmap_decentered_with_pixel(self, m, n, pos, pixel):
         data = Gaussian2DKernel(stddev=2, x_size=m, y_size=n).array
         data2 = shift(data, (pos[1], pos[0]))
@@ -125,7 +125,7 @@ class TestVisibility(object):
         vt = -1.0 * (np.arange(n) - n / 2 + 0.5) * (1 / n)
         u, v = np.meshgrid(ut, vt)
         uv = np.array([u, v]).reshape(2, m * n)
-        resized_pos=np.multiply(pos, pixel)
+        resized_pos = np.multiply(pos, pixel)
         dft_data = Visibility.dft_map(data2, uv, center=resized_pos,
                                       pixel_size=pixel)
         idft_data = Visibility.idft_map(dft_data, np.zeros((m, n)),
@@ -176,7 +176,7 @@ class TestVisibility(object):
         header = {'crval1': pos[0], 'crval2': pos[1],
                   'cdelt1': pixel[0], 'cdelt2': pixel[1]}
         data = Gaussian2DKernel(stddev=2, x_size=m, y_size=n).array
-        mp =  Map((data, header))
+        mp = Map((data, header))
 
         vis = Visibility(uv, np.zeros(uv.shape[1], dtype=complex))
         vis.from_sunpy_map(mp)
@@ -195,7 +195,7 @@ class TestVisibility(object):
         header = {'crval1': pos[0], 'crval2': pos[1],
                   'cdelt1': pixel[0], 'cdelt2': pixel[1]}
         data = Gaussian2DKernel(stddev=2, x_size=m, y_size=n).array
-        mp =  Map((data, header))
+        mp = Map((data, header))
 
         vis = Visibility(uv, np.zeros(uv.shape[1], dtype=complex))
         vis.from_sunpy_map(mp)
