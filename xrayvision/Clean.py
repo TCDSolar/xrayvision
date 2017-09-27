@@ -97,23 +97,13 @@ class Hogbom(object):
 
         """
         # #3
-        if self.niter < 1:
+        max_intesity = np.max(self.dirty_map)
+        if self.niter < 1 or max_intesity < self.thres:
             return True
 
-        max_intesity = 0.0
-        pos = (0, 0)
-        summarized = 0.0
-        for i in range(self.dirty_map.shape[0]):
-            for j in range(self.dirty_map.shape[1]):
-                intensity = self.dirty_map[i, j]
-                if intensity > max_intesity:
-                    max_intesity = intensity
-                    pos = (i, j)
-                    summarized += intensity
-        # Checking if we reached the threshold or not
-        abs_avg_value = summarized / self.dirty_map[pos[0], pos[1]]
-        if abs_avg_value < self.thres:
-            return True
+        pos = np.unravel_index(np.argmax(self.dirty_map),
+                               self.dirty_map.shape)
+
         # If gain is not set, using the one that was give during init
         if not gain:
             gain = self.gain
@@ -128,6 +118,7 @@ class Hogbom(object):
                                      centered_dirty_beam * max_intesity * gain)
         self.niter -= 1
         self.iterated += 1
+
         return False
 
     def finish(self, stddev: float):
