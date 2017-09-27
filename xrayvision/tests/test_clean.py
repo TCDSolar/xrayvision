@@ -82,7 +82,7 @@ class TestClean(object):
         input_delta[N//2, M//2] = 1.
         vis.from_map(input_delta)
 
-        dirty_beam = np.zeros((N,M))
+        dirty_beam = np.zeros((N, M))
         dirty_beam = vis.to_map(dirty_beam)
 
         vis.vis = save_vis
