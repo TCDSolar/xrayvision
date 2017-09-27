@@ -33,7 +33,7 @@ class Visibility(object):
 
     """
 
-    def __init__(self, uv, vis, xyoffset=(0., 0.), pixel_size=(1., 1.)):
+    def __init__(self, uv, vis, xyoffset=None, pixel_size=None):
         self.uv = np.array(uv)
         self.vis = np.array(vis, dtype=complex)
         self.xyoffset = xyoffset
@@ -70,11 +70,17 @@ class Visibility(object):
 
         """
         if not center:
-            center = self.xyoffset
+            if not self.xyoffset:
+                center = (0., 0.)
+            else:
+                center = self.xyoffset
         else:
             self.xyoffset = center
         if not pixel_size:
-            pixel_size = self.pixel_size
+            if not self.pixel_size:
+                pixel_size = (1., 1.)
+            else:
+                pixel_size = self.pixel_size
         else:
             self.pixel_size = pixel_size
         self.vis = Visibility.dft_map(inmap, self.uv, center, pixel_size)
@@ -99,7 +105,7 @@ class Visibility(object):
         if "crval2" in meta:
             new_pos[1] = float(meta["crval2"])
 
-        new_psize = [0., 0.]
+        new_psize = [1., 1.]
         if "cdelt1" in meta:
             new_psize[0] = float(meta["cdelt1"])
         if "cdelt2" in meta:
@@ -135,18 +141,24 @@ class Visibility(object):
 
         """
         if not center:
-            center = self.xyoffset
+            if not self.xyoffset:
+                center = (0., 0.)
+            else:
+                center = self.xyoffset
         if not pixel_size:
-            pixel_size = self.pixel_size
+            if not self.pixel_size:
+                pixel_size = (1., 1.)
+            else:
+                pixel_size = self.pixel_size
 
         return Visibility.idft_map(self.vis, outmap, self.uv, center, pixel_size)
 
-    def to_sunpy_map(self, dim):
+    def to_sunpy_map(self, size=(33,33)):
         """
 
         Parameters
         ----------
-        dim: array-like
+        size: array-like
             (m, n) dimension of the output map
 
         Returns
@@ -159,7 +171,7 @@ class Visibility(object):
                   'crval2': self.xyoffset[1],
                   'cdelt1': self.pixel_size[0],
                   'cdelt2': self.pixel_size[1]}
-        data = np.zeros(dim)
+        data = np.zeros(size)
         data = self.to_map_v2(data)
         return Map((data, header))
 
