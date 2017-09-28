@@ -99,7 +99,7 @@ class TestClean(object):
         # Check for successful amplification at the place of the sources
         assert final_image[pos1] > dirty_map[pos1]
         assert final_image[pos2] > dirty_map[pos2]
-        
+
         # Since we already checked for these coordinates, we can use them
         dirty_map[pos1] = 0
         dirty_map[pos2] = 0
