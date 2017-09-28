@@ -45,8 +45,8 @@ class TestClean(object):
 
     def test_clean_usecase(self):
         N = M = 64
-        pos1 = [15, 30]
-        pos2 = [40, 32]
+        pos1 = (15, 30)
+        pos2 = (40, 32)
         # Creating a "clean" map as a base with 2 point sources
         clean_map = np.zeros((N, M))
         clean_map[pos1[0], pos1[1]] = 1.
@@ -86,18 +86,27 @@ class TestClean(object):
         dirty_beam = vis.to_map(dirty_beam)
 
         vis.vis = save_vis
-        clean = Hogbom(vis, dirty_beam, 1e-14, (N, M), gain=1.0)
+        clean = Hogbom(vis, dirty_beam, 1e-2, (N, M), gain=1.0)
         while not clean.iterate():
             pass
         final_image = np.add(clean.dirty_map, clean.point_source_map)
-        assert abs(1. - final_image[pos1[0], pos1[1]]) < 1e-1
-        assert abs(0.8 - final_image[pos2[0], pos2[1]]) < 1e-1
 
-        dirty_map[pos1[0], pos1[1]] = 0
-        dirty_map[pos2[0], pos2[1]] = 0
-        final_image[pos1[0], pos1[1]] = 0
-        final_image[pos2[0], pos2[1]] = 0
+        temp = np.argsort(final_image.ravel())[-2:]
+        max_loccations = np.dstack(np.unravel_index(temp, final_image.shape))
+        assert max_loccations[0][1].tolist() == list(pos1)
+        assert max_loccations[0][0].tolist() == list(pos2)
 
+        # Check for successful amplification at the place of the sources
+        assert final_image[pos1] > dirty_map[pos1]
+        assert final_image[pos2] > dirty_map[pos2]
+        
+        # Since we already checked for these coordinates, we can use them
+        dirty_map[pos1] = 0
+        dirty_map[pos2] = 0
+        final_image[pos1] = 0
+        final_image[pos2] = 0
+
+        # Check if the background was succesfuly filtered or not
         dirty_avg_bgr = np.average(dirty_map)
         final_avg_bgr = np.average(final_image)
         assert final_avg_bgr < dirty_avg_bgr
