@@ -5,6 +5,7 @@ import random
 import copy
 
 from ..Clean import Hogbom
+from ..Clean import ReasonOfStop
 from ..Visibility import Visibility
 
 
@@ -38,7 +39,7 @@ class TestClean(object):
         vis.vis = vist
 
         clean = Hogbom(vis, dirty_beam, 1e-8, (N, M), gain=0.5)
-        while not clean.iterate():
+        while clean.iterate() == ReasonOfStop.NOT_FINISHED:
             pass
         final_image = np.add(clean.dirty_map, clean.point_source_map)
         assert np.allclose(final_image, clean_map)
@@ -87,7 +88,7 @@ class TestClean(object):
 
         vis.vis = save_vis
         clean = Hogbom(vis, dirty_beam, 1e-2, (N, M), gain=1.0)
-        while not clean.iterate():
+        while clean.iterate() == ReasonOfStop.NOT_FINISHED:
             pass
         final_image = np.add(clean.dirty_map, clean.point_source_map)
 
@@ -110,6 +111,15 @@ class TestClean(object):
         dirty_avg_bgr = np.average(dirty_map)
         final_avg_bgr = np.average(final_image)
         assert final_avg_bgr < dirty_avg_bgr
+
+    def test_clean_stop_reason(self):
+        vis = Visibility([[0], [0]], [1])
+        clean = Hogbom(vis, np.array([[]]), 0, (1, 1))
+        clean.niter = 0
+        assert clean.iterate() == ReasonOfStop.REACHED_NITER
+        clean = Hogbom(vis, np.array([[]]), 2, (1, 1))
+        clean.dirty_map = np.ones((1,1))
+        assert clean.iterate() == ReasonOfStop.REACHED_THRESHOLD
 
     def test_clean2(self):
         N = M = 65
