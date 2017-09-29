@@ -7,6 +7,7 @@ from datetime import datetime
 
 import numpy as np
 from sunpy.map import Map
+from sunpy.io.fits import fits
 
 from .Transform import Transform
 
@@ -360,29 +361,29 @@ class RHESSIVisibility(Visibility):
                  atten_state: int=1, count=None,
                  pixel_size: np.array=np.array([1.0, 1.0])):
         super().__init__(uv, vis, xyoffset, pixel_size)
-        if not isc:
+        if isc is None:
             self.isc = np.zeros(vis.shape)
         else:
             self.isc = isc
         self.harm = harm
         self.erange = erange
         self.trange = trange
-        if not totflux:
+        if totflux is None:
             self.totflux = np.zeros(vis.shape)
         else:
             self.totflux = totflux
-        if not sigamp:
+        if sigamp is None:
             self.sigamp = np.zeros(vis.shape)
         else:
             self.sigamp = sigamp
-        if not chi2:
+        if chi2 is None:
             self.chi2 = np.zeros(vis.shape)
         else:
             self.chi2 = chi2
         self.type_string = type_string
         self.units = RHESSIVisibility.convert_units_to_tex(units)
         self.atten_state = atten_state
-        if not count:
+        if count is None:
             self.count = np.zeros(vis.shape)
         else:
             self.count = count
@@ -425,3 +426,84 @@ class RHESSIVisibility(Visibility):
                 final_string += string[i]
         final_string += opened * "}"
         return final_string
+
+    @staticmethod
+    def from_fits_file(path):
+        """
+        Creates RHESSIVisibility objects from compatible fits files
+
+        Parameters
+        ----------
+        path: str
+            Path where the fits file can be found
+
+        Examples
+        --------
+
+        Notes
+        -----
+        It separates the Visibility data based on the time and energy
+        ranges.
+        """
+        hudlist = fits.open(path)
+        for i in hudlist:
+            if i.name == "VISIBILITY":
+                # Checking how many data structures we have
+                data_sort = {}
+                erange = i.data["erange"]
+                erange_unique = np.unique(erange, axis=0)
+                trange = i.data["trange"]
+                trange_unique = np.unique(trange, axis=0)
+
+                def find_erange(e):
+                    for i, j in enumerate(erange_unique):
+                        if np.allclose(j, e):
+                            return i
+
+                def find_trange(t):
+                    for i, j in enumerate(trange_unique):
+                        if np.allclose(j, t):
+                            return i
+
+                for j, k in enumerate(erange_unique):
+                        data_sort[j] = {}
+                for j, k in enumerate(trange):
+                        eind = find_erange(erange[j])
+                        tind = find_trange(k)
+                        if not tind in data_sort[eind]:
+                            data_sort[eind][tind] = [j]
+                        else:
+                            data_sort[eind][tind].append(j)
+
+                # Creating the RHESSIVisibilities
+                visibilities = []
+                for j, k in data_sort.items():
+                    for l, m in k.items():
+                        visibilities.append(RHESSIVisibility(np.array([]), np.array([[], []]), erange=erange_unique[j], trange=trange_unique[l]))
+                        u = np.take(i.data["u"], m)
+                        v = np.take(i.data["v"], m)
+                        visibilities[-1].uv = np.array([u, v])
+                        if "XYOFFSET" in i.header.values():
+                            visibilities[-1].xyoffset = i.data["xyoffset"][m[0]]
+                        if "ISC" in i.header.values():
+                            visibilities[-1].isc = np.take(i.data["isc"], m)
+                        if "HARM" in i.header.values():
+                            visibilities[-1].harm = i.data["harm"][m[0]]
+                        if "OBSVIS" in i.header.values():
+                            visibilities[-1].vis = np.take(i.data["obsvis"], m)
+                        if "TOTFLUX" in i.header.values():
+                            visibilities[-1].totflux = np.take(i.data["totflux"], m)
+                        if "SIGAMP" in i.header.values():
+                            visibilities[-1].sigamp = np.take(i.data["sigamp"], m)
+                        if "CHI2" in i.header.values():
+                            visibilities[-1].chi2 = np.take(i.data["chi2"], m)
+                        if "TYPE" in i.header.values():
+                            visibilities[-1].type_string = i.data["type"][m[0]]
+                        if "UNITS" in i.header.values():
+                            visibilities[-1].units = RHESSIVisibility.convert_units_to_tex(i.data["units"][m[0]])
+                        if "ATTEN_STATE" in i.header.values():
+                            visibilities[-1].atten_state = i.data["atten_state"][m[0]]
+                        if "COUNT" in i.header.values():
+                            visibilities[-1].count = np.take(i.data["count"], m)
+                return visibilities
+        return None
