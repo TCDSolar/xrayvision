@@ -84,7 +84,7 @@ class Hogbom(object):
         self.point_source_map = np.zeros(image_dimensions)
         # #1
         self.dirty_map = np.zeros(self.dim)
-        temp = self.vis.to_map(self.dirty_map)
+        temp = self.vis.to_map_v2(self.dirty_map)
         self.dirty_map = temp
 
         # #2 Creating the dirty beam
