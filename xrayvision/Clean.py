@@ -5,6 +5,26 @@ from scipy.ndimage.interpolation import shift
 from scipy import signal
 import numpy as np
 from astropy.convolution import Gaussian2DKernel
+from enum import Enum
+
+
+class ReasonOfStop(Enum):
+    """
+    Enum values to describe the state of the CLEAN algorithm
+
+    Parameters
+    ----------
+
+    Examples
+    --------
+
+    Notes
+    -----
+
+    """
+    NOT_FINISHED = 0
+    REACHED_NITER = 1
+    REACHED_THRESHOLD = 2
 
 
 class Hogbom(object):
@@ -47,6 +67,7 @@ class Hogbom(object):
         self.gain = gain
         self.niter = niter
         self.iterated = 0
+        self.reason_of_stop = ReasonOfStop.NOT_FINISHED
         # Check the validity of the image_dimensions input
         if not len(image_dimensions) == 2:
             raise ValueError("image_dimensions: incorrect tuple length! "
@@ -98,8 +119,12 @@ class Hogbom(object):
         """
         # #3
         max_intesity = np.max(self.dirty_map)
-        if self.niter < 1 or max_intesity < self.thres:
-            return True
+        if self.niter < 1:
+            self.reason_of_stop = ReasonOfStop.REACHED_NITER
+            return self.reason_of_stop 
+        if max_intesity < self.thres:
+            self.reason_of_stop = ReasonOfStop.REACHED_THRESHOLD
+            return self.reason_of_stop
 
         pos = np.unravel_index(np.argmax(self.dirty_map),
                                self.dirty_map.shape)
@@ -119,7 +144,7 @@ class Hogbom(object):
         self.niter -= 1
         self.iterated += 1
 
-        return False
+        return ReasonOfStop.NOT_FINISHED
 
     def finish(self, stddev: float):
         """
