@@ -248,7 +248,7 @@ class Visibility(object):
         x = x.reshape(size)
         y = y.reshape(size)
 
-        for i in range(size):
+        for i in range(input_uv.shape[1]):
             vis[i] = np.sum(
                 input_map.reshape(size) * np.exp(
                     -2j * np.pi * (input_uv[0, i] * x + input_uv[1, i] * y)))
