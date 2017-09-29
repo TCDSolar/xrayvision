@@ -118,7 +118,7 @@ class TestClean(object):
         clean.niter = 0
         assert clean.iterate() == ReasonOfStop.REACHED_NITER
         clean = Hogbom(vis, np.array([[]]), 2, (1, 1))
-        clean.dirty_map = np.ones((1,1))
+        clean.dirty_map = np.ones((1, 1))
         assert clean.iterate() == ReasonOfStop.REACHED_THRESHOLD
 
     def test_clean2(self):

@@ -154,7 +154,7 @@ class Visibility(object):
 
         return Visibility.idft_map(self.vis, outmap, self.uv, center, pixel_size)
 
-    def to_sunpy_map(self, size=(33,33)):
+    def to_sunpy_map(self, size=(33, 33)):
         """
 
         Parameters
@@ -470,7 +470,7 @@ class RHESSIVisibility(Visibility):
                 for j, k in enumerate(trange):
                         eind = find_erange(erange[j])
                         tind = find_trange(k)
-                        if not tind in data_sort[eind]:
+                        if tind not in data_sort[eind]:
                             data_sort[eind][tind] = [j]
                         else:
                             data_sort[eind][tind].append(j)
@@ -479,7 +479,10 @@ class RHESSIVisibility(Visibility):
                 visibilities = []
                 for j, k in data_sort.items():
                     for l, m in k.items():
-                        visibilities.append(RHESSIVisibility(np.array([]), np.array([[], []]), erange=erange_unique[j], trange=trange_unique[l]))
+                        visibilities.append(RHESSIVisibility(np.array([]),
+                                                             np.array([[], []]),
+                                                             erange=erange_unique[j],
+                                                             trange=trange_unique[l]))
                         u = np.take(i.data["u"], m)
                         v = np.take(i.data["v"], m)
                         visibilities[-1].uv = np.array([u, v])
@@ -500,7 +503,8 @@ class RHESSIVisibility(Visibility):
                         if "TYPE" in i.header.values():
                             visibilities[-1].type_string = i.data["type"][m[0]]
                         if "UNITS" in i.header.values():
-                            visibilities[-1].units = RHESSIVisibility.convert_units_to_tex(i.data["units"][m[0]])
+                            string = RHESSIVisibility.convert_units_to_tex(i.data["units"][m[0]])
+                            visibilities[-1].units = string
                         if "ATTEN_STATE" in i.header.values():
                             visibilities[-1].atten_state = i.data["atten_state"][m[0]]
                         if "COUNT" in i.header.values():
