@@ -69,15 +69,15 @@ class Visibility(object):
         -------
 
         """
-        if not center:
-            if not self.xyoffset:
+        if center is None:
+            if self.xyoffset is None:
                 center = (0., 0.)
             else:
                 center = self.xyoffset
         else:
             self.xyoffset = center
-        if not pixel_size:
-            if not self.pixel_size:
+        if pixel_size is None:
+            if self.pixel_size is None:
                 pixel_size = (1., 1.)
             else:
                 pixel_size = self.pixel_size
@@ -140,13 +140,13 @@ class Visibility(object):
         -------
 
         """
-        if not center:
-            if not self.xyoffset:
+        if center is None:
+            if self.xyoffset is None:
                 center = (0., 0.)
             else:
                 center = self.xyoffset
-        if not pixel_size:
-            if not self.pixel_size:
+        if pixel_size is None:
+            if self.pixel_size is None:
                 pixel_size = (1., 1.)
             else:
                 pixel_size = self.pixel_size
@@ -316,7 +316,7 @@ class RHESSIVisibility(Visibility):
         The u, v coordinates of the visibilities
     vis: `numpy.ndarray`
         The complex visibility
-    isc: `int`
+    isc: `int based array-like`
         Related to the grid/detector
     harm: `int`
         Harmonic used
@@ -324,11 +324,11 @@ class RHESSIVisibility(Visibility):
         Energy range
     trange: `numpy.ndarray`
         Time range
-    totflux: `float`
+    totflux: `numpy.ndarray`
         Total flux
-    sigamp: `float`
+    sigamp: `numpy.ndarray`
         Sigma or error on visibility
-    chi2: `float`
+    chi2: `numpy.ndarray`
         Chi squared from fit
     xyoffset: `np.ndarray`
         Offset from Sun centre
@@ -338,7 +338,7 @@ class RHESSIVisibility(Visibility):
         If it is in idl format it will be converted
     atten_state: `int`
         State of the attenuator
-    count: `float`
+    count: `numpy.ndarray`
         detector counts
     pixel_size: `array-like`
         size of a pixel in arcseconds
@@ -350,29 +350,42 @@ class RHESSIVisibility(Visibility):
 
     """
 
-    def __init__(self, uv, vis, isc: int=0, harm: int=1,
+    def __init__(self, uv, vis, isc=None, harm: int=1,
                  erange: np.array=np.array([0.0, 0.0]),
                  trange: np.array=np.array([datetime.now(), datetime.now()]),
-                 totflux: float=0.0, sigamp: float=0.0,
-                 chi2: float=0.0,
+                 totflux=None, sigamp=None, chi2=None,
                  xyoffset: np.array=np.array([0.0, 0.0]),
                  type_string: str="photon",
                  units: str="Photons cm!u-2!n s!u-1!n",
-                 atten_state: int=1,
-                 count: float=0.0,
+                 atten_state: int=1, count=None,
                  pixel_size: np.array=np.array([1.0, 1.0])):
         super().__init__(uv, vis, xyoffset, pixel_size)
-        self.isc = isc
+        if not isc:
+            self.isc = np.zeros(vis.shape)
+        else:
+            self.isc = isc
         self.harm = harm
         self.erange = erange
         self.trange = trange
-        self.totflux = totflux
-        self.sigamp = sigamp
-        self.chi2 = chi2
+        if not totflux:
+            self.totflux = np.zeros(vis.shape)
+        else:
+            self.totflux = totflux
+        if not sigamp:
+            self.sigamp = np.zeros(vis.shape)
+        else:
+            self.sigamp = sigamp
+        if not chi2:
+            self.chi2 = np.zeros(vis.shape)
+        else:
+            self.chi2 = chi2
         self.type_string = type_string
         self.units = RHESSIVisibility.convert_units_to_tex(units)
         self.atten_state = atten_state
-        self.count = count
+        if not count:
+            self.count = np.zeros(vis.shape)
+        else:
+            self.count = count
 
     @staticmethod
     def convert_units_to_tex(string: str):
