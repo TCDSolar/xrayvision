@@ -53,4 +53,4 @@ class TestRHESSIVisibility(object):
         assert len(i) == 4
 
         i = RHESSIVisibility.from_fits_file("../data/hsi_20020220_110600_10times_1energy.fits")
-        assert len(i) == 10
+        assert len(i) == 9

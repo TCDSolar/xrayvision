@@ -462,11 +462,12 @@ class RHESSIVisibility(Visibility):
 
                 def find_trange(t):
                     for i, j in enumerate(trange_unique):
-                        if np.allclose(j, t):
+                        if np.allclose(j, t, rtol=1e-15):
                             return i
 
                 for j, k in enumerate(erange_unique):
                         data_sort[j] = {}
+
                 for j, k in enumerate(trange):
                         eind = find_erange(erange[j])
                         tind = find_trange(k)
