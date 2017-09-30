@@ -7,6 +7,7 @@ from datetime import datetime
 
 import numpy as np
 from sunpy.map import Map
+from sunpy.io.fits import fits
 
 from .Transform import Transform
 
@@ -69,15 +70,15 @@ class Visibility(object):
         -------
 
         """
-        if not center:
-            if not self.xyoffset:
+        if center is None:
+            if self.xyoffset is None:
                 center = (0., 0.)
             else:
                 center = self.xyoffset
         else:
             self.xyoffset = center
-        if not pixel_size:
-            if not self.pixel_size:
+        if pixel_size is None:
+            if self.pixel_size is None:
                 pixel_size = (1., 1.)
             else:
                 pixel_size = self.pixel_size
@@ -140,20 +141,20 @@ class Visibility(object):
         -------
 
         """
-        if not center:
-            if not self.xyoffset:
+        if center is None:
+            if self.xyoffset is None:
                 center = (0., 0.)
             else:
                 center = self.xyoffset
-        if not pixel_size:
-            if not self.pixel_size:
+        if pixel_size is None:
+            if self.pixel_size is None:
                 pixel_size = (1., 1.)
             else:
                 pixel_size = self.pixel_size
 
         return Visibility.idft_map(self.vis, outmap, self.uv, center, pixel_size)
 
-    def to_sunpy_map(self, size=(33,33)):
+    def to_sunpy_map(self, size=(33, 33)):
         """
 
         Parameters
@@ -316,7 +317,7 @@ class RHESSIVisibility(Visibility):
         The u, v coordinates of the visibilities
     vis: `numpy.ndarray`
         The complex visibility
-    isc: `int`
+    isc: `int based array-like`
         Related to the grid/detector
     harm: `int`
         Harmonic used
@@ -324,11 +325,11 @@ class RHESSIVisibility(Visibility):
         Energy range
     trange: `numpy.ndarray`
         Time range
-    totflux: `float`
+    totflux: `numpy.ndarray`
         Total flux
-    sigamp: `float`
+    sigamp: `numpy.ndarray`
         Sigma or error on visibility
-    chi2: `float`
+    chi2: `numpy.ndarray`
         Chi squared from fit
     xyoffset: `np.ndarray`
         Offset from Sun centre
@@ -338,7 +339,7 @@ class RHESSIVisibility(Visibility):
         If it is in idl format it will be converted
     atten_state: `int`
         State of the attenuator
-    count: `float`
+    count: `numpy.ndarray`
         detector counts
     pixel_size: `array-like`
         size of a pixel in arcseconds
@@ -350,29 +351,42 @@ class RHESSIVisibility(Visibility):
 
     """
 
-    def __init__(self, uv, vis, isc: int=0, harm: int=1,
+    def __init__(self, uv, vis, isc=None, harm: int=1,
                  erange: np.array=np.array([0.0, 0.0]),
                  trange: np.array=np.array([datetime.now(), datetime.now()]),
-                 totflux: float=0.0, sigamp: float=0.0,
-                 chi2: float=0.0,
+                 totflux=None, sigamp=None, chi2=None,
                  xyoffset: np.array=np.array([0.0, 0.0]),
                  type_string: str="photon",
                  units: str="Photons cm!u-2!n s!u-1!n",
-                 atten_state: int=1,
-                 count: float=0.0,
+                 atten_state: int=1, count=None,
                  pixel_size: np.array=np.array([1.0, 1.0])):
         super().__init__(uv, vis, xyoffset, pixel_size)
-        self.isc = isc
+        if isc is None:
+            self.isc = np.zeros(vis.shape)
+        else:
+            self.isc = isc
         self.harm = harm
         self.erange = erange
         self.trange = trange
-        self.totflux = totflux
-        self.sigamp = sigamp
-        self.chi2 = chi2
+        if totflux is None:
+            self.totflux = np.zeros(vis.shape)
+        else:
+            self.totflux = totflux
+        if sigamp is None:
+            self.sigamp = np.zeros(vis.shape)
+        else:
+            self.sigamp = sigamp
+        if chi2 is None:
+            self.chi2 = np.zeros(vis.shape)
+        else:
+            self.chi2 = chi2
         self.type_string = type_string
         self.units = RHESSIVisibility.convert_units_to_tex(units)
         self.atten_state = atten_state
-        self.count = count
+        if count is None:
+            self.count = np.zeros(vis.shape)
+        else:
+            self.count = count
 
     @staticmethod
     def convert_units_to_tex(string: str):
@@ -412,3 +426,89 @@ class RHESSIVisibility(Visibility):
                 final_string += string[i]
         final_string += opened * "}"
         return final_string
+
+    @staticmethod
+    def from_fits_file(path):
+        """
+        Creates RHESSIVisibility objects from compatible fits files
+
+        Parameters
+        ----------
+        path: str
+            Path where the fits file can be found
+
+        Examples
+        --------
+
+        Notes
+        -----
+        It separates the Visibility data based on the time and energy
+        ranges.
+        """
+        hudlist = fits.open(path)
+        for i in hudlist:
+            if i.name == "VISIBILITY":
+                # Checking how many data structures we have
+                data_sort = {}
+                erange = i.data["erange"]
+                erange_unique = np.unique(erange, axis=0)
+                trange = i.data["trange"]
+                trange_unique = np.unique(trange, axis=0)
+
+                def find_erange(e):
+                    for i, j in enumerate(erange_unique):
+                        if np.allclose(j, e):
+                            return i
+
+                def find_trange(t):
+                    for i, j in enumerate(trange_unique):
+                        if np.allclose(j, t, rtol=1e-15):
+                            return i
+
+                for j, k in enumerate(erange_unique):
+                        data_sort[j] = {}
+
+                for j, k in enumerate(trange):
+                        eind = find_erange(erange[j])
+                        tind = find_trange(k)
+                        if tind not in data_sort[eind]:
+                            data_sort[eind][tind] = [j]
+                        else:
+                            data_sort[eind][tind].append(j)
+
+                # Creating the RHESSIVisibilities
+                visibilities = []
+                for j, k in data_sort.items():
+                    for l, m in k.items():
+                        visibilities.append(RHESSIVisibility(np.array([]),
+                                                             np.array([[], []]),
+                                                             erange=erange_unique[j],
+                                                             trange=trange_unique[l]))
+                        u = np.take(i.data["u"], m)
+                        v = np.take(i.data["v"], m)
+                        visibilities[-1].uv = np.array([u, v])
+                        if "XYOFFSET" in i.header.values():
+                            visibilities[-1].xyoffset = i.data["xyoffset"][m[0]]
+                        if "ISC" in i.header.values():
+                            visibilities[-1].isc = np.take(i.data["isc"], m)
+                        if "HARM" in i.header.values():
+                            visibilities[-1].harm = i.data["harm"][m[0]]
+                        if "OBSVIS" in i.header.values():
+                            visibilities[-1].vis = np.take(i.data["obsvis"], m)
+                        if "TOTFLUX" in i.header.values():
+                            visibilities[-1].totflux = np.take(i.data["totflux"], m)
+                        if "SIGAMP" in i.header.values():
+                            visibilities[-1].sigamp = np.take(i.data["sigamp"], m)
+                        if "CHI2" in i.header.values():
+                            visibilities[-1].chi2 = np.take(i.data["chi2"], m)
+                        if "TYPE" in i.header.values():
+                            visibilities[-1].type_string = i.data["type"][m[0]]
+                        if "UNITS" in i.header.values():
+                            string = RHESSIVisibility.convert_units_to_tex(i.data["units"][m[0]])
+                            visibilities[-1].units = string
+                        if "ATTEN_STATE" in i.header.values():
+                            visibilities[-1].atten_state = i.data["atten_state"][m[0]]
+                        if "COUNT" in i.header.values():
+                            visibilities[-1].count = np.take(i.data["count"], m)
+                return visibilities
+        return None

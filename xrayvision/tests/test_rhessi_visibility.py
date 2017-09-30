@@ -44,3 +44,13 @@ class TestRHESSIVisibility(object):
                               ("m!u1!u-2!n", "m^{1^{-2}}")])
     def test_unit_string_conversation(self, in_str, out_str):
         assert out_str == RHESSIVisibility.convert_units_to_tex(in_str)
+
+    def test_fits_file_data_read_successful(self):
+        i = RHESSIVisibility.from_fits_file("../data/hsi_20020220_110600_1time_1energy.fits")
+        assert len(i) == 1
+
+        i = RHESSIVisibility.from_fits_file("../data/hsi_20020220_110600_1time_4energies.fits")
+        assert len(i) == 4
+
+        i = RHESSIVisibility.from_fits_file("../data/hsi_20020220_110600_9times_1energy.fits")
+        assert len(i) == 9

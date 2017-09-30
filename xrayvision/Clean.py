@@ -84,7 +84,7 @@ class Hogbom(object):
         self.point_source_map = np.zeros(image_dimensions)
         # #1
         self.dirty_map = np.zeros(self.dim)
-        temp = self.vis.to_map(self.dirty_map)
+        temp = self.vis.to_map_v2(self.dirty_map)
         self.dirty_map = temp
 
         # #2 Creating the dirty beam
@@ -121,7 +121,7 @@ class Hogbom(object):
         max_intesity = np.max(self.dirty_map)
         if self.niter < 1:
             self.reason_of_stop = ReasonOfStop.REACHED_NITER
-            return self.reason_of_stop 
+            return self.reason_of_stop
         if max_intesity < self.thres:
             self.reason_of_stop = ReasonOfStop.REACHED_THRESHOLD
             return self.reason_of_stop
@@ -196,5 +196,5 @@ class Hogbom(object):
                 break
 
         # For testing turned off
-        #signal.convolve2d(model, Gaussian2DKernel(stddev=1), mode='same')  # noqa
+        # signal.convolve2d(model, Gaussian2DKernel(stddev=1), mode='same')  # noqa
         return model + dirty_map
