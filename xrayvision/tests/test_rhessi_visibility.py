@@ -47,8 +47,7 @@ class TestRHESSIVisibility(object):
         assert out_str == RHESSIVisibility.convert_units_to_tex(in_str)
 
     def test_fits_file_data_read_successful(self):
-        print('!!!!!!!!!!!!!!!!!!!!!', getcwd(), '!!!!!!!!!!!!!!!!!')
-        i = RHESSIVisibility.from_fits_file("data/hsi_20020220_110600_1time_1energy.fits")
+        i = RHESSIVisibility.from_fits_file("xrayvision/data/hsi_20020220_110600_1time_1energy.fits")
         assert len(i) == 1
 
         i = RHESSIVisibility.from_fits_file("data/hsi_20020220_110600_1time_4energies.fits")
