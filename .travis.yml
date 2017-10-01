@@ -35,7 +35,7 @@ env:
         - SETUP_CMD='test'
         - CONDA_CHANNELS='astropy astropy-ci-extras conda-forge'
         - CONDA_DEPENDENCIES='sunpy'
-        - PIP_DEPENDENCIES='pylama pylama-lint'
+        - PIP_DEPENDENCIES='pylama pylama-pylint'
         - EVENT_TYPE='pull_request push'
 
     matrix:
