@@ -4,13 +4,13 @@ language: python
 sudo: false
 
 # The apt packages below are needed but can no longer be installed with
-# # sudo apt-get.
-# addons:
-#     apt:
-#         packages:
-#             - libatlas-dev
-#             - liblapack-dev
-#             - gfortran
+# sudo apt-get.
+addons:
+    apt:
+        packages:
+            - libatlas-dev
+            - liblapack-dev
+            - gfortran
 #             - graphviz
 #             - texlive-latex-extra
 #             - dvipng
@@ -35,7 +35,7 @@ env:
         - SETUP_CMD='test'
         - CONDA_CHANNELS='astropy astropy-ci-extras conda-forge'
         - CONDA_DEPENDENCIES='sunpy'
-        - PIP_DEPENDENCIES=''
+        - PIP_DEPENDENCIES='pylama pylama-lint'
         - EVENT_TYPE='pull_request push'
 
     matrix:
