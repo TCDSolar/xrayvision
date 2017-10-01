@@ -1,3 +1,4 @@
+from os import getcwd
 import numpy as np
 import pytest
 
@@ -46,6 +47,7 @@ class TestRHESSIVisibility(object):
         assert out_str == RHESSIVisibility.convert_units_to_tex(in_str)
 
     def test_fits_file_data_read_successful(self):
+        print('!!!!!!!!!!!!!!!!!!!!!', getcwd(), '!!!!!!!!!!!!!!!!!')
         i = RHESSIVisibility.from_fits_file("data/hsi_20020220_110600_1time_1energy.fits")
         assert len(i) == 1
 
