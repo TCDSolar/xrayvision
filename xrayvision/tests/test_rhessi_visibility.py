@@ -1,3 +1,4 @@
+from os import getcwd
 import numpy as np
 import pytest
 
