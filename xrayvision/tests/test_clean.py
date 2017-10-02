@@ -143,7 +143,7 @@ class TestClean(object):
         # ax3.imshow(dirty_map, label='Dirty Map')
         # plt.show()
 
-        out_map = Hogbom.clean(dirty_map, dirty_beam)
+        out_map = Hogbom.clean(dirty_map, dirty_beam, clean_beam_width=0.0)
 
         # Within threshold set
         assert np.allclose(clean_map, out_map, atol=2*0.01)

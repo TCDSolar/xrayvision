@@ -171,14 +171,13 @@ class Hogbom(object):
         return np.add(result, self.dirty_map)
 
     @staticmethod
-    def clean(dirty_map, dirty_beam, gain=0.1, thres=0.01, niter=1000):
+    def clean(dirty_map, dirty_beam, clean_beam_width=4.0, gain=0.1, thres=0.01, niter=1000):
         # Assume bear center is in middle
         beam_center = (dirty_beam.shape[0] - 1)/2.0, (dirty_beam.shape[1] - 1)/2.0
 
         # Model for sources
         model = np.zeros(dirty_map.shape)
         for i in range(niter):
-            print(i)
             # Find max in dirty map and save to point source
             mx, my = np.unravel_index(dirty_map.argmax(), dirty_map.shape)
             Imax = dirty_map[mx, my]
@@ -191,9 +190,16 @@ class Hogbom(object):
 
             dirty_map = np.subtract(dirty_map, comp)
 
-            if dirty_map.max() <= thres or dirty_map.min() < 0.0:
+            if dirty_map.max() <= thres:
                 print("Break")
                 break
+
+        # Clean Beam
+        clean_beam = Gaussian2DKernel(stddev=4, x_size=dirty_beam.shape[0], y_size=dirty_beam.shape[1]).array
+        if clean_beam_width != 0.0:
+            model = signal.convolve2d(model, clean_beam, mode='same')  # noqa
+        clean_beam = clean_beam * (1/clean_beam.max())
+        dirty_map = dirty_map / clean_beam.sum()
 
         # For testing turned off
         # signal.convolve2d(model, Gaussian2DKernel(stddev=1), mode='same')  # noqa
