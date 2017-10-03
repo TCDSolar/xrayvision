@@ -195,7 +195,7 @@ class Hogbom(object):
                 break
 
         # Clean Beam
-        clean_beam = Gaussian2DKernel(stddev=4, x_size=dirty_beam.shape[0], y_size=dirty_beam.shape[1]).array
+        clean_beam = Gaussian2DKernel(stddev=clean_beam_width, x_size=dirty_beam.shape[0], y_size=dirty_beam.shape[1]).array
         if clean_beam_width != 0.0:
             model = signal.convolve2d(model, clean_beam, mode='same')  # noqa
         clean_beam = clean_beam * (1/clean_beam.max())
