@@ -8,3 +8,7 @@ Reference/API
 =============
 
 .. automodapi:: xrayvision
+
+.. automodapi:: xrayvision.visibility
+
+.. automodapi:: xrayvision.transform
