@@ -10,6 +10,7 @@ from sunpy.io.fits import fits
 
 from .transform import dft_map, idft_map
 
+__all__ = ['Visibility', 'RHESSIVisibility']
 
 class Visibility(object):
     """

@@ -102,7 +102,7 @@ templates_path.append('_templates')
 
 # -- Project information ------------------------------------------------------
 
-project = u'SunPy'
+project = u'xrayvision'
 author = u'The SunPy Community'
 copyright = u'{}, {}'.format(datetime.datetime.now().year, author)
 
