@@ -37,10 +37,10 @@ def generate_xy(number_pixels, center=0.0, pixel_size=1.0):
     These are written in doctest format, and should illustrate how to
     use the function.
 
-    >>> x = generate_xy(9)
+    >>> generate_xy(9)
     array([-4., -3., -2., -1.,  0.,  1.,  2.,  3.,  4.])
 
-    >>> x = generate_xy(9, pixel_size=2.5)
+    >>> generate_xy(9, pixel_size=2.5)
     array([-10. ,  -7.5,  -5. ,  -2.5,   0. ,   2.5,   5. ,   7.5,  10. ])
 
     >>> generate_xy(9, center = 10, pixel_size=2.5)
@@ -77,7 +77,7 @@ def generate_uv(number_pixels, center=0.0, pixel_size=1.0):
     These are written in doctest format, and should illustrate how to
     use the function.
 
-    >>> x = generate_uv(9)
+    >>> generate_uv(9)
     array([-0.44444444, -0.33333333, -0.22222222, -0.11111111,  0.        ,
         0.11111111,  0.22222222,  0.33333333,  0.44444444])
 
@@ -178,7 +178,8 @@ def idft_map(input_vis, shape, uv, center=(0.0, 0.0), pixel_size=(1.0, 1.0)):
 
 # def dft(im, uv):
 #     """
-#     Discrete Fourier transform of the input array or image calculated at the given u, v coordinates
+#     Discrete Fourier transform of the input array or image calculated at the given u, v
+#     coordinates
 #
 #     Loops over a list of u, v coordinates rather than looping over u and v separately
 #

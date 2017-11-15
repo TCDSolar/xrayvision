@@ -1,5 +1,5 @@
 """
-This modules contain visibility related classes 
+This modules contain visibility related classes
 
 """
 from datetime import datetime
@@ -11,6 +11,7 @@ from sunpy.io.fits import fits
 from .transform import dft_map, idft_map
 
 __all__ = ['Visibility', 'RHESSIVisibility']
+
 
 class Visibility(object):
     """
@@ -96,7 +97,7 @@ class Visibility(object):
     def from_image(cls, image, uv, center=(0.0, 0.0), pixel_size=(1.0, 1.0)):
         """
         Creates a new Visibility object from the given image array
-        
+
         Parameters
         ----------
         image : `numpy.ndarray`
@@ -159,7 +160,8 @@ class Visibility(object):
             Coordinates of the map center if given will override `self.xyoffset`
 
         pixel_size : `float` (dx, dy), optional
-            Size of the pixels in x, y if only one give assumed same in both directions will override `self.pixel_size`
+            Size of the pixels in x, y if only one give assumed same in both directions will \
+            override `self.pixel_size`
 
         Returns
         -------
@@ -191,7 +193,7 @@ class Visibility(object):
     def to_map(self, shape=(33, 33), center=None, pixel_size=None):
         """
         Create a map from doing a back projection or inverse transform on the visibilities
-        
+
         Parameters
         ----------
         shape : `int` (m, n)
@@ -325,7 +327,7 @@ class RHESSIVisibility(Visibility):
         ----------
         string : `str`
             The IDL format string to be converted
-        
+
         Returns
         -------
         `str`
@@ -368,7 +370,7 @@ class RHESSIVisibility(Visibility):
         ----------
         hdu_list : `list`
             List of RHESSI visibility hdus
-        
+
         Returns
         -------
         `list`

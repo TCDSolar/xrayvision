@@ -1,6 +1,6 @@
-====================
+========================
 Xrayvision documentation
-====================
+========================
 
 .. rubric:: Everything you need to know about Xrayvision.
 

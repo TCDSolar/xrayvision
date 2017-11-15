@@ -6,6 +6,8 @@ from astropy.convolution import Gaussian2DKernel
 from scipy import signal
 from scipy.ndimage.interpolation import shift
 
+__all__ = ['clean']
+
 
 def clean(dirty_map, dirty_beam, clean_beam_width=4.0, gain=0.1, thres=0.01, niter=1000):
     """
