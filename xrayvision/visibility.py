@@ -235,6 +235,21 @@ class Visibility(object):
         data = self.to_image(shape, center=center, pixel_size=pixel_size)
         return Map((data, header))
 
+    def to_fits_file(self, path):
+        """
+        Write the visibilities to a fits file
+
+        Parameters
+        ----------
+        path : 'basestr'
+            Path to fits file
+
+        Returns
+        -------
+
+        """
+        pass
+
 
 class RHESSIVisibility(Visibility):
     """
@@ -272,6 +287,7 @@ class RHESSIVisibility(Visibility):
         detector counts
     pixel_size : `array-like`
         size of a pixel in arcseconds
+
     Examples
     --------
 
@@ -361,7 +377,7 @@ class RHESSIVisibility(Visibility):
         final_string += opened * "}"
         return final_string
 
-    @classmethod
+    @classmethod  # noqa
     def from_fits(cls, hdu_list):
         """
         Creates RHESSIVisibility objects from compatible fits files
@@ -449,3 +465,16 @@ class RHESSIVisibility(Visibility):
                         if "COUNT" in i.header.values():
                             visibilities[-1].count = np.take(i.data["count"], m)
                 return visibilities
+
+    def to_fits_file(self, path):
+        """
+
+        Parameters
+        ----------
+        path
+
+        Returns
+        -------
+
+        """
+        pass
