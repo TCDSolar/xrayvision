@@ -7,11 +7,12 @@ takes inputs which have positional information `dft_map` and the inverse `idft_m
 
 """
 import astropy.units as u
+from astropy.units.core import UnitsError
 import numpy as np
 
 
 @u.quantity_input(center='angle', pixel_size='angle')
-def generate_xy(number_pixels, center=0.0*u.arcsec, pixel_size=1.0*u.arcsec):
+def generate_xy(number_pixels, center=0.0 * u.arcsec, pixel_size=1.0 * u.arcsec):
     """
     Generate the x or y coordinates given the number of pixels, center and pixel size
 
@@ -39,20 +40,20 @@ def generate_xy(number_pixels, center=0.0*u.arcsec, pixel_size=1.0*u.arcsec):
     use the function.
 
     >>> generate_xy(9)
-    array([-4., -3., -2., -1.,  0.,  1.,  2.,  3.,  4.])
+    <Quantity [-4.,-3.,-2.,-1., 0., 1., 2., 3., 4.] arcsec>
 
-    >>> generate_xy(9, pixel_size=2.5)
-    array([-10. ,  -7.5,  -5. ,  -2.5,   0. ,   2.5,   5. ,   7.5,  10. ])
+    >>> generate_xy(9, pixel_size=2.5 * u.arcsec)
+    <Quantity [-10. ,  -7.5,  -5. ,  -2.5,   0. ,   2.5,   5. ,   7.5,  10. ] arcsec>
 
-    >>> generate_xy(9, center = 10, pixel_size=2.5)
-    array([  0. ,   2.5,   5. ,   7.5,  10. ,  12.5,  15. ,  17.5,  20. ])
+    >>> generate_xy(9, center=10 * u.arcsec, pixel_size=2.5 * u.arcsec)
+    <Quantity [  0. ,   2.5,   5. ,   7.5,  10. ,  12.5,  15. ,  17.5,  20. ] arcsec>
     """
     x = (np.arange(number_pixels) - number_pixels / 2 + 0.5) * pixel_size + center
     return x
 
 
 @u.quantity_input(center='angle', pixel_size='angle')
-def generate_uv(number_pixels, center=0.0*u.arcsec, pixel_size=1.0*u.arcsec):
+def generate_uv(number_pixels, center=0.0 * u.arcsec, pixel_size=1.0 * u.arcsec):
     """
     Generate the u or v  coordinates given the number of pixels, center and pixel size
 
@@ -80,21 +81,25 @@ def generate_uv(number_pixels, center=0.0*u.arcsec, pixel_size=1.0*u.arcsec):
     use the function.
 
     >>> generate_uv(9)
-    array([-0.44444444, -0.33333333, -0.22222222, -0.11111111,  0.        ,
-        0.11111111,  0.22222222,  0.33333333,  0.44444444])
+    <Quantity [-0.44444444,-0.33333333,-0.22222222,-0.11111111, 0.        ,
+                0.11111111, 0.22222222, 0.33333333, 0.44444444] 1 / arcsec>
 
-    >>> generate_uv(9, pixel_size=2.5)
-    array([-0.17777778, -0.13333333, -0.08888889, -0.04444444,  0.        ,
-        0.04444444,  0.08888889,  0.13333333,  0.17777778])
+    >>> generate_uv(9, pixel_size=2.5 * u.arcsec)
+    <Quantity [-0.17777778,-0.13333333,-0.08888889,-0.04444444, 0.        ,
+                0.04444444, 0.08888889, 0.13333333, 0.17777778] 1 / arcsec>
+
+    >>> generate_uv(9, center=10 * u.arcsec, pixel_size=2.5 * u.arcsec)
+    <Quantity [-0.07777778,-0.03333333, 0.01111111, 0.05555556, 0.1       ,
+                0.14444444, 0.18888889, 0.23333333, 0.27777778] 1 / arcsec>
     """
     x = (np.arange(number_pixels) - number_pixels / 2 + 0.5) * (1 / (pixel_size * number_pixels))
     if center.value != 0.0:
-        x += 1/center
+        x += 1 / center
     return x
 
 
 @u.quantity_input(center='angle', pixel_size='angle')
-def dft_map(input_array, uv, center=(0.0, 0.0)*u.arcsec, pixel_size=(1.0, 1.0)*u.arcsec):
+def dft_map(input_array, uv, center=(0.0, 0.0) * u.arcsec, pixel_size=(1.0, 1.0) * u.arcsec):
     """
     Calculate the discrete Fourier transform of the array or image in terms of coordinates \
     returning a 1-D array of complex visibilities
@@ -128,16 +133,27 @@ def dft_map(input_array, uv, center=(0.0, 0.0)*u.arcsec, pixel_size=(1.0, 1.0)*u
     x = x.reshape(size)
     y = y.reshape(size)
 
-    for i in range(uv.shape[1]):
-        vis[i] = np.sum(
-            input_array.reshape(size) * np.exp(
-                -2j * np.pi * (uv[0, i] * x + uv[1, i] * y)))
+    # Check units are correct for exp need to be dimensionless and then remove units for speed
+    if (uv[0, :] * x).unit == u.dimensionless_unscaled and \
+            (uv[1, :] * y).unit == u.dimensionless_unscaled:
 
-    return vis
+        uv = uv.value
+        x = x.value
+        y = y.value
+
+        for i in range(uv.shape[1]):
+            vis[i] = np.sum(
+                input_array.reshape(size) * np.exp(
+                    -2j * np.pi * (uv[0, i] * x + uv[1, i] * y)))
+
+        return vis
+    else:
+        raise UnitsError("Incompatible units on uv {uv.unit} should cancel with xy "
+                         "to leave a dimensionless quantity")
 
 
 @u.quantity_input(center='angle', pixel_size='angle')
-def idft_map(input_vis, shape, uv, center=(0.0, 0.0)*u.arcsec, pixel_size=(1.0, 1.0)*u.arcsec):
+def idft_map(input_vis, shape, uv, center=(0.0, 0.0) * u.arcsec, pixel_size=(1.0, 1.0) * u.arcsec):
     """
     Calculate the inverse discrete Fourier transform in terms of coordinates returning a 2D real
     array or image
@@ -173,12 +189,23 @@ def idft_map(input_vis, shape, uv, center=(0.0, 0.0)*u.arcsec, pixel_size=(1.0, 
 
     im = np.zeros(size)
 
-    for i in range(size):
-        im[i] = (1 / input_vis.size) * \
-            np.real(np.sum(input_vis * np.exp(2j * np.pi * (uv[0, :] * x[i] + uv[1, :] * y[i]))))
+    # Check units are correct for exp need to be dimensionless and then remove units for speed
+    if (uv[0, :] * x).unit == u.dimensionless_unscaled and \
+            (uv[1, :] * y).unit == u.dimensionless_unscaled:
 
-    return im.reshape(m, n)
+        uv = uv.value
+        x = x.value
+        y = y.value
 
+        for i in range(size):
+            im[i] = (1 / input_vis.size) * \
+                    np.real(np.sum(
+                        input_vis * np.exp(2j * np.pi * (uv[0, :] * x[i] + uv[1, :] * y[i]))))
+
+        return im.reshape(m, n)
+    else:
+        raise UnitsError("Incompatible units on uv {uv.unit} should cancel with xy "
+                         "to leave a dimensionless quantity")
 
 # def dft(im, uv):
 #     """

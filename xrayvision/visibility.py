@@ -4,6 +4,7 @@ This modules contain visibility related classes
 """
 from datetime import datetime
 
+import astropy.units as u
 import numpy as np
 from sunpy.map import Map
 from sunpy.io.fits import fits
@@ -39,7 +40,7 @@ class Visibility(object):
 
     """
 
-    def __init__(self, uv, vis, xyoffset=(0., 0.), pixel_size=(1., 1.)):
+    def __init__(self, uv, vis, xyoffset=(0., 0.)*u.arcsec, pixel_size=(1., 1.)*u.arcsec):
         """
         Initialises a new Visibility object
 
@@ -56,13 +57,13 @@ class Visibility(object):
             Pixel in the given direction (x, y)
 
         """
-        self.uv = np.array(uv)
+        self.uv = uv
         self.vis = np.array(vis, dtype=complex)
         self.xyoffset = xyoffset
         self.pixel_size = pixel_size
 
     def __repr__(self):
-        return self.uv, self.vis
+        return f"{self.uv}, {self.vis}"
 
     @classmethod
     def from_fits_file(cls, filename):
@@ -94,7 +95,8 @@ class Visibility(object):
                 raise TypeError("Currently only support reading of RHESSI visibility files")
 
     @classmethod
-    def from_image(cls, image, uv, center=(0.0, 0.0), pixel_size=(1.0, 1.0)):
+    @u.quantity_input(center=u.arcsec, pixel_size=u.arcsec)
+    def from_image(cls, image, uv, center=(0.0, 0.0)*u.arcsec, pixel_size=(1.0, 1.0)*u.arcsec):
         """
         Creates a new Visibility object from the given image array
 
@@ -103,7 +105,7 @@ class Visibility(object):
         image : `numpy.ndarray`
             The 2D input image
         uv : `numpy.ndarray`
-            Array of 2xN u, v coordinates where the visibilites will be evaluated
+            Array of 2xN u, v coordinates where the visibilities will be evaluated
         center : `float` (x, y)
             The coordinates of the center of the image
         pixel_size : `float` (dx, dy)
@@ -112,12 +114,13 @@ class Visibility(object):
         Returns
         -------
         `Visibility`
-            The new visibilty object
+            The new visibility object
         """
         vis = dft_map(image, uv, center=center, pixel_size=pixel_size)
         return Visibility(uv, vis, center, pixel_size)
 
     @classmethod
+    @u.quantity_input(uv=1/u.arcsec)
     def from_map(cls, map, uv):
         """
         Creates a new Visibility object from the given map
@@ -126,11 +129,12 @@ class Visibility(object):
         ----------
         map : `sunpy.map.Map`
             The input map
-
+        uv : `numpy.ndarray`
+            Array of 2xN u, v coordinates where the visibilities will be evaluated
         Returns
         -------
         `Visibility`
-            The new visibilty object
+            The new visibility object
         """
         meta = map.meta
         new_pos = [0., 0.]
@@ -145,8 +149,10 @@ class Visibility(object):
         if "cdelt2" in meta:
             new_psize[1] = float(meta["cdelt2"])
 
-        return cls.from_image(map.data, uv, center=new_pos, pixel_size=new_psize)
+        return cls.from_image(map.data, uv, center=new_pos * u.arcsec,
+                              pixel_size=new_psize * u.arcsec)
 
+    @u.quantity_input(center=u.arcsec, pixel_size=u.arcsec)
     def to_image(self, shape, center=None, pixel_size=None):
         """
         Create a image by doing a back projection or inverse transform on the visibilities
@@ -169,27 +175,22 @@ class Visibility(object):
             Output image
 
         """
-
         offset = self.xyoffset
         if center:
             offset = center
 
         pixel = self.pixel_size
         if pixel_size:
-            if isinstance(pixel_size, (int, float)):
-                n_sizes = 1
-            else:
-                n_sizes = len(pixel_size)
-
-            if n_sizes == 1:
-                pixel = (pixel_size, pixel_size)
-            elif n_sizes == 2:
+            if pixel_size.ndim == 0:
+                pixel = pixel_size.repeat(2)
+            elif pixel_size.ndim == 1 and pixel_size.size == 2:
                 pixel = pixel_size
             else:
-                raise ValueError(f"pixel_size can have a length of 1 or 2 not {n_sizes}")
+                raise ValueError(f"Pixel_size must be scalar or of length of 2 not {pixel_size.shape}")  # noqa
 
         return idft_map(self.vis, shape, self.uv, center=offset, pixel_size=pixel)
 
+    @u.quantity_input(center=u.arcsec, pixel_size=u.arcsec)
     def to_map(self, shape=(33, 33), center=None, pixel_size=None):
         """
         Create a map from doing a back projection or inverse transform on the visibilities
@@ -210,27 +211,23 @@ class Visibility(object):
             offset and the pixel size
 
         """
-        header = {'crval1': self.xyoffset[0],
-                  'crval2': self.xyoffset[1],
-                  'cdelt1': self.pixel_size[0],
-                  'cdelt2': self.pixel_size[1]}
+        header = {'crval1': self.xyoffset[0].value,
+                  'crval2': self.xyoffset[1].value,
+                  'cdelt1': self.pixel_size[0].value,
+                  'cdelt2': self.pixel_size[1].value}
         if center:
-            header['crval1'] = center[0]
-            header['crval2'] = center[1]
+            header['crval1'] = center[0].value
+            header['crval2'] = center[1].value
 
         if pixel_size:
-            if isinstance(pixel_size, (int, float)):
-                n_sizes = 1
+            if pixel_size.ndim == 0:
+                header['cdelt1'] = pixel_size.value
+                header['cdelt2'] = pixel_size.value
+            elif pixel_size.ndim == 1 and pixel_size.size == 2:
+                header['cdelt1'] = pixel_size[0].value
+                header['cdelt2'] = pixel_size[1].value
             else:
-                n_sizes = len(pixel_size)
-            if n_sizes == 1:
-                header['cdelt1'] = pixel_size
-                header['cdelt2'] = pixel_size
-            elif n_sizes == 2:
-                header['cdelt1'] = pixel_size[0]
-                header['cdelt2'] = pixel_size[1]
-            else:
-                raise ValueError(f"pixel_size can have a length of 1 or 2 not {n_sizes}")
+                raise ValueError(f"pixel_size can have a length of 1 or 2 not {pixel_size.shape}")
 
         data = self.to_image(shape, center=center, pixel_size=pixel_size)
         return Map((data, header))
