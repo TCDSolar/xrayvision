@@ -6,11 +6,12 @@ the input has no positional information other than an arbitary 0 origin and a le
 takes inputs which have positional information `dft_map` and the inverse `idft_map`
 
 """
-
+import astropy.units as u
 import numpy as np
 
 
-def generate_xy(number_pixels, center=0.0, pixel_size=1.0):
+@u.quantity_input(center='angle', pixel_size='angle')
+def generate_xy(number_pixels, center=0.0*u.arcsec, pixel_size=1.0*u.arcsec):
     """
     Generate the x or y coordinates given the number of pixels, center and pixel size
 
@@ -50,7 +51,8 @@ def generate_xy(number_pixels, center=0.0, pixel_size=1.0):
     return x
 
 
-def generate_uv(number_pixels, center=0.0, pixel_size=1.0):
+@u.quantity_input(center='angle', pixel_size='angle')
+def generate_uv(number_pixels, center=0.0*u.arcsec, pixel_size=1.0*u.arcsec):
     """
     Generate the u or v  coordinates given the number of pixels, center and pixel size
 
@@ -86,12 +88,13 @@ def generate_uv(number_pixels, center=0.0, pixel_size=1.0):
         0.04444444,  0.08888889,  0.13333333,  0.17777778])
     """
     x = (np.arange(number_pixels) - number_pixels / 2 + 0.5) * (1 / (pixel_size * number_pixels))
-    if center != 0.0:
+    if center.value != 0.0:
         x += 1/center
     return x
 
 
-def dft_map(input_array, uv, center=(0.0, 0.0), pixel_size=(1.0, 1.0)):
+@u.quantity_input(center='angle', pixel_size='angle')
+def dft_map(input_array, uv, center=(0.0, 0.0)*u.arcsec, pixel_size=(1.0, 1.0)*u.arcsec):
     """
     Calculate the discrete Fourier transform of the array or image in terms of coordinates \
     returning a 1-D array of complex visibilities
@@ -133,7 +136,8 @@ def dft_map(input_array, uv, center=(0.0, 0.0), pixel_size=(1.0, 1.0)):
     return vis
 
 
-def idft_map(input_vis, shape, uv, center=(0.0, 0.0), pixel_size=(1.0, 1.0)):
+@u.quantity_input(center='angle', pixel_size='angle')
+def idft_map(input_vis, shape, uv, center=(0.0, 0.0)*u.arcsec, pixel_size=(1.0, 1.0)*u.arcsec):
     """
     Calculate the inverse discrete Fourier transform in terms of coordinates returning a 2D real
     array or image
