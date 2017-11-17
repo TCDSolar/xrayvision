@@ -1,5 +1,5 @@
 """
-This module contain visibility related classes
+This modules contain visibility related classes
 
 """
 from datetime import datetime
@@ -10,6 +10,8 @@ from sunpy.io.fits import fits
 
 from .transform import dft_map, idft_map
 
+__all__ = ['Visibility', 'RHESSIVisibility']
+
 
 class Visibility(object):
     """
@@ -18,16 +20,13 @@ class Visibility(object):
     Attributes
     ----------
     uv : `numpy.ndarray`
-        The u, v coordinates of the visibilities
-
+        Array of 2xN u, v coordinates where visibilities will be evaluated
     vis : `numpy.ndarray`
-        The complex visibilities
-
-    xyoffset : `tuple` (x, y)
+        Array of N complex visibilities at coordinates in `uv`
+    xyoffset : `float` (x, y), optional
         The offset x, y offset of phase center
-
-    pixel_size : array-like
-        Pixel in the given direction (x, y)
+    pixel_size : `float` (dx, dy), optional
+        Pixel size in x and y directions
 
     Methods
     -------
@@ -47,11 +46,9 @@ class Visibility(object):
         Parameters
         ----------
         uv : `numpy.ndarray`
-            The u, v coordinates of the visibilities
-
+            Array of 2xN u, v coordinates where visibilities will be evaluated
         vis : `numpy.ndarray`
             The complex visibilities
-
         xyoffset : `tuple` (x-center, y-center), optional
             The offset x, y offset of phase center
 
@@ -79,7 +76,7 @@ class Visibility(object):
 
         Returns
         -------
-        Visibility
+        `Visibility`
             The new visibilty object
 
         Raises
@@ -100,24 +97,22 @@ class Visibility(object):
     def from_image(cls, image, uv, center=(0.0, 0.0), pixel_size=(1.0, 1.0)):
         """
         Creates a new Visibility object from the given image array
-        
+
         Parameters
         ----------
-        image : `np.array`
-            The input image
-
+        image : `numpy.ndarray`
+            The 2D input image
         uv : `numpy.ndarray`
-            The v, v coordinates the visibilities will be calculated
-
-        center : array-like
+            Array of 2xN u, v coordinates where the visibilites will be evaluated
+        center : `float` (x, y)
             The coordinates of the center of the image
-        pixel_size : array-like
-            The pixel size, in terms of coordinates, for x and y directions
+        pixel_size : `float` (dx, dy)
+            The pixel size in  x and y directions
 
         Returns
         -------
-        Visibility
-            The
+        `Visibility`
+            The new visibilty object
         """
         vis = dft_map(image, uv, center=center, pixel_size=pixel_size)
         return Visibility(uv, vis, center, pixel_size)
@@ -129,13 +124,13 @@ class Visibility(object):
 
         Parameters
         ----------
-        map : sunpy.map
+        map : `sunpy.map.Map`
             The input map
 
         Returns
         -------
-        Visibility
-            The calculated
+        `Visibility`
+            The new visibilty object
         """
         meta = map.meta
         new_pos = [0., 0.]
@@ -158,15 +153,15 @@ class Visibility(object):
 
         Parameters
         ----------
-        shape : `tuple` (x, y)
-            Shape of the output map to create
+        shape : `int`
+            Shape of the output image to create (m, n)
 
-        center: `tuple`, optional
+        center : `float`, (x, y)
             Coordinates of the map center if given will override `self.xyoffset`
 
-        pixel_size: `tuple` (x_size, y_size), optional
-            Desired pixel size in term of coordinates in the x and y directions if given will over \
-            ride `self.pixel_size`
+        pixel_size : `float` (dx, dy), optional
+            Size of the pixels in x, y if only one give assumed same in both directions will \
+            override `self.pixel_size`
 
         Returns
         -------
@@ -197,21 +192,22 @@ class Visibility(object):
 
     def to_map(self, shape=(33, 33), center=None, pixel_size=None):
         """
+        Create a map from doing a back projection or inverse transform on the visibilities
 
         Parameters
         ----------
-        shape : array-like
-            (m, n) Dimension of the output map
-        center : array-like
-            (x, y) Location to center the map on
-        pixel_size : array-like, optional
-            (dx, dy) Size of the pixels in x, y if only one give assumed same in both directions
+        shape : `int` (m, n)
+            Shape of the output map in pixels
+        center : `float` (x, y)
+            Coordinates of the map center if given will override `self.xyoffset`
+        pixel_size : `float` (dx, dy), optional
+            Size of the pixels in x, y if only one give assumed same in both directions
 
         Returns
         -------
-        sunpy.map.Map
+        `sunpy.map.Map`
             Map object with the map created from the visibilities and the meta data will contain the
-            offset and the pixel's size
+            offset and the pixel size
 
         """
         header = {'crval1': self.xyoffset[0],
@@ -238,6 +234,21 @@ class Visibility(object):
 
         data = self.to_image(shape, center=center, pixel_size=pixel_size)
         return Map((data, header))
+
+    def to_fits_file(self, path):
+        """
+        Write the visibilities to a fits file
+
+        Parameters
+        ----------
+        path : 'basestr'
+            Path to fits file
+
+        Returns
+        -------
+
+        """
+        pass
 
 
 class RHESSIVisibility(Visibility):
@@ -276,6 +287,7 @@ class RHESSIVisibility(Visibility):
         detector counts
     pixel_size : `array-like`
         size of a pixel in arcseconds
+
     Examples
     --------
 
@@ -329,8 +341,13 @@ class RHESSIVisibility(Visibility):
 
         Parameters
         ----------
-        string: str
-            The string what should be converted
+        string : `str`
+            The IDL format string to be converted
+
+        Returns
+        -------
+        `str`
+            The LATEX equivalent of the IDL format string
 
         Examples
         --------
@@ -360,7 +377,7 @@ class RHESSIVisibility(Visibility):
         final_string += opened * "}"
         return final_string
 
-    @classmethod
+    @classmethod  # noqa
     def from_fits(cls, hdu_list):
         """
         Creates RHESSIVisibility objects from compatible fits files
@@ -369,6 +386,11 @@ class RHESSIVisibility(Visibility):
         ----------
         hdu_list : `list`
             List of RHESSI visibility hdus
+
+        Returns
+        -------
+        `list`
+            A list of `RHESSIVisibilty`
 
         Examples
         --------
@@ -443,3 +465,16 @@ class RHESSIVisibility(Visibility):
                         if "COUNT" in i.header.values():
                             visibilities[-1].count = np.take(i.data["count"], m)
                 return visibilities
+
+    def to_fits_file(self, path):
+        """
+
+        Parameters
+        ----------
+        path
+
+        Returns
+        -------
+
+        """
+        pass

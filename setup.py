@@ -31,11 +31,11 @@ conf.read(['setup.cfg'])
 metadata = dict(conf.items('metadata'))
 
 PACKAGENAME = metadata.get('package_name', 'xrayvision')
-DESCRIPTION = metadata.get('description', 'to CLEAN all the images')
+DESCRIPTION = metadata.get('description', 'Image reconstruction methods for Fouier type X-ray Telescopes')
 AUTHOR = metadata.get('author', 'SunPy Developers')
 AUTHOR_EMAIL = metadata.get('author_email', '')
 LICENSE = metadata.get('license', 'unknown')
-URL = metadata.get('url', 'http://sunpy.github.io/xrayvision')
+URL = metadata.get('url', 'http://sunpy.org')
 
 # order of priority for long_description:
 #   (1) set in setup.cfg,
@@ -66,7 +66,7 @@ else:
 builtins._ASTROPY_PACKAGE_NAME_ = PACKAGENAME
 
 # VERSION should be PEP440 compatible (http://www.python.org/dev/peps/pep-0440)
-VERSION = metadata.get('version', '0.0.dev')
+VERSION = metadata.get('version', '0.0.dev0')
 
 # Indicates if this version is a release version
 RELEASE = 'dev' not in VERSION
@@ -126,7 +126,7 @@ setup(name=PACKAGENAME,
       version=VERSION,
       description=DESCRIPTION,
       scripts=scripts,
-      install_requires=metadata.get('install_requires', 'astropy').strip().split(),
+      install_requires=[s.strip() for s in metadata.get('install_requires', 'astropy').split(',')],
       author=AUTHOR,
       author_email=AUTHOR_EMAIL,
       license=LICENSE,

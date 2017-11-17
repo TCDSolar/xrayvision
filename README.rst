@@ -1,11 +1,11 @@
-to CLEAN all the images
------------------------
+Image reconstruction methods for Fouier type X-ray Telescopes
+-------------------------------------------------------------
 
-.. image:: http://img.shields.io/badge/powered%20by-AstroPy-orange.svg?style=flat
-    :target: http://www.astropy.org
-    :alt: Powered by Astropy Badge
+.. image:: http://img.shields.io/badge/powered%20by-SunPy-orange.svg?style=flat 
+    :target: http://www.sunpy.org                                               
+    :alt: Powered by SunPy Badge    
 
-Have you got images to CLEAN? here you've got us to help
+
 
 
 License

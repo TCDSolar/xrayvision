@@ -18,9 +18,9 @@ def generate_xy(number_pixels, center=0.0, pixel_size=1.0):
     ----------
     number_pixels : `int`
         Number of pixels
-    center : `float`
+    center : `float`, optional
         Center coordinates
-    pixel_size : `float`
+    pixel_size : `float`, optional
         Size of pixel in physical units (e.g. arcsecs, meters)
 
     Returns
@@ -37,8 +37,14 @@ def generate_xy(number_pixels, center=0.0, pixel_size=1.0):
     These are written in doctest format, and should illustrate how to
     use the function.
 
-    >>> x = generate_xy(33)
+    >>> generate_xy(9)
+    array([-4., -3., -2., -1.,  0.,  1.,  2.,  3.,  4.])
 
+    >>> generate_xy(9, pixel_size=2.5)
+    array([-10. ,  -7.5,  -5. ,  -2.5,   0. ,   2.5,   5. ,   7.5,  10. ])
+
+    >>> generate_xy(9, center = 10, pixel_size=2.5)
+    array([  0. ,   2.5,   5. ,   7.5,  10. ,  12.5,  15. ,  17.5,  20. ])
     """
     x = (np.arange(number_pixels) - number_pixels / 2 + 0.5) * pixel_size + center
     return x
@@ -52,9 +58,9 @@ def generate_uv(number_pixels, center=0.0, pixel_size=1.0):
     ----------
     number_pixels : `int`
         Number of pixels
-    center : `float`
+    center : `float`, optional
         Center coordinates
-    pixel_size : `float`
+    pixel_size : `float`, optional
         Size of pixel in physical units (e.g. arcsecs, meters)
 
     Returns
@@ -71,8 +77,13 @@ def generate_uv(number_pixels, center=0.0, pixel_size=1.0):
     These are written in doctest format, and should illustrate how to
     use the function.
 
-    >>> x = generate_uv(33)
+    >>> generate_uv(9)
+    array([-0.44444444, -0.33333333, -0.22222222, -0.11111111,  0.        ,
+        0.11111111,  0.22222222,  0.33333333,  0.44444444])
 
+    >>> generate_uv(9, pixel_size=2.5)
+    array([-0.17777778, -0.13333333, -0.08888889, -0.04444444,  0.        ,
+        0.04444444,  0.08888889,  0.13333333,  0.17777778])
     """
     x = (np.arange(number_pixels) - number_pixels / 2 + 0.5) * (1 / (pixel_size * number_pixels))
     if center != 0.0:
@@ -88,21 +99,19 @@ def dft_map(input_array, uv, center=(0.0, 0.0), pixel_size=(1.0, 1.0)):
     Parameters
     ----------
     input_array : `numpy.ndarray`
-        Input array to be transformed
-
+        Input array to be transformed should be 2D (m, n)
     uv : `numpy.array`
-        Array of u, v coordinates where visibilities will be calculated
-
-    center : `tuple` (x, y), optional
-        Coordinates of the center of the map
-
-    pixel_size : `tuple` (x_size, y_size), optional
-        The size of a pixel in (x_size, y_size) format
+        Array of 2xN u, v coordinates where the visibilities will be evaluated
+    center : `float` (x, y), optional
+        Coordinates of the center of the map e.g. ``(0,0)`` or ``[5.0, -2.0]``
+    pixel_size : `float` (dx, dy), optional
+        The pixel size in x and y directions, need not be square e.g. ``(1, 3)``
 
     Returns
     -------
     `numpy.ndarray`
-        The complex visibilities evaluated at the u, v coordinates given bu `uv`
+        Array of N `complex` visibilities evaluated at the u, v coordinates \
+        given bu `uv`
 
     """
     m, n = input_array.shape
@@ -126,31 +135,25 @@ def dft_map(input_array, uv, center=(0.0, 0.0), pixel_size=(1.0, 1.0)):
 
 def idft_map(input_vis, shape, uv, center=(0.0, 0.0), pixel_size=(1.0, 1.0)):
     """
-    Calculate the inverse discrete Fourier transform in terms of coordinates returning a 2-D real
+    Calculate the inverse discrete Fourier transform in terms of coordinates returning a 2D real
     array or image
 
     Parameters
     ----------
-    input_vis : array-like
-        The input visibilities to use
-
-    shape : (x,y)
-        The shape of the array
-
-    uv : array-like
-        The u, v coordinates corresponding to the input visibilities in `input_visibilities`
-
-    center: array-like
-        Position of the center of the transformation. The center
-        of the result image is (0,0) and the direction of the x axis is ->
-        and the direction of the y axis is ^
-
-    pixel_size: array-like
-        The size of a pixel in (x_size, y_size) format
+    input_vis : `numpy.ndarray`
+        Array of N `complex` input visibilities
+    shape : `float` (m,n)
+        The shape of the output arry to create
+    uv : `numpy.ndarray`
+        Array of 2xN u, v coordinates corresponding to the input visibilities in `input_vis`
+    center : `float` (x, y), optional
+        Coordinates of the center of the map e.g. ``(0,0)`` or ``[5.0, -2.0]``
+    pixel_size : `float` (dx, dy), optional
+        The pixel size in x and y directions, need not be square e.g. ``(1, 3)``
 
     Returns
     -------
-    array-like
+    `numpy.ndarray`
         The complex visibilities evaluated at the u, v coordinates
 
     """
@@ -175,7 +178,8 @@ def idft_map(input_vis, shape, uv, center=(0.0, 0.0), pixel_size=(1.0, 1.0)):
 
 # def dft(im, uv):
 #     """
-#     Discrete Fourier transform of the input array or image calculated at the given u, v coordinates
+#     Discrete Fourier transform of the input array or image calculated at the given u, v
+#     coordinates
 #
 #     Loops over a list of u, v coordinates rather than looping over u and v separately
 #
