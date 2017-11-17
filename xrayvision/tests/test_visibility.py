@@ -190,7 +190,7 @@ class TestVisibility(object):
 
         vis = Visibility.from_image(data, uv)
         with pytest.raises(ValueError):
-            vis.to_image((m, n), pixel_size=[1,2,2] * unit.arcsec)
+            vis.to_image((m, n), pixel_size=[1, 2, 2] * unit.arcsec)
 
     @pytest.mark.parametrize("m,n,pos,pixel", [(33, 33, (10., -5.), (2., 3.)),
                                                (32, 32, (-12, -19), (1., 5.))])
@@ -252,7 +252,7 @@ class TestVisibility(object):
         vis = Visibility.from_map(mp, uv)
 
         with pytest.raises(ValueError):
-            res = vis.to_map((m, n), pixel_size=[1, 2, 3] * unit.arcsec)
+            vis.to_map((m, n), pixel_size=[1, 2, 3] * unit.arcsec)
 
 
 class TestRHESSIVisibility(object):

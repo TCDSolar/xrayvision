@@ -1,5 +1,5 @@
 """
-Discrete Fourier Transform (DFT) and Inverse Discrete Fourier Transform (IDFT) related functions
+Discrete Fourier Transform (DFT) and Inverse Discrete Fourier Transform (IDFT) related functions.
 
 There are two implementations one a standard DFT `dft` and IDFT `idft` in terms of pixel space, i.e.
 the input has no positional information other than an arbitary 0 origin and a length. The second
@@ -14,7 +14,7 @@ import numpy as np
 @u.quantity_input(center='angle', pixel_size='angle')
 def generate_xy(number_pixels, center=0.0 * u.arcsec, pixel_size=1.0 * u.arcsec):
     """
-    Generate the x or y coordinates given the number of pixels, center and pixel size
+    Generate the x or y coordinates given the number of pixels, center and pixel size.
 
     Parameters
     ----------
@@ -47,6 +47,7 @@ def generate_xy(number_pixels, center=0.0 * u.arcsec, pixel_size=1.0 * u.arcsec)
 
     >>> generate_xy(9, center=10 * u.arcsec, pixel_size=2.5 * u.arcsec)
     <Quantity [  0. ,   2.5,   5. ,   7.5,  10. ,  12.5,  15. ,  17.5,  20. ] arcsec>
+
     """
     x = (np.arange(number_pixels) - number_pixels / 2 + 0.5) * pixel_size + center
     return x
@@ -55,7 +56,7 @@ def generate_xy(number_pixels, center=0.0 * u.arcsec, pixel_size=1.0 * u.arcsec)
 @u.quantity_input(center='angle', pixel_size='angle')
 def generate_uv(number_pixels, center=0.0 * u.arcsec, pixel_size=1.0 * u.arcsec):
     """
-    Generate the u or v  coordinates given the number of pixels, center and pixel size
+    Generate the u or v  coordinates given the number of pixels, center and pixel size.
 
     Parameters
     ----------
@@ -91,6 +92,7 @@ def generate_uv(number_pixels, center=0.0 * u.arcsec, pixel_size=1.0 * u.arcsec)
     >>> generate_uv(9, center=10 * u.arcsec, pixel_size=2.5 * u.arcsec)
     <Quantity [-0.07777778,-0.03333333, 0.01111111, 0.05555556, 0.1       ,
                 0.14444444, 0.18888889, 0.23333333, 0.27777778] 1 / arcsec>
+
     """
     x = (np.arange(number_pixels) - number_pixels / 2 + 0.5) * (1 / (pixel_size * number_pixels))
     if center.value != 0.0:
@@ -100,9 +102,8 @@ def generate_uv(number_pixels, center=0.0 * u.arcsec, pixel_size=1.0 * u.arcsec)
 
 @u.quantity_input(center='angle', pixel_size='angle')
 def dft_map(input_array, uv, center=(0.0, 0.0) * u.arcsec, pixel_size=(1.0, 1.0) * u.arcsec):
-    """
-    Calculate the discrete Fourier transform of the array or image in terms of coordinates \
-    returning a 1-D array of complex visibilities
+    r"""
+    Discrete Fourier transform in terms of coordinates returning 1-D array complex visibilities.
 
     Parameters
     ----------
@@ -154,9 +155,8 @@ def dft_map(input_array, uv, center=(0.0, 0.0) * u.arcsec, pixel_size=(1.0, 1.0)
 
 @u.quantity_input(center='angle', pixel_size='angle')
 def idft_map(input_vis, shape, uv, center=(0.0, 0.0) * u.arcsec, pixel_size=(1.0, 1.0) * u.arcsec):
-    """
-    Calculate the inverse discrete Fourier transform in terms of coordinates returning a 2D real
-    array or image
+    r"""
+    Inverse discrete Fourier transform in terms of coordinates returning a 2D real array or image.
 
     Parameters
     ----------

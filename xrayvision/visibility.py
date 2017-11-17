@@ -1,6 +1,8 @@
 """
-This modules contain visibility related classes
+Modules contains visibility related classes.
 
+This contains classes to hold general visibilities and specialised classes hold visibilities from
+certain spacecraft or instruments
 """
 from datetime import datetime
 
@@ -15,8 +17,8 @@ __all__ = ['Visibility', 'RHESSIVisibility']
 
 
 class Visibility(object):
-    """
-    A class to hold a set of visibilities and related information
+    r"""
+    A class to hold a set of visibilities and related information.
 
     Attributes
     ----------
@@ -41,8 +43,8 @@ class Visibility(object):
     """
 
     def __init__(self, uv, vis, xyoffset=(0., 0.)*u.arcsec, pixel_size=(1., 1.)*u.arcsec):
-        """
-        Initialises a new Visibility object
+        r"""
+        Initialise a new Visibility object.
 
         Parameters
         ----------
@@ -63,12 +65,20 @@ class Visibility(object):
         self.pixel_size = pixel_size
 
     def __repr__(self):
+        r"""
+        Return a printable representation of the visibility.
+
+        Returns
+        -------
+        `str`
+
+        """
         return f"{self.uv}, {self.vis}"
 
     @classmethod
     def from_fits_file(cls, filename):
-        """
-        Create a new visibility object from a fits file
+        r"""
+        Create a new visibility object from a fits file.
 
         Parameters
         ----------
@@ -97,8 +107,8 @@ class Visibility(object):
     @classmethod
     @u.quantity_input(center=u.arcsec, pixel_size=u.arcsec)
     def from_image(cls, image, uv, center=(0.0, 0.0)*u.arcsec, pixel_size=(1.0, 1.0)*u.arcsec):
-        """
-        Creates a new Visibility object from the given image array
+        r"""
+        Create a new Visibility object from the given image array.
 
         Parameters
         ----------
@@ -115,19 +125,20 @@ class Visibility(object):
         -------
         `Visibility`
             The new visibility object
+
         """
         vis = dft_map(image, uv, center=center, pixel_size=pixel_size)
         return Visibility(uv, vis, center, pixel_size)
 
     @classmethod
     @u.quantity_input(uv=1/u.arcsec)
-    def from_map(cls, map, uv):
-        """
-        Creates a new Visibility object from the given map
+    def from_map(cls, inmap, uv):
+        r"""
+        Create a new Visibility object from the given map.
 
         Parameters
         ----------
-        map : `sunpy.map.Map`
+        inmap : `sunpy.map.Map`
             The input map
         uv : `numpy.ndarray`
             Array of 2xN u, v coordinates where the visibilities will be evaluated
@@ -135,8 +146,9 @@ class Visibility(object):
         -------
         `Visibility`
             The new visibility object
+
         """
-        meta = map.meta
+        meta = inmap.meta
         new_pos = [0., 0.]
         if "crval1" in meta:
             new_pos[0] = float(meta["crval1"])
@@ -149,13 +161,13 @@ class Visibility(object):
         if "cdelt2" in meta:
             new_psize[1] = float(meta["cdelt2"])
 
-        return cls.from_image(map.data, uv, center=new_pos * u.arcsec,
+        return cls.from_image(inmap.data, uv, center=new_pos * u.arcsec,
                               pixel_size=new_psize * u.arcsec)
 
     @u.quantity_input(center=u.arcsec, pixel_size=u.arcsec)
     def to_image(self, shape, center=None, pixel_size=None):
-        """
-        Create a image by doing a back projection or inverse transform on the visibilities
+        r"""
+        Create a image by doing a back projection or inverse transform on the visibilities.
 
         Parameters
         ----------
@@ -192,8 +204,8 @@ class Visibility(object):
 
     @u.quantity_input(center=u.arcsec, pixel_size=u.arcsec)
     def to_map(self, shape=(33, 33), center=None, pixel_size=None):
-        """
-        Create a map from doing a back projection or inverse transform on the visibilities
+        r"""
+        Create a map from doing a back projection or inverse transform on the visibilities.
 
         Parameters
         ----------
@@ -234,7 +246,7 @@ class Visibility(object):
 
     def to_fits_file(self, path):
         """
-        Write the visibilities to a fits file
+        Write the visibilities to a fits file.
 
         Parameters
         ----------
@@ -302,6 +314,28 @@ class RHESSIVisibility(Visibility):
                  units: str="Photons cm!u-2!n s!u-1!n",
                  attenuator_state: int=1, count=None,
                  pixel_size: np.array=np.array([1.0, 1.0])):
+        r"""
+        Initialise a new RHESSI visibility.
+
+        Parameters
+        ----------
+        uv
+        vis
+        isc
+        harm
+        energy_range
+        time_range
+        total_flux
+        sigamp
+        chi2
+        xyoffset
+        type_string
+        units
+        attenuator_state
+        count
+        pixel_size
+
+        """
         super().__init__(uv, vis, xyoffset, pixel_size)
         if isc is None:
             self.isc = np.zeros(vis.shape)
@@ -333,8 +367,7 @@ class RHESSIVisibility(Visibility):
     @staticmethod
     def convert_units_to_tex(string: str):
         """
-        String is converted from idl format to tex, if it already is,
-        there will be no conversation
+        Convert from idl format to latex, if it already is there will be no conversation.
 
         Parameters
         ----------
@@ -351,6 +384,7 @@ class RHESSIVisibility(Visibility):
 
         Notes
         -----
+
         """
         final_string = ""
         opened = 0
@@ -377,7 +411,7 @@ class RHESSIVisibility(Visibility):
     @classmethod  # noqa
     def from_fits(cls, hdu_list):
         """
-        Creates RHESSIVisibility objects from compatible fits files
+        Create RHESSIVisibility from compatible fits hdus.
 
         Parameters
         ----------
@@ -396,6 +430,7 @@ class RHESSIVisibility(Visibility):
         -----
         It separates the Visibility data based on the time and energy
         ranges.
+
         """
         for i in hdu_list:
             if i.name == "VISIBILITY":
@@ -417,15 +452,15 @@ class RHESSIVisibility(Visibility):
                             return i
 
                 for j, k in enumerate(erange_unique):
-                        data_sort[j] = {}
+                    data_sort[j] = {}
 
                 for j, k in enumerate(trange):
-                        eind = find_erange(erange[j])
-                        tind = find_trange(k)
-                        if tind not in data_sort[eind]:
-                            data_sort[eind][tind] = [j]
-                        else:
-                            data_sort[eind][tind].append(j)
+                    eind = find_erange(erange[j])
+                    tind = find_trange(k)
+                    if tind not in data_sort[eind]:
+                        data_sort[eind][tind] = [j]
+                    else:
+                        data_sort[eind][tind].append(j)
 
                 # Creating the RHESSIVisibilities
                 visibilities = []
@@ -435,9 +470,9 @@ class RHESSIVisibility(Visibility):
                                                              np.array([[], []]),
                                                              energy_range=erange_unique[j],
                                                              time_range=trange_unique[l]))
-                        u = np.take(i.data["u"], m)
-                        v = np.take(i.data["v"], m)
-                        visibilities[-1].uv = np.array([u, v])
+                        uu = np.take(i.data["u"], m)
+                        vv = np.take(i.data["v"], m)
+                        visibilities[-1].uv = np.array([uu, vv])
                         if "XYOFFSET" in i.header.values():
                             visibilities[-1].xyoffset = i.data["xyoffset"][m[0]]
                         if "ISC" in i.header.values():
@@ -465,6 +500,7 @@ class RHESSIVisibility(Visibility):
 
     def to_fits_file(self, path):
         """
+        Write the visibility to a fits file.
 
         Parameters
         ----------
