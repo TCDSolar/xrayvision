@@ -147,6 +147,7 @@ def dft_map(input_array, uv, center=(0.0, 0.0) * u.arcsec, pixel_size=(1.0, 1.0)
                 input_array.reshape(size) * np.exp(
                     -2j * np.pi * (uv[0, i] * x + uv[1, i] * y)))
 
+
         return vis
     else:
         raise UnitsError("Incompatible units on uv {uv.unit} should cancel with xy "

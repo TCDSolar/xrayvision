@@ -105,6 +105,7 @@ class Visibility(object):
                 raise TypeError("Currently only support reading of RHESSI visibility files")
 
     @classmethod
+
     @u.quantity_input(center=u.arcsec, pixel_size=u.arcsec)
     def from_image(cls, image, uv, center=(0.0, 0.0)*u.arcsec, pixel_size=(1.0, 1.0)*u.arcsec):
         r"""
@@ -124,6 +125,7 @@ class Visibility(object):
         Returns
         -------
         `Visibility`
+
             The new visibility object
 
         """
@@ -204,6 +206,7 @@ class Visibility(object):
 
     @u.quantity_input(center=u.arcsec, pixel_size=u.arcsec)
     def to_map(self, shape=(33, 33), center=None, pixel_size=None):
+
         r"""
         Create a map from doing a back projection or inverse transform on the visibilities.
 
