@@ -1,4 +1,8 @@
-"""CLEAN algorithms"""
+"""
+CLEAN algorithms.
+
+adsf
+"""
 
 
 import numpy as np
@@ -10,8 +14,8 @@ __all__ = ['clean']
 
 
 def clean(dirty_map, dirty_beam, clean_beam_width=4.0, gain=0.1, thres=0.01, niter=1000):
-    """
-    Clean the image using Hogbom's orginal method
+    r"""
+    Clean the image using Hogbom's orginal method.
 
     Will stop when either `thres` is reached or `niter`
     iteration have been completed.
@@ -36,13 +40,14 @@ def clean(dirty_map, dirty_beam, clean_beam_width=4.0, gain=0.1, thres=0.01, nit
     -------
     `numpy.ndarray`
         The CLEAN image 2D
+
     """
     # Assume bear center is in middle
     beam_center = (dirty_beam.shape[0] - 1)/2.0, (dirty_beam.shape[1] - 1)/2.0
 
     # Model for sources
     model = np.zeros(dirty_map.shape)
-    for i in range(niter):
+    for _i in range(niter):
         # Find max in dirty map and save to point source
         mx, my = np.unravel_index(dirty_map.argmax(), dirty_map.shape)
         Imax = dirty_map[mx, my]

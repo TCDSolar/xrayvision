@@ -1,5 +1,6 @@
 import numpy as np
 import pytest
+import astropy.units as u
 from astropy.convolution import Gaussian2DKernel
 
 
@@ -9,6 +10,7 @@ from ..transform import generate_xy, generate_uv, dft_map, idft_map
 @pytest.mark.parametrize("pixel_size", [0.5, 1, 2, 3])
 def test_generate_xy_pixel_size(pixel_size):
     # Odd
+    pixel_size = pixel_size * u.arcsec
     odd = np.linspace(-16 * pixel_size, 16 * pixel_size, 33)
     assert np.array_equal(odd, generate_xy(33, pixel_size=pixel_size))
 
@@ -20,11 +22,12 @@ def test_generate_xy_pixel_size(pixel_size):
 @pytest.mark.parametrize("center", [0, +5.5, -5.5])
 def test_generate_xy_offset(center):
     # Odd
-    odd = np.linspace(-16, 16, 33) + center
+    center = center * u.arcsec
+    odd = np.linspace(-16, 16, 33) * u.arcsec + center
     assert np.array_equal(odd, generate_xy(33, center=center))
 
     # Even
-    even = np.linspace(-15.5, 15.5, 32) + center
+    even = np.linspace(-15.5, 15.5, 32) * u.arcsec + center
     assert np.array_equal(even, generate_xy(32, center=center))
 
 
@@ -32,6 +35,9 @@ def test_generate_xy_offset(center):
                                                 (+5.5, (0.5, 1, 2, 3)),
                                                 (-5.5, (0.5, 1, 2, 3))])
 def test_generate_xy_offset_size(center, pixel_size):
+    center = center * u.arcsec
+    pixel_size = pixel_size * u.arcsec
+    # No sure if this is a good idea could be hard to debug
     for size in pixel_size:
         # Odd
         odd = np.linspace(-16 * size, 16 * size, 33) + center
@@ -44,40 +50,46 @@ def test_generate_xy_offset_size(center, pixel_size):
 
 @pytest.mark.parametrize("pixel_size", [0.5, 1, 2, 3])
 def test_generate_uv_pixel_size(pixel_size):
+    pixel_size = pixel_size * u.arcsec
     m = 33
     n = 32
 
     # Odd
     odd = np.linspace(-((m-1)/2) * (1/(m * pixel_size)), ((m-1)/2) * (1/(m * pixel_size)), m)
-    assert np.allclose(odd, generate_uv(m, pixel_size=pixel_size))
+
+    # Know issue with quantities and isclose/allclose need to add unit to atol default value
+    assert np.allclose(odd, generate_uv(m, pixel_size=pixel_size), atol=1e-8/u.arcsec)
 
     # Even
     even = (np.arange(n) - n / 2 + 0.5) * (1 / (pixel_size * n))
-    assert np.allclose(even, generate_uv(32, pixel_size=pixel_size))
+    assert np.allclose(even, generate_uv(32, pixel_size=pixel_size), atol=1e-8 / u.arcsec)
 
 
 @pytest.mark.parametrize("center", [0.0, -5.5, 5.5])
 def test_generate_uv_pixel_offset(center):
+    center = center * u.arcsec
     m = 33
     n = 32
 
     # Odd
-    odd = np.linspace(-((m-1)/2) * (1/m), ((m-1)/2) * (1/m), m)
-    if center != 0:
+    odd = np.linspace(-((m-1)/2) * (1/m), ((m-1)/2) * (1/m), m) / u.arcsec
+    if center.value != 0:
         odd += 1/center
-    assert np.allclose(odd, generate_uv(m, center=center))
+    assert np.allclose(odd, generate_uv(m, center=center), atol=1e-8 / u.arcsec)
 
     # Even
-    even = (np.arange(n) - n / 2 + 0.5) * (1 / n)
-    if center != 0:
+    even = (np.arange(n) - n / 2 + 0.5) * (1 / n) / u.arcsec
+    if center.value != 0:
         even += 1/center
-    assert np.allclose(even, generate_uv(32, center=center))
+    assert np.allclose(even, generate_uv(32, center=center), atol=1e-8 / u.arcsec)
 
 
 @pytest.mark.parametrize("center, pixel_size", [(0, (0.5, 1, 2, 3)),
                                                 (+5.5, (0.5, 1, 2, 3)),
                                                 (-5.5, (0.5, 1, 2, 3))])
 def test_generate_uv_offset_size(center, pixel_size):
+    center = center * u.arcsec
+    pixel_size = pixel_size * u.arcsec
     m = 33
     n = 32
 
@@ -86,24 +98,26 @@ def test_generate_uv_offset_size(center, pixel_size):
         odd = np.linspace(-((m - 1) / 2) * (1 / (size * m)), ((m - 1) / 2) * (1 / (size * m)), m)
         if center != 0:
             odd += 1 / center
-        assert np.allclose(odd, generate_uv(m, center=center, pixel_size=size))
+        assert np.allclose(odd, generate_uv(m, center=center, pixel_size=size),
+                           atol=1e-8 / u.arcsec)
 
         # Even
         even = (np.arange(n) - n / 2 + 0.5) * (1 / (size * n))
         if center != 0:
             even += 1 / center
-        assert np.allclose(even, generate_uv(32, center=center, pixel_size=size))
+        assert np.allclose(even, generate_uv(32, center=center, pixel_size=size),
+                           atol=1e-8 / u.arcsec)
 
 
 @pytest.mark.parametrize("shape", [(33, 33), (32, 32), (33, 32), (32, 33)])
 def test_dft_idft_map(shape):
     m, n = shape
     size = m * n
-    u = generate_uv(m)
-    v = generate_uv(n)
+    uu = generate_uv(m)
+    vv = generate_uv(n)
 
-    u, v = np.meshgrid(u, v)
-    uv = np.array([u, v]).reshape(2, size)
+    uu, vv = np.meshgrid(uu, vv)  # Loses units
+    uv = np.array([uu, vv]).reshape(2, size) / u.arcsec
 
     # All zeros
     zeros = np.zeros(shape)
@@ -136,14 +150,15 @@ def test_dft_idft_map(shape):
 
 @pytest.mark.parametrize("pixel_size", [(0.5, 3.0), (1.0, 2.0), (2.0, 1.0), (3.0, 0.5)])
 def test_dft_idft_map_pixel_size(pixel_size):
+    pixel_size = pixel_size * u.arcsec
     shape = (33, 33)
     m, n = shape
     size = m * n
-    u = generate_uv(m, pixel_size=pixel_size[0])
-    v = generate_uv(n, pixel_size=pixel_size[1])
+    uu = generate_uv(m, pixel_size=pixel_size[0])
+    vv = generate_uv(n, pixel_size=pixel_size[1])
 
-    u, v = np.meshgrid(u, v)
-    uv = np.array([u, v]).reshape(2, size)
+    uu, vv = np.meshgrid(uu, vv)  # Losses units
+    uv = np.array([uu, vv]).reshape(2, size) / u.arcsec
 
     # All zeros
     zeros = np.zeros(shape)
@@ -176,14 +191,15 @@ def test_dft_idft_map_pixel_size(pixel_size):
 
 @pytest.mark.parametrize("center", [(0, 0), (2.1, 2.1), (5.4, -5.4), (-5.6, 5.6)])
 def test_dft_idft_map_center(center):
+    center = center * u.arcsec
     shape = (33, 33)
     m, n = shape
     size = m * n
-    u = generate_uv(m, center=center[0])
-    v = generate_uv(n, center=center[1])
+    uu = generate_uv(m, center=center[0])
+    vv = generate_uv(n, center=center[1])
 
-    u, v = np.meshgrid(u, v)
-    uv = np.array([u, v]).reshape(2, size)
+    uu, vv = np.meshgrid(uu, vv)
+    uv = np.array([uu, vv]).reshape(2, size) / u.arcsec
 
     # All zeros
     zeros = np.zeros(shape)
@@ -214,19 +230,19 @@ def test_dft_idft_map_center(center):
     assert np.allclose(gaussian, out_map)
 
 
-
 @pytest.mark.parametrize("shape, pixel_size", [((33, 32), (0.5, 0.5)),
                                                ((33, 32), (1.0, 1.0)),
                                                ((33, 32), (2.0, 2.0)),
                                                ((33, 32), (3.0, 3.0))])
 def test_dft_idft_map_shape_pixel_size(shape, pixel_size):
+    pixel_size = pixel_size * u.arcsec
     m, n = shape
     size = m * n
-    u = generate_uv(m, pixel_size=pixel_size[0])
-    v = generate_uv(n, pixel_size=pixel_size[1])
+    uu = generate_uv(m, pixel_size=pixel_size[0])
+    vv = generate_uv(n, pixel_size=pixel_size[1])
 
-    u, v = np.meshgrid(u, v)
-    uv = np.array([u, v]).reshape(2, size)
+    uu, vv = np.meshgrid(uu, vv)
+    uv = np.array([uu, vv]).reshape(2, size) / u.arcsec
 
     # All zeros
     zeros = np.zeros(shape)

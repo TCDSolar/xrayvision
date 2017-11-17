@@ -1,6 +1,7 @@
 import numpy as np
 import pytest
 
+import astropy.units as unit
 from astropy.convolution import Gaussian2DKernel
 from astropy.io import fits
 
@@ -22,12 +23,12 @@ class TestVisibility(object):
         u = generate_uv(m)
         v = generate_uv(n)
         u, v = np.meshgrid(u, v)
-        uv_in = np.array([u, v]).reshape(2, size)
+        uv_in = np.array([u, v]).reshape(2, size) / unit.arcsec
 
         # For an empty map visibilities should all be zero (0+0j)
         empty_vis = Visibility.from_image(image, uv_in)
-        assert empty_vis.pixel_size == (1.0, 1.0)
-        assert empty_vis.xyoffset == (0.0, 0.0)
+        assert np.array_equal(empty_vis.pixel_size, (1.0, 1.0) * unit.arcsec)
+        assert np.array_equal(empty_vis.xyoffset, (0.0, 0.0) * unit.arcsec)
         assert np.array_equal(empty_vis.vis, np.zeros(n*m, dtype=complex))
 
     def test_from_image_with_center(self):
@@ -40,12 +41,12 @@ class TestVisibility(object):
         u = generate_uv(m)
         v = generate_uv(n)
         u, v = np.meshgrid(u, v)
-        uv_in = np.array([u, v]).reshape(2, size)
+        uv_in = np.array([u, v]).reshape(2, size) / unit.arcsec
 
         # For an empty map visibilities should all be zero (0+0j)
-        empty_vis = Visibility.from_image(image, uv_in, center=(2.0, -3.0))
-        assert empty_vis.pixel_size == (1.0, 1.0)
-        assert empty_vis.xyoffset == (2.0, -3.0)
+        empty_vis = Visibility.from_image(image, uv_in, center=(2.0, -3.0) * unit.arcsec)
+        assert np.array_equal(empty_vis.pixel_size,  (1.0, 1.0) * unit.arcsec)
+        assert np.array_equal(empty_vis.xyoffset,  (2.0, -3.0) * unit.arcsec)
         assert np.array_equal(empty_vis.vis, np.zeros(n * m, dtype=complex))
 
     def test_from_image_with_pixel_size(self):
@@ -58,19 +59,19 @@ class TestVisibility(object):
         u = generate_uv(m)
         v = generate_uv(n)
         u, v = np.meshgrid(u, v)
-        uv_in = np.array([u, v]).reshape(2, size)
+        uv_in = np.array([u, v]).reshape(2, size) / unit.arcsec
 
-        empty_vis = Visibility.from_image(image, uv_in, pixel_size=(2.0, 3.0))
-        assert empty_vis.pixel_size == (2.0, 3.0)
-        assert empty_vis.xyoffset == (0.0, 0.0)
+        empty_vis = Visibility.from_image(image, uv_in, pixel_size=(2.0, 3.0) * unit.arcsec)
+        assert np.array_equal(empty_vis.pixel_size, (2.0, 3.0) * unit.arcsec)
+        assert np.array_equal(empty_vis.xyoffset,  (0.0, 0.0) * unit.arcsec)
         assert np.array_equal(empty_vis.vis, np.zeros(n * m, dtype=complex))
 
     def test_from_image_with_center_and_pixel_size(self):
         m = n = 33
         size = m * n
 
-        cen = (2.0, -3.0)
-        pix = (2, 3)
+        cen = (2.0, -3.0) * unit.arcsec
+        pix = (2, 3) * unit.arcsec
         # Set up empty map
         image = Gaussian2DKernel(stddev=6, x_size=n, y_size=m).array
 
@@ -78,40 +79,43 @@ class TestVisibility(object):
         u = generate_uv(m, center=cen[0], pixel_size=pix[0])
         v = generate_uv(n, center=cen[1], pixel_size=pix[1])
         u, v = np.meshgrid(u, v)
-        uv_in = np.array([u, v]).reshape(2, size)
+        uv_in = np.array([u, v]).reshape(2, size) / unit.arcsec
 
-        vis = Visibility.from_image(image, uv_in, center=(2.0, -3.0), pixel_size=(2.0, 3.0))
-        assert vis.pixel_size == (2.0, 3.0)
-        assert vis.xyoffset == (2.0, -3.0)
-
-        res = vis.to_image((m, n), center=(2.0, -3.0), pixel_size=(2.0, 3.0))
+        vis = Visibility.from_image(image, uv_in, center=(2.0, -3.0) * unit.arcsec,
+                                    pixel_size=(2.0, 3.0) * unit.arcsec)
+        assert np.array_equal(vis.pixel_size, (2.0, 3.0) * unit.arcsec)
+        assert np.array_equal(vis.xyoffset, (2.0, -3.0) * unit.arcsec)
+        res = vis.to_image((m, n), center=(2.0, -3.0) * unit.arcsec,
+                           pixel_size=(2.0, 3.0) * unit.arcsec)
         assert np.allclose(res, image)
 
     @pytest.mark.parametrize("pos,pixel", [((0.0, 0.0), (1.0, 1.0)),
-                                               ((-12.0, 19.0), (1., 2.)),
-                                               ((12.0, -19.0), (1., 5.)),
-                                               ((0.0, 0.0), (1.0, 5.0))])
+                                           ((-12.0, 19.0), (1., 2.)),
+                                           ((12.0, -19.0), (1., 5.)),
+                                           ((0.0, 0.0), (1.0, 5.0))])
     def test_from_sunpy_map(self, pos, pixel):
         m = n = 33
         size = m * n
+
+        pos = pos * unit.arcsec
+        pixel = pixel * unit.arcsec
 
         # Calculate full u, v coverage so will be equivalent to a discrete Fourier transform (DFT)
         u = generate_uv(m)
         v = generate_uv(n)
         u, v = np.meshgrid(u, v)
-        uv = np.array([u, v]).reshape(2, size)
+        uv = np.array([u, v]).reshape(2, size) / unit.arcsec
 
-        header = {'crval1': pos[0], 'crval2': pos[1],
-                  'cdelt1': pixel[0], 'cdelt2': pixel[1]}
+        header = {'crval1': pos[0].value, 'crval2': pos[1].value,
+                  'cdelt1': pixel[0].value, 'cdelt2': pixel[1].value}
 
         # Astropy index order is opposite to that of numpy, is 1st dim is across second down
         data = Gaussian2DKernel(stddev=6, x_size=n, y_size=m).array
         mp = Map((data, header))
-
         vis = Visibility.from_map(mp, uv)
 
-        assert vis.pixel_size == list(pixel)
-        assert vis.xyoffset == list(pos)
+        assert np.array_equal(vis.pixel_size, pixel)
+        assert np.array_equal(vis.xyoffset, pos)
 
         res = vis.to_image((m, n), center=pos, pixel_size=pixel)
         assert np.allclose(res, data)
@@ -133,7 +137,7 @@ class TestVisibility(object):
         fits.writeto(str(p), data, header=header, overwrite=True)
 
         with pytest.raises(TypeError):
-            vis = Visibility.from_fits_file(str(p))
+            Visibility.from_fits_file(str(p))
 
     def test_to_image(self):
         m = n = 32
@@ -143,7 +147,7 @@ class TestVisibility(object):
         u = generate_uv(m)
         v = generate_uv(n)
         u, v = np.meshgrid(u, v)
-        uv = np.array([u, v]).reshape(2, size)
+        uv = np.array([u, v]).reshape(2, size) / unit.arcsec
 
         # Astropy index order is opposite to that of numpy, is 1st dim is across second down
         data = Gaussian2DKernel(stddev=6, x_size=n, y_size=m).array
@@ -158,19 +162,18 @@ class TestVisibility(object):
         size = m * n
 
         # Calculate full u, v coverage so will be equivalent to a discrete Fourier transform (DFT)
-        u = generate_uv(m, pixel_size=2.)
-        v = generate_uv(n, pixel_size=2.)
+        u = generate_uv(m, pixel_size=2. * unit.arcsec)
+        v = generate_uv(n, pixel_size=2. * unit.arcsec)
         u, v = np.meshgrid(u, v)
-        uv = np.array([u, v]).reshape(2, size)
+        uv = np.array([u, v]).reshape(2, size) / unit.arcsec
 
         # Astropy index order is opposite to that of numpy, is 1st dim is across second down
         data = Gaussian2DKernel(stddev=6, x_size=n, y_size=m).array
 
-        vis = Visibility.from_image(data, uv, pixel_size=(2., 2.))
-        res = vis.to_image((m, n), pixel_size=2.)
+        vis = Visibility.from_image(data, uv, pixel_size=(2., 2.) * unit.arcsec)
+        res = vis.to_image((m, n), pixel_size=2. * unit.arcsec)
         assert res.shape == (m, n)
         assert np.allclose(data, res)
-
 
     def test_to_image_invalid_pixel_size(self):
         m = n = 32
@@ -180,25 +183,27 @@ class TestVisibility(object):
         u = generate_uv(m)
         v = generate_uv(n)
         u, v = np.meshgrid(u, v)
-        uv = np.array([u, v]).reshape(2, size)
+        uv = np.array([u, v]).reshape(2, size) / unit.arcsec
 
         # Astropy index order is opposite to that of numpy, is 1st dim is across second down
         data = Gaussian2DKernel(stddev=6, x_size=n, y_size=m).array
 
         vis = Visibility.from_image(data, uv)
         with pytest.raises(ValueError):
-            res = vis.to_image((m, n), pixel_size=[1,2,2])
+            vis.to_image((m, n), pixel_size=[1, 2, 2] * unit.arcsec)
 
     @pytest.mark.parametrize("m,n,pos,pixel", [(33, 33, (10., -5.), (2., 3.)),
                                                (32, 32, (-12, -19), (1., 5.))])
     def test_to_sunpy_map(self, m, n, pos, pixel):
+        pos = pos * unit.arcsec
+        pixel = pixel * unit.arcsec
         u = generate_uv(m, pos[0], pixel[0])
         v = generate_uv(m, pos[1], pixel[1])
         u, v = np.meshgrid(u, v)
-        uv = np.array([u, v]).reshape(2, m * n)
+        uv = np.array([u, v]).reshape(2, m * n) / unit.arcsec
 
-        header = {'crval1': pos[0], 'crval2': pos[1],
-                  'cdelt1': pixel[0], 'cdelt2': pixel[1]}
+        header = {'crval1': pos[0].value, 'crval2': pos[1].value,
+                  'cdelt1': pixel[0].value, 'cdelt2': pixel[1].value}
         data = Gaussian2DKernel(stddev=2, x_size=n, y_size=m).array
         mp = Map((data, header))
 
@@ -206,19 +211,20 @@ class TestVisibility(object):
 
         res = vis.to_map((m, n), center=pos, pixel_size=pixel)
         assert np.allclose(res.data, data)
-        assert res.meta['crval1'] == pos[0]
-        assert res.meta['crval2'] == pos[1]
-        assert res.meta['cdelt1'] == pixel[0]
-        assert res.meta['cdelt2'] == pixel[1]
-        assert res.meta['naxis1'] == m
-        assert res.meta['naxis2'] == n
+
+        assert res.reference_coordinate.Tx == pos[0]
+        assert res.reference_coordinate.Ty == pos[1]
+        assert res.scale.axis1 == pixel[0] / unit.pix
+        assert res.scale.axis2 == pixel[1] / unit.pix
+        assert res.dimensions.x == m * unit.pix
+        assert res.dimensions.y == n * unit.pix
 
     def test_to_sunpy_single_pixel_size(self):
         m = n = 32
-        u = generate_uv(m, pixel_size=2.)
-        v = generate_uv(m, pixel_size=2.)
+        u = generate_uv(m, pixel_size=2. * unit.arcsec)
+        v = generate_uv(m, pixel_size=2. * unit.arcsec)
         u, v = np.meshgrid(u, v)
-        uv = np.array([u, v]).reshape(2, m * n)
+        uv = np.array([u, v]).reshape(2, m * n) / unit.arcsec
 
         header = {'crval1': 0, 'crval2': 0,
                   'cdelt1': 2, 'cdelt2': 2}
@@ -226,7 +232,7 @@ class TestVisibility(object):
         mp = Map((data, header))
 
         vis = Visibility.from_map(mp, uv)
-        res = vis.to_map((m, n), pixel_size=2,)
+        res = vis.to_map((m, n), pixel_size=2 * unit.arcsec)
         assert res.meta['cdelt1'] == 2.
         assert res.meta['cdelt1'] == 2.
         assert np.allclose(data, res.data)
@@ -236,7 +242,7 @@ class TestVisibility(object):
         u = generate_uv(m)
         v = generate_uv(m)
         u, v = np.meshgrid(u, v)
-        uv = np.array([u, v]).reshape(2, m * n)
+        uv = np.array([u, v]).reshape(2, m * n) / unit.arcsec
 
         header = {'crval1': 0, 'crval2': 0,
                   'cdelt1': 1, 'cdelt2': 1}
@@ -246,7 +252,7 @@ class TestVisibility(object):
         vis = Visibility.from_map(mp, uv)
 
         with pytest.raises(ValueError):
-            res = vis.to_map((m, n), pixel_size=[1,2,3])
+            vis.to_map((m, n), pixel_size=[1, 2, 3] * unit.arcsec)
 
 
 class TestRHESSIVisibility(object):
