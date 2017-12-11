@@ -135,16 +135,18 @@ def dft_map(input_array, uv, center=(0.0, 0.0) * u.arcsec, pixel_size=(1.0, 1.0)
     y = y.reshape(size)
 
     # Check units are correct for exp need to be dimensionless and then remove units for speed
-    if (uv[0, :] * x).unit == u.dimensionless_unscaled and \
-            (uv[1, :] * y).unit == u.dimensionless_unscaled:
+    if (uv[0, :] * x[0]).unit == u.dimensionless_unscaled and \
+            (uv[1, :] * y[0]).unit == u.dimensionless_unscaled:
 
         uv = uv.value
         x = x.value
         y = y.value
 
+        input_array = input_array.reshape(size)
+
         for i in range(uv.shape[1]):
             vis[i] = np.sum(
-                input_array.reshape(size) * np.exp(
+                input_array * np.exp(
                     -2j * np.pi * (uv[0, i] * x + uv[1, i] * y)))
 
         return vis
@@ -190,15 +192,15 @@ def idft_map(input_vis, shape, uv, center=(0.0, 0.0) * u.arcsec, pixel_size=(1.0
     im = np.zeros(size)
 
     # Check units are correct for exp need to be dimensionless and then remove units for speed
-    if (uv[0, :] * x).unit == u.dimensionless_unscaled and \
-            (uv[1, :] * y).unit == u.dimensionless_unscaled:
+    if (uv[0, :] * x[0]).unit == u.dimensionless_unscaled and \
+            (uv[1, :] * y[0]).unit == u.dimensionless_unscaled:
 
         uv = uv.value
         x = x.value
         y = y.value
 
         for i in range(size):
-            im[i] = (1 / input_vis.size) * \
+            im[i] = (1 / size) * \
                     np.real(np.sum(
                         input_vis * np.exp(2j * np.pi * (uv[0, :] * x[i] + uv[1, :] * y[i]))))
 

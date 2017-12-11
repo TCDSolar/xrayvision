@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 import astropy.units as u
 from astropy.convolution import Gaussian2DKernel
+from scipy import signal
 
 
 from ..transform import generate_xy, generate_uv, dft_map, idft_map
@@ -271,3 +272,69 @@ def test_dft_idft_map_shape_pixel_size(shape, pixel_size):
     vis = dft_map(gaussian, uv, pixel_size=pixel_size)
     out_map = idft_map(vis, shape, uv, pixel_size=pixel_size)
     assert np.allclose(gaussian, out_map)
+
+
+def test_equivalence_of_convolve():
+    data = np.zeros((33, 33))
+    #data[16,16] = 10.0
+    data[3:6,3:6] = 5.0
+
+    m, n = (33, 33)
+    size = m * n
+    uu = generate_uv(m)
+    vv = generate_uv(n)
+
+    uu, vv = np.meshgrid(uu, vv)  # Loses units
+    uv = np.array([uu, vv]).reshape(2, size) / u.arcsec
+
+
+    full_vis = dft_map(data, uv)
+
+    sampling = np.random.choice(2, size=(33**2))*1
+    sampling.reshape(33,33)[16,16] = 1
+    sub_vis = sampling * full_vis
+
+    bp1 = idft_map(full_vis, (33, 33), uv)
+
+    bp2 = idft_map(sub_vis, (33, 33), uv)
+
+    psf1 = idft_map(sampling, (33, 33), uv)
+
+    conv = signal.convolve(data, psf1, mode='same', method='fft')
+
+    non_zero = np.where(sampling != 0)[0]
+
+    psf2 = idft_map(sampling[non_zero], (33, 33), uv[:, non_zero])
+
+    bp3 = idft_map(full_vis[non_zero], (33, 33), uv[:, non_zero])
+
+    assert np.allclose(bp2, conv)
+    assert np.allclose(bp2, bp3)
+    assert np.allclose(psf1, psf2)
+
+
+def test_clean_sim():
+    data = np.zeros((33, 33))
+    #data[16,16] = 10.0
+    data[3:6,3:6] = 5.0
+
+
+    half_log_space = np.logspace(np.log10(0.03030303), np.log10(0.48484848), 10)
+
+    theta = np.linspace(0, 2*np.pi, 32)
+    theta = theta[np.newaxis, :]
+    theta = np.repeat(theta, 10, axis=0)
+
+    r = half_log_space
+    r = r[:, np.newaxis]
+    r = np.repeat(r, 32, axis=1)
+
+    x = r * np.sin(theta)
+    y = r * np.cos(theta)
+
+    sub_uv = np.vstack([x.flatten(), y.flatten()])
+    sub_uv = np.hstack([sub_uv, np.zeros((2, 1))]) / u.arcsec
+
+    vis = dft_map(data, sub_uv)
+
+

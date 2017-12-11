@@ -5,7 +5,7 @@ from ..clean import clean, ms_clean, component, radial_prolate_sphereoidal,\
     vec_radial_prolate_sphereoidal
 
 
-def test_clean():
+def test_clean_ideal():
     n = m = 65
     pos1 = [15, 30]
     pos2 = [40, 32]
@@ -17,17 +17,17 @@ def test_clean():
     dirty_beam = np.zeros((n, m))
     dirty_beam[(n-1)//4:(n-1)//4 + (n-1)//2, (m-1)//2] = 0.75
     dirty_beam[(n-1)//2, (m-1)//4:(m-1)//4 + (m-1)//2, ] = 0.75
-    dirty_beam[(n-1)//2, (m-1)//2] = 1.0
+    dirty_beam[(n-1)//2, (m-1)//2] = 0.8
 
-    dirty_map = signal.convolve2d(clean_map, dirty_beam, mode='same')
+    dirty_map = signal.convolve(clean_map, dirty_beam, mode='same')
 
     # Disable convolution of model with gaussian for testing
     out_map = clean(dirty_map, dirty_beam, clean_beam_width=0.0)
 
     # Within threshold default threshold
-    assert np.allclose(clean_map, out_map, atol=0.01)
-    temp = np.argsort(out_map.ravel())[-2:]
-    max_locations = np.dstack(np.unravel_index(temp, out_map.shape))
+    assert np.allclose(clean_map, (out_map[0]+out_map[1]), out_map, atol=0.01)
+    temp = np.argsort((out_map[0]+out_map[1]).ravel())[-2:]
+    max_locations = np.dstack(np.unravel_index(temp, out_map[0].shape))
     # Position of max equal those set above
     assert max_locations[0][1].tolist() == pos1
     assert max_locations[0][0].tolist() == pos2
@@ -87,12 +87,21 @@ def test_ms_clean():
     dirty_map = signal.convolve2d(clean_map, dirty_beam, mode='same')
 
     # Disable convolution of model with gaussian for testing
-    out_map = ms_clean(dirty_map, dirty_beam, scales=[0], clean_beam_width=0.0)
+    model, res = ms_clean(dirty_map, dirty_beam, scales=[0], clean_beam_width=0.0)
+    recovered = model+res
 
     # Within threshold default threshold
-    assert np.allclose(clean_map, out_map, atol=0.01)
-    temp = np.argsort(out_map.ravel())[-2:]
-    max_locations = np.dstack(np.unravel_index(temp, out_map.shape))
+    assert np.allclose(clean_map, recovered, atol=0.01)
+
+    # Disable convolution of model with gaussian for testing
+    model, res = ms_clean(dirty_map, dirty_beam, scales=[1], clean_beam_width=0.0)
+    recovered = model+res
+
+    assert np.allclose(clean_map, recovered, atol=0.01)
+
+    # This seem point less as images match pixel by pixel
+    #temp = np.argsort(recovered.ravel())[-2:]
+    #max_locations = np.dstack(np.unravel_index(temp, recovered.shape))
     # Position of max equal those set above
-    assert max_locations[0][1].tolist() == pos1
-    assert max_locations[0][0].tolist() == pos2
+    #assert max_locations[0][1].tolist() == pos1
+    #assert max_locations[0][0].tolist() == pos2

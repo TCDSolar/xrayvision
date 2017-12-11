@@ -1,16 +1,25 @@
-************************
-xrayvision Documentation
-************************
+========================
+Xrayvision documentation
+========================
 
-This is the documentation for xrayvision.
+.. rubric:: Everything you need to know about Xrayvision.
 
-Reference/API
-=============
+How the documentation is organized
+==================================
 
-.. automodapi:: xrayvision
+xrayvision's (**X-RAY** **VI**\ sibility **S**\ ynthesis **I**\ magi\ **N**\ g) documentation is broken into the following sections:
 
-.. automodapi:: xrayvision.visibility
+* Introduction - brief introduction to Fourier or synthesis imaging concepts and their application to X-ray imaging
+* Tutorial - step by step guide taking a new user through a simple example
+* How to's - short examples demonstrating how to perform common tasks
+* Articles - more in depth discussion of topics such as nomenclature and historical aspects.
 
-.. automodapi:: xrayvision.transform
+Table of Contents
+=================
 
-.. automodapi:: xrayvision.clean
+.. toctree::
+  :maxdepth: 2
+
+  introduction.rst
+  tutorial.rst
+  api.rst

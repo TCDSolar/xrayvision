@@ -1,7 +1,10 @@
 """
 CLEAN algorithms.
 
-adsf
+The CLEAN algorithm solves the deconvolution problem by assuming equation by assuming a model
+for the true sky intensity which is a collection of point sources or in the case of multiscale
+clean a collection of appropriate component shapes at different scales.
+
 """
 
 
@@ -15,10 +18,12 @@ __all__ = ['clean', 'ms_clean']
 
 def clean(dirty_map, dirty_beam, clean_beam_width=4.0, gain=0.1, thres=0.01, niter=1000):
     r"""
-    Clean the image using Hogbom's orginal method.
+    Clean the image using Hogbom's original method.
 
-    Will stop when either `thres` is reached or `niter`
-    iteration have been completed.
+    CLEAN iteratively subtracts the PSF or dirty beam from the dirty map to create the residual. \
+    At each iteration the location of the maximum residual is found and a shifted dirty beam is \
+    subtracted that location updating the residual. This process continues until either `niter` \
+    iterations is reached or the maximum residual <= `thres`.
 
     Parameters
     ----------
@@ -32,7 +37,7 @@ def clean(dirty_map, dirty_beam, clean_beam_width=4.0, gain=0.1, thres=0.01, nit
     gain : `float`
         The gain per loop or loop gain
     thres : `float`
-        A threshold val at which to stop
+        Terminates clean when ``residual.max() <= thres``
     niter : `int`
         Maximum number of iterations to perform
 
@@ -41,9 +46,29 @@ def clean(dirty_map, dirty_beam, clean_beam_width=4.0, gain=0.1, thres=0.01, nit
     `numpy.ndarray`
         The CLEAN image 2D
 
+    Notes
+    -----
+    The CLEAN algorithm can be summarised in pesudo code as follows:
+
+    .. math::
+       & \textrm{CLEAN} \left (I^{D}(l, m),\ B(l,m),\ \gamma,\ f_{Thresh},\ N \right ) \\
+       & I^{Res} = I^{D},\ M = \{\},\ i=0 \\
+       & \textbf{while} \ \operatorname{max} I^{Res} > f_{Thresh} \ \textrm{and} \ i \lt N \
+       \textbf{do:} \\
+       & \qquad l_{max}, m_{max} = \underset{l,m}{\operatorname{argmax}} I^{Res}(l,m) \\
+       & \qquad f_{max} = I^{Res}(l_{max}, m_{max}) \\
+       & \qquad I^{Res} = I^{Res} - \alpha \cdot f_{max} \cdot \operatorname{shift} \left
+       ( B(l,m), l_{max}, m_{max} \right ) \\
+       & \qquad M = M + \{ l_{max}, m_{max}: \alpha \cdot f_{max} \} \\
+       & \qquad i = i + 1 \\
+       & \textbf{done} \\
+       & \textbf{return}\  M,\ I^{Res}
+
     """
-    # Assume bear center is in middle
+    # Assume beam center is in middle
     beam_center = (dirty_beam.shape[0] - 1)/2.0, (dirty_beam.shape[1] - 1)/2.0
+
+    max_beam = dirty_beam.max()
 
     # Model for sources
     model = np.zeros(dirty_map.shape)
@@ -51,6 +76,8 @@ def clean(dirty_map, dirty_beam, clean_beam_width=4.0, gain=0.1, thres=0.01, nit
         # Find max in dirty map and save to point source
         mx, my = np.unravel_index(dirty_map.argmax(), dirty_map.shape)
         imax = dirty_map[mx, my]
+        # TODO check if correct and how to undo
+        imax = imax / max_beam
         model[mx, my] += gain*imax
 
         comp = imax * gain * shift(dirty_beam, (mx - beam_center[0], my - beam_center[1]), order=0)
@@ -58,59 +85,80 @@ def clean(dirty_map, dirty_beam, clean_beam_width=4.0, gain=0.1, thres=0.01, nit
         dirty_map = np.subtract(dirty_map, comp)
 
         if dirty_map.max() <= thres:
+            print("Threshold reached")
             break
+    else:
+        print("Max iterations reached")
 
     if clean_beam_width != 0.0:
         clean_beam = Gaussian2DKernel(stddev=clean_beam_width, x_size=dirty_beam.shape[1],
                                       y_size=dirty_beam.shape[0]).array
 
-        model = signal.convolve2d(model, clean_beam, mode='same')  # noqa
+        model = signal.convolve2d(model, clean_beam, mode='same')
 
-        clean_beam = clean_beam * (1/clean_beam.max())
+        #clean_beam = clean_beam * (1/clean_beam.max())
         dirty_map = dirty_map / clean_beam.sum()
 
-    return model + dirty_map
+    return model, dirty_map
 
 
 def ms_clean(dirty_map, dirty_beam, scales=None,
              clean_beam_width=4.0, gain=0.1, thres=0.01, niter=1000):
     r"""
+    Clean the map using a multiscale clean algorithm.
+
+
 
     Parameters
     ----------
-    dirty_map
-    dirty_beam
-    scales
-    clean_beam_width
-    gain
-    thres
-    niter
+    dirty_map : `numpy.ndarray`
+        The 2D dirty map to be cleaned
+    dirty_beam : `numpy.ndarray`
+        The 2D dirty beam should have the same dimensions as `dirty_map`
+    scales : array-like, optional, optional
+        The scales to use eg ``[1, 2, 4, 8]``
+    clean_beam_width : `float`
+        The width of the gaussian to convolve the model with. If set to 0.0 the gaussian \
+        convolution is disabled
+    gain : `float`
+        The gain per loop or loop gain
+    thres : `float`
+        Terminates clean when `residuals.max() <= thres``
+    niter : `int`
+        Maximum number of iterations to perform
 
     Returns
     -------
+    `numpy.ndarray`
+        Cleaned image
 
     Notes
     -----
-    This is an implementation of the multiscale clean algorithm as outlined in [1] adapted for x-ray
-    Fourier observations. In particular the choice of scale is not related to resolution
-    :math:`\lambda/D` but is chosen
+    This is an implementation of the multiscale clean algorithm as outlined in [R1]_ adapted for \
+    x-ray Fourier observations.
+
+    It is based on the on the implementation in the CASA software which can be found here_.
+
+    .. _here: https://github.com/casacore/casacore/blob/f4dc1c36287c766796ce3375cebdfc8af797a388/lattices/LatticeMath/LatticeCleaner.tcc#L956
 
     References
     ----------
-    .. [1] Cornwell, T. J., "Multiscale CLEAN Deconvolution of Radio Synthesis Images", IEEE Journal
-    of Selected Topics in Signal Processing, vol 2, p793-801
+    .. [R1] Cornwell, T. J., "Multiscale CLEAN Deconvolution of Radio Synthesis Images", IEEE Journal of Selected Topics in Signal Processing, vol 2, p793-801, Paper_
 
+    .. _Paper: https://ieeexplore.ieee.org/document/4703304/
     """
     # Compute the number of dyadic scales, their sizes and scale biases
     number_of_scales = np.floor(np.log2(min(dirty_map.shape))).astype(int)
     scale_sizes = 2**np.arange(number_of_scales)
-    scale_biases = 1 - 0.6 * scale_sizes / scale_sizes.max()
 
     if scales:
         scales = np.array(scales)
         number_of_scales = len(scales)
         scale_sizes = scales
-        scale_biases = [1.0]
+
+    scale_sizes = np.where(scale_sizes == 0, 1, scale_sizes)
+
+    scale_biases = 1 - 0.6 * scale_sizes / scale_sizes.max()
 
     model = np.zeros(dirty_map.shape)
 
@@ -133,7 +181,7 @@ def ms_clean(dirty_map, dirty_beam, scales=None,
 
     # Clean loop
     for i in range(niter):
-        print(f'Clean loop {i}')
+        #print(f'Clean loop {i}')
         # For each scale find the strength and location of max residual
         # Chose scale with has maximum strength
         max_index = np.argmax(scaled_residuals)
@@ -143,6 +191,8 @@ def ms_clean(dirty_map, dirty_beam, scales=None,
 
         # Adjust for the max of scaled beam
         strength = strength / max_scaled_dirty_beams[max_scale]
+
+        print(f"Iter: {i}, max scale: {max_scale}, strenght: {strength}")
 
         # Loop gain and scale dependent bias
         strength = strength * scale_biases[max_scale] * gain
@@ -157,11 +207,6 @@ def ms_clean(dirty_map, dirty_beam, scales=None,
         model = np.add(model, comp)
 
         # Update all images using precomputed terms
-        # Straight forward for current scale
-
-        # scaled_residuals[:, :, max_scale] = np.subtract(scaled_residuals[:, :, max_scale], comp)
-
-        # Need to use precomputed terms for effect on other scales
         for j, _ in enumerate(scale_sizes):
             if j > max_scale:
                 cross_term = cross_terms[(max_scale, j)]
@@ -174,9 +219,14 @@ def ms_clean(dirty_map, dirty_beam, scales=None,
             scaled_residuals[:, :, j] = np.subtract(scaled_residuals[:, :, j], comp)
 
         # End max(res(a)) or niter
-        if np.fabs(scaled_residuals[:, :, max_scale]).max() <= thres:
+        if scaled_residuals[:, :, max_scale].max() <= thres:
             print("Threshold reached")
             break
+
+        # if scaled_residuals[:,:,-1].min() < 0:
+        #     print("Max scale residual negative")
+        #     break
+
     else:
         print("Max iterations reached")
 
@@ -188,7 +238,7 @@ def ms_clean(dirty_map, dirty_beam, scales=None,
         model = signal.convolve2d(model, clean_beam, mode='same')  # noqa
 
     # Add residuals B_G * I^M + I^R
-    return model + scaled_residuals.sum(axis=2)
+    return model, scaled_residuals.sum(axis=2)
 
 
 def radial_prolate_sphereoidal(nu):
@@ -339,8 +389,8 @@ def vec_radial_prolate_sphereoidal(nu):
     bot[lower] += np.sum(q[j, 0, np.newaxis] * np.power(delnusq[lower], j[..., np.newaxis]), axis=0)
     bot[upper] += np.sum(q[j, 1, np.newaxis] * np.power(delnusq[upper], j[..., np.newaxis]), axis=0)
 
-    out = np.where(bot != 0.0, top/bot, 0.0)
-
+    out = np.zeros(nu.shape)
+    out[bot != 0] = top[bot != 0]/bot[bot != 0]
     out = np.where(nu <= 0, 1.0, out)
     out = np.where(nu >= 1, 0.0, out)
 
