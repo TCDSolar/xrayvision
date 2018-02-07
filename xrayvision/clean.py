@@ -82,13 +82,15 @@ def clean(dirty_map, dirty_beam, clean_beam_width=4.0, gain=0.1, thres=0.01, nit
 
     # Model for sources
     model = np.zeros(dirty_map.shape)
-    for _ in range(niter):
+    for i in range(niter):
         # Find max in dirty map and save to point source
         mx, my = np.unravel_index(dirty_map.argmax(), dirty_map.shape)
         imax = dirty_map[mx, my]
         # TODO check if correct and how to undo
         # imax = imax * max_beam
         model[mx, my] += gain * imax
+
+        print(f"Iter: {i}, strength: {imax}, location: {mx, my}")
 
         offset = map_center[0] - mx, map_center[1] - my
         shifted_beam_center = int(beam_center[0] + offset[0]), int(beam_center[1] + offset[1])
@@ -101,9 +103,9 @@ def clean(dirty_map, dirty_beam, clean_beam_width=4.0, gain=0.1, thres=0.01, nit
 
         dirty_map = np.subtract(dirty_map, comp)
 
-        # if dirty_map.max() <= thres:
-        #     print("Threshold reached")
-        #     break
+        if dirty_map.max() <= thres:
+            print("Threshold reached")
+            # break
         # el
         if np.abs(dirty_map.min()) > dirty_map.max():
             print("Largest residual negative")
@@ -125,7 +127,7 @@ def clean(dirty_map, dirty_beam, clean_beam_width=4.0, gain=0.1, thres=0.01, nit
 
 
 def ms_clean(dirty_map, dirty_beam, scales=None,
-             clean_beam_width=4.0, gain=0.1, thres=0.01, niter=1000):
+             clean_beam_width=4.0, gain=0.1, thres=0.01, niter=5000):
     r"""
     Clean the map using a multiscale clean algorithm.
 
@@ -184,6 +186,11 @@ def ms_clean(dirty_map, dirty_beam, scales=None,
 
     model = np.zeros(dirty_map.shape)
 
+    map_center = (dirty_map.shape[0] - 1)/2.0, (dirty_map.shape[1] - 1)/2.0
+    height = dirty_map.shape[0] // 2
+    width = dirty_map.shape[1] // 2
+    pad = [0 if x % 2 == 0 else 1 for x in dirty_map.shape]
+
     # Pre-compute scales, residual maps and dirty beams at each scale and dirty beam cross terms
     scales = np.zeros((dirty_map.shape[0], dirty_map.shape[1], number_of_scales))
     scaled_residuals = np.zeros((dirty_map.shape[0], dirty_map.shape[1], number_of_scales))
@@ -222,8 +229,17 @@ def ms_clean(dirty_map, dirty_beam, scales=None,
         beam_center = [(scaled_dirty_beams[:, :, max_scale].shape[0] - 1) / 2.0,
                        (scaled_dirty_beams[:, :, max_scale].shape[1] - 1) / 2.0]
 
+        offset = map_center[0] - max_x, map_center[1] - max_y
+        shifted_beam_center = int(beam_center[0] + offset[0]), int(beam_center[1] + offset[1])
+        xr = slice(shifted_beam_center[0] - height, shifted_beam_center[0] + height + pad[0])
+        yr = slice(shifted_beam_center[1] - width, shifted_beam_center[1] + width + pad[0])
+
+        # shifted = dirty_beam[xr, yr]
+
         comp = strength * shift(scales[:, :, max_scale],
-                                (max_x - beam_center[0], max_y - beam_center[1]), order=0)
+                                (max_x - map_center[0], max_y - map_center[1]), order=0)
+
+        # comp = strength * scales[xr, yr]
 
         # Add this component to current model
         model = np.add(model, comp)
@@ -235,19 +251,22 @@ def ms_clean(dirty_map, dirty_beam, scales=None,
             else:
                 cross_term = cross_terms[(j, max_scale)]
 
-            comp = strength * shift(cross_term,
-                                    (max_x - beam_center[0], max_y - beam_center[1]), order=0)
+            # comp = strength * shift(cross_term[xr, yr],
+            #                         (max_x - beam_center[0], max_y - beam_center[1]), order=0)
+
+            comp = strength * cross_term[xr, yr]
 
             scaled_residuals[:, :, j] = np.subtract(scaled_residuals[:, :, j], comp)
 
         # End max(res(a)) or niter
         if scaled_residuals[:, :, max_scale].max() <= thres:
             print("Threshold reached")
-            break
+            # break
 
-        # if scaled_residuals[:,:,-1].min() < 0:
-        #     print("Max scale residual negative")
-        #     break
+        # Largest scales largest residual is negative
+        if np.abs(scaled_residuals[:, :, 0].min()) > scaled_residuals[:, :, 0].max():
+            print("Max scale residual negative")
+            break
 
     else:
         print("Max iterations reached")
@@ -317,10 +336,10 @@ def radial_prolate_sphereoidal(nu):
         part = 0
         nuend = 0.0
 
-        if nu >= 0.0 and nu < 0.75:
+        if 0.0 <= nu < 0.75:
             part = 0
             nuend = 0.75
-        elif nu >= 0.75 and nu <= 1.00:
+        elif 0.75 <= nu <= 1.00:
             part = 1
             nuend = 1.0
 

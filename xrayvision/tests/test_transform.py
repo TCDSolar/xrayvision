@@ -299,6 +299,7 @@ def test_equivalence_of_convolve():
 
     bp2 = idft_map(sub_vis, (33, 33), uv)
 
+    # Need to make the psf large enough to slide over entire data window
     psf1 = idft_map(sampling*9, (33*3, 33*3), uv)
 
     conv = signal.convolve(data, psf1, mode='same', method='fft')
@@ -309,7 +310,7 @@ def test_equivalence_of_convolve():
 
     bp3 = idft_map(full_vis[non_zero], (33, 33), uv[:, non_zero])
 
-    # TODO figure out why convolution and inverse don't match perfectly ever where -> padding
     assert np.allclose(bp2, conv)
     assert np.allclose(bp2, bp3)
+    # Due to the enlarged psf need to only use center portion
     assert np.allclose(psf1[33:66,33:66], psf2)
