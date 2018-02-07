@@ -43,10 +43,10 @@ def generate_xy(number_pixels, center=0.0 * u.arcsec, pixel_size=1.0 * u.arcsec)
     <Quantity [-4.,-3.,-2.,-1., 0., 1., 2., 3., 4.] arcsec>
 
     >>> generate_xy(9, pixel_size=2.5 * u.arcsec)
-    <Quantity [-10. ,  -7.5,  -5. ,  -2.5,   0. ,   2.5,   5. ,   7.5,  10. ] arcsec>
+    <Quantity [-10. , -7.5, -5. , -2.5,  0. ,  2.5,  5. ,  7.5, 10. ] arcsec>
 
     >>> generate_xy(9, center=10 * u.arcsec, pixel_size=2.5 * u.arcsec)
-    <Quantity [  0. ,   2.5,   5. ,   7.5,  10. ,  12.5,  15. ,  17.5,  20. ] arcsec>
+    <Quantity [  0. ,  2.5,  5. ,  7.5, 10. , 12.5, 15. , 17.5, 20. ] arcsec>
 
     """
     x = (np.arange(number_pixels) - number_pixels / 2 + 0.5) * pixel_size + center

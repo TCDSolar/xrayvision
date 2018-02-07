@@ -69,17 +69,16 @@ def clean(dirty_map, dirty_beam, clean_beam_width=4.0, gain=0.1, thres=0.01, nit
     assert [x % 2 == 0 for x in dirty_map.shape] == [x % 2 == 0 for x in dirty_beam.shape]
     pad = [0 if x % 2 == 0 else 1 for x in dirty_map.shape]
 
-
     # Assume beam, map center is in middle
     beam_center = (dirty_beam.shape[0] - 1)/2.0, (dirty_beam.shape[1] - 1)/2.0
-    map_center = (dirty_map.shape[0] - 1)/2.0, (dirty_map.shape[1] -1)/2.0
+    map_center = (dirty_map.shape[0] - 1)/2.0, (dirty_map.shape[1] - 1)/2.0
 
     # Work out size of map for slicing over-sized dirty beam
     shape = dirty_map.shape
     height = shape[0] // 2
     width = shape[1] // 2
 
-    max_beam = dirty_beam.max()
+    # max_beam = dirty_beam.max()
 
     # Model for sources
     model = np.zeros(dirty_map.shape)
@@ -119,7 +118,7 @@ def clean(dirty_map, dirty_beam, clean_beam_width=4.0, gain=0.1, thres=0.01, nit
 
         model = signal.convolve2d(model, clean_beam, mode='same')
 
-        #clean_beam = clean_beam * (1/clean_beam.max())
+        # clean_beam = clean_beam * (1/clean_beam.max())
         dirty_map = dirty_map / clean_beam.sum()
 
     return model, dirty_map
@@ -204,7 +203,7 @@ def ms_clean(dirty_map, dirty_beam, scales=None,
 
     # Clean loop
     for i in range(niter):
-        #print(f'Clean loop {i}')
+        # print(f'Clean loop {i}')
         # For each scale find the strength and location of max residual
         # Chose scale with has maximum strength
         max_index = np.argmax(scaled_residuals)
@@ -215,7 +214,7 @@ def ms_clean(dirty_map, dirty_beam, scales=None,
         # Adjust for the max of scaled beam
         strength = strength / max_scaled_dirty_beams[max_scale]
 
-        print(f"Iter: {i}, max scale: {max_scale}, strenght: {strength}")
+        print(f"Iter: {i}, max scale: {max_scale}, strength: {strength}")
 
         # Loop gain and scale dependent bias
         strength = strength * scale_biases[max_scale] * gain
