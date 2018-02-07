@@ -309,34 +309,7 @@ def test_equivalence_of_convolve():
 
     bp3 = idft_map(full_vis[non_zero], (33, 33), uv[:, non_zero])
 
-    # TODO figure out why convolution and inverse don't match perfectly ever where
+    # TODO figure out why convolution and inverse don't match perfectly ever where -> padding
     assert np.allclose((bp2 -conv)[0:18,19::-1], 0)
     assert np.allclose(bp2, bp3)
     assert np.allclose(psf1, psf2)
-
-
-def test_clean_sim():
-    data = np.zeros((33, 33))
-    #data[16,16] = 10.0
-    data[3:6,3:6] = 5.0
-
-
-    half_log_space = np.logspace(np.log10(0.03030303), np.log10(0.48484848), 10)
-
-    theta = np.linspace(0, 2*np.pi, 32)
-    theta = theta[np.newaxis, :]
-    theta = np.repeat(theta, 10, axis=0)
-
-    r = half_log_space
-    r = r[:, np.newaxis]
-    r = np.repeat(r, 32, axis=1)
-
-    x = r * np.sin(theta)
-    y = r * np.cos(theta)
-
-    sub_uv = np.vstack([x.flatten(), y.flatten()])
-    sub_uv = np.hstack([sub_uv, np.zeros((2, 1))]) / u.arcsec
-
-    vis = dft_map(data, sub_uv)
-
-

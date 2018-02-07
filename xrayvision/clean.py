@@ -16,7 +16,7 @@ from scipy.ndimage.interpolation import shift
 __all__ = ['clean', 'ms_clean']
 
 
-def clean(dirty_map, dirty_beam, clean_beam_width=4.0, gain=0.1, thres=0.01, niter=1000):
+def clean(dirty_map, dirty_beam, clean_beam_width=4.0, gain=0.1, thres=0.01, niter=5000):
     r"""
     Clean the image using Hogbom's original method.
 
@@ -65,28 +65,51 @@ def clean(dirty_map, dirty_beam, clean_beam_width=4.0, gain=0.1, thres=0.01, nit
        & \textbf{return}\  M,\ I^{Res}
 
     """
-    # Assume beam center is in middle
+    # Ensure both beam and map are even/odd on same axes
+    assert [x % 2 == 0 for x in dirty_map.shape] == [x % 2 == 0 for x in dirty_beam.shape]
+    pad = [0 if x % 2 == 0 else 1 for x in dirty_map.shape]
+
+
+    # Assume beam, map center is in middle
     beam_center = (dirty_beam.shape[0] - 1)/2.0, (dirty_beam.shape[1] - 1)/2.0
+    map_center = (dirty_map.shape[0] - 1)/2.0, (dirty_map.shape[1] -1)/2.0
+
+    # Work out size of map for slicing over-sized dirty beam
+    shape = dirty_map.shape
+    height = shape[0] // 2
+    width = shape[1] // 2
 
     max_beam = dirty_beam.max()
 
     # Model for sources
     model = np.zeros(dirty_map.shape)
-    for _i in range(niter):
+    for _ in range(niter):
         # Find max in dirty map and save to point source
         mx, my = np.unravel_index(dirty_map.argmax(), dirty_map.shape)
         imax = dirty_map[mx, my]
         # TODO check if correct and how to undo
-        imax = imax / max_beam
-        model[mx, my] += gain*imax
+        # imax = imax * max_beam
+        model[mx, my] += gain * imax
 
-        comp = imax * gain * shift(dirty_beam, (mx - beam_center[0], my - beam_center[1]), order=0)
+        offset = map_center[0] - mx, map_center[1] - my
+        shifted_beam_center = int(beam_center[0] + offset[0]), int(beam_center[1] + offset[1])
+        xr = slice(shifted_beam_center[0] - height, shifted_beam_center[0] + height + pad[0])
+        yr = slice(shifted_beam_center[1] - width, shifted_beam_center[1] + width + pad[0])
+
+        shifted = dirty_beam[xr, yr]
+
+        comp = imax * gain * shifted
 
         dirty_map = np.subtract(dirty_map, comp)
 
-        if dirty_map.max() <= thres:
-            print("Threshold reached")
+        # if dirty_map.max() <= thres:
+        #     print("Threshold reached")
+        #     break
+        # el
+        if np.abs(dirty_map.min()) > dirty_map.max():
+            print("Largest residual negative")
             break
+
     else:
         print("Max iterations reached")
 

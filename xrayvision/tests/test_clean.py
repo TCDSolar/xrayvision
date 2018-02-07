@@ -1,8 +1,12 @@
 import numpy as np
+import astropy.units as u
+from astropy.convolution.kernels import Gaussian2DKernel
+
 from scipy import signal
 
 from ..clean import clean, ms_clean, component, radial_prolate_sphereoidal,\
     vec_radial_prolate_sphereoidal
+from ..transform import dft_map, idft_map
 
 
 def test_clean_ideal():
@@ -18,6 +22,7 @@ def test_clean_ideal():
     dirty_beam[(n-1)//4:(n-1)//4 + (n-1)//2, (m-1)//2] = 0.75
     dirty_beam[(n-1)//2, (m-1)//4:(m-1)//4 + (m-1)//2, ] = 0.75
     dirty_beam[(n-1)//2, (m-1)//2] = 0.8
+    dirty_beam = np.pad(dirty_beam, (65, 65), 'constant')
 
     dirty_map = signal.convolve(clean_map, dirty_beam, mode='same')
 
@@ -35,7 +40,7 @@ def test_clean_ideal():
 
 def test_component():
     comp = np.zeros((3, 3))
-    comp[1,1] = 1.0
+    comp[1, 1] = 1.0
 
     res = component(scale=0, shape=(3, 3))
     assert np.array_equal(res, comp)
@@ -43,18 +48,18 @@ def test_component():
     res = component(scale=1, shape=(3, 3))
     assert np.array_equal(res, comp)
 
-    res = component(scale=2, shape=(6,6))
+    res = component(scale=2, shape=(6, 6))
     assert np.all(res[0, :] == 0.0)
     assert np.all(res[:, 0] == 0.0)
     assert np.all(res[2:4, 2:4] == res.max())
 
-    res = component(scale=3, shape=(7,7))
+    res = component(scale=3, shape=(7, 7))
     assert np.all(res[0, :] == 0.0)
     assert np.all(res[:, 0] == 0.0)
     assert res[3, 3] == 1
 
 
-def test_radial_prolate_sphereoidal():
+def test_radial_prolate_spheroidal():
     amps = [radial_prolate_sphereoidal(r) for r in [-1.0, 0.0, 0.5, 1.0, 2.0]]
     assert amps[0] == 1.0
     assert amps[1] == 1.0
@@ -63,14 +68,14 @@ def test_radial_prolate_sphereoidal():
     assert amps[4] == 0.0
 
 
-def test_vec_radial_prolate_sphereoidal():
+def test_vec_radial_prolate_spheroidal():
     radii = np.linspace(-0.5, 1.5, 1000)
-    amps1 = [radial_prolate_sphereoidal(r) for r in radii ]
+    amps1 = [radial_prolate_sphereoidal(r) for r in radii]
     amps2 = vec_radial_prolate_sphereoidal(radii)
     assert np.allclose(amps1, amps2)
 
 
-def test_ms_clean():
+def test_ms_clean_ideal():
     n = m = 65
     pos1 = [15, 30]
     pos2 = [40, 32]
@@ -100,8 +105,42 @@ def test_ms_clean():
     assert np.allclose(clean_map, recovered, atol=0.01)
 
     # This seem point less as images match pixel by pixel
-    #temp = np.argsort(recovered.ravel())[-2:]
-    #max_locations = np.dstack(np.unravel_index(temp, recovered.shape))
+    # temp = np.argsort(recovered.ravel())[-2:]
+    # max_locations = np.dstack(np.unravel_index(temp, recovered.shape))
     # Position of max equal those set above
-    #assert max_locations[0][1].tolist() == pos1
-    #assert max_locations[0][0].tolist() == pos2
+    # assert max_locations[0][1].tolist() == pos1
+    # assert max_locations[0][0].tolist() == pos2
+
+
+def test_clean_sim():
+    n = m = 33
+    data = Gaussian2DKernel(stddev=3.0, x_size=n, y_size=m).array
+    # data = np.zeros((n, m))
+    # data[13,13] = 10.0
+    # data[12:14,12:14] = 10.0/4.0
+
+    half_log_space = np.logspace(np.log10(0.03030303), np.log10(0.48484848), 10)
+
+    theta = np.linspace(0, 2*np.pi, 32)
+    theta = theta[np.newaxis, :]
+    theta = np.repeat(theta, 10, axis=0)
+
+    r = half_log_space
+    r = r[:, np.newaxis]
+    r = np.repeat(r, 32, axis=1)
+
+    x = r * np.sin(theta)
+    y = r * np.cos(theta)
+
+    sub_uv = np.vstack([x.flatten(), y.flatten()])
+    sub_uv = np.hstack([sub_uv, np.zeros((2, 1))]) / u.arcsec
+
+    # Factor of 9 is compensate for the factor of 9 increase in size
+    dirty_beam = idft_map(np.ones(321)*9, (n*3, m*3), sub_uv)
+
+    vis = dft_map(data, sub_uv)
+
+    dirty_map = idft_map(vis, (n, m), sub_uv)
+
+    clean_map, res = clean(dirty_map, dirty_beam, clean_beam_width=0)
+    assert (data - (clean_map + res)).max() < dirty_beam.max() * 0.1
