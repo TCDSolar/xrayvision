@@ -8,8 +8,9 @@ from datetime import datetime
 
 import astropy.units as u
 import numpy as np
-from sunpy.map import Map
+from astropy.table import Table
 from sunpy.io.fits import fits
+from sunpy.map import Map
 
 from .transform import dft_map, idft_map
 
@@ -18,7 +19,7 @@ __all__ = ['Visibility', 'RHESSIVisibility']
 
 class Visibility(object):
     r"""
-    A class to hold a set of visibilities and related information.
+    Hold a set of related visibilities and information.
 
     Attributes
     ----------
@@ -42,7 +43,7 @@ class Visibility(object):
 
     """
 
-    def __init__(self, uv, vis, xyoffset=(0., 0.)*u.arcsec, pixel_size=(1., 1.)*u.arcsec):
+    def __init__(self, uv, vis, xyoffset=(0., 0.) * u.arcsec, pixel_size=(1., 1.) * u.arcsec):
         r"""
         Initialise a new Visibility object.
 
@@ -50,8 +51,10 @@ class Visibility(object):
         ----------
         uv : `numpy.ndarray`
             Array of 2xN u, v coordinates where visibilities will be evaluated
+
         vis : `numpy.ndarray`
             The complex visibilities
+
         xyoffset : `tuple` (x-center, y-center), optional
             The offset x, y offset of phase center
 
@@ -63,6 +66,7 @@ class Visibility(object):
         self.vis = np.array(vis, dtype=complex)
         self.xyoffset = xyoffset
         self.pixel_size = pixel_size
+        self.meta = None
 
     def __repr__(self):
         r"""
@@ -74,6 +78,30 @@ class Visibility(object):
 
         """
         return f"{self.uv}, {self.vis}"
+
+    def __eq__(self, other):
+        r"""
+        Equality for Visibility class
+
+        Parameters
+        ----------
+        other : `Visibility`
+            The other visibility to compare
+
+        Returns
+        -------
+        `boolean`
+
+        """
+        props_equal = []
+        for key in self.__dict__.keys():
+                props_equal.append(np.array_equal(self.__dict__[key], other.__dict__[key]))
+
+        if all(props_equal):
+            return True
+        else:
+            return False
+
 
     @classmethod
     def from_fits_file(cls, filename):
@@ -88,7 +116,7 @@ class Visibility(object):
         Returns
         -------
         `Visibility`
-            The new visibilty object
+            The new visibility object
 
         Raises
         ------
@@ -96,17 +124,29 @@ class Visibility(object):
             If the fits file is not from a supported instrument
 
         """
-        with fits.open(filename) as hdus:
-            primary_header = hdus[0].header
-            if primary_header.get('TELESCOP') == 'RHESSI' and \
+        with fits.open(filename) as hdu_list:
+            primary_header = hdu_list[0].header
+            if primary_header.get('source') == 'xrayvision':
+                return Visibility.from_fits(hdu_list)
+            elif primary_header.get('TELESCOP') == 'RHESSI' and \
                     primary_header.get('INSTRUME') == 'RHESSI':
-                return RHESSIVisibility.from_fits(hdu_list=hdus)
+                return RHESSIVisibility.from_fits(hdu_list=hdu_list)
             else:
                 raise TypeError("Currently only support reading of RHESSI visibility files")
 
     @classmethod
+    def from_fits(cls, hdu):
+        vis_hdu = hdu[1]
+        spatial_unit = u.Unit(vis_hdu.header.get('unit', 'arcsec'))
+        xyoffset = np.unique(vis_hdu.data['xyoffset'], axis=0)
+        pixel_size = np.unique(vis_hdu.data['pixel_size'], axis=0)
+        return Visibility(vis_hdu.data['uv'].T / spatial_unit, vis_hdu.data['vis'].T,
+                          xyoffset.flatten() * spatial_unit, pixel_size.flatten() * spatial_unit)
+
+
+    @classmethod
     @u.quantity_input(center=u.arcsec, pixel_size=u.arcsec)
-    def from_image(cls, image, uv, center=(0.0, 0.0)*u.arcsec, pixel_size=(1.0, 1.0)*u.arcsec):
+    def from_image(cls, image, uv, center=(0.0, 0.0) * u.arcsec, pixel_size=(1.0, 1.0) * u.arcsec):
         r"""
         Create a new Visibility object from the given image array.
 
@@ -132,7 +172,7 @@ class Visibility(object):
         return Visibility(uv, vis, center, pixel_size)
 
     @classmethod
-    @u.quantity_input(uv=1/u.arcsec)
+    @u.quantity_input(uv=1 / u.arcsec)
     def from_map(cls, inmap, uv):
         r"""
         Create a new Visibility object from the given map.
@@ -150,13 +190,13 @@ class Visibility(object):
 
         """
         meta = inmap.meta
-        new_pos = [0., 0.]
+        new_pos = np.array([0., 0.])
         if "crval1" in meta:
             new_pos[0] = float(meta["crval1"])
         if "crval2" in meta:
             new_pos[1] = float(meta["crval2"])
 
-        new_psize = [1., 1.]
+        new_psize = np.array([1., 1.])
         if "cdelt1" in meta:
             new_psize[0] = float(meta["cdelt1"])
         if "cdelt2" in meta:
@@ -168,7 +208,7 @@ class Visibility(object):
     @u.quantity_input(center=u.arcsec, pixel_size=u.arcsec)
     def to_image(self, shape, center=None, pixel_size=None):
         r"""
-        Create a image by doing a back projection or inverse transform on the visibilities.
+        Create a image by performing a back projection or inverse transform on the visibilities.
 
         Parameters
         ----------
@@ -199,7 +239,8 @@ class Visibility(object):
             elif pixel_size.ndim == 1 and pixel_size.size == 2:
                 pixel = pixel_size
             else:
-                raise ValueError(f"Pixel_size must be scalar or of length of 2 not {pixel_size.shape}")  # noqa
+                raise ValueError(
+                    f"Pixel_size must be scalar or of length of 2 not {pixel_size.shape}")  # noqa
 
         return idft_map(self.vis, shape, self.uv, center=offset, pixel_size=pixel)
 
@@ -207,7 +248,7 @@ class Visibility(object):
     def to_map(self, shape=(33, 33), center=None, pixel_size=None):
 
         r"""
-        Create a map from doing a back projection or inverse transform on the visibilities.
+        Create a map by performing a back projection or inverse transform on the visibilities.
 
         Parameters
         ----------
@@ -259,7 +300,29 @@ class Visibility(object):
         -------
 
         """
-        pass
+        primary_hdu = fits.PrimaryHDU()
+        primary_hdu.header['source'] = 'xrayvision'
+        vis_table = Table([self.uv.value.T, self.vis,
+                           np.repeat([self.xyoffset.value], self.vis.shape, axis=0),
+                           np.repeat([self.pixel_size.value], self.vis.shape, axis=0)],
+                          names=('uv', 'vis', 'xyoffset', 'pixel_size'))
+
+        vis_hdu = fits.BinTableHDU.from_columns(fits.ColDefs(vis_table.as_array()))
+        if self.uv.unit.bases == self.xyoffset.unit.bases == self.pixel_size.unit.bases:
+            vis_hdu.header.set('unit', str(self.uv.unit.bases[0]))
+        else:
+            raise ValueError(f'Units must have the same base unit  uv: {self.uv.unit}, xyoffset: '
+                             f'{self.xyoffset.unit}, pixel_size: {self.pixel_size.unit}')
+
+        hdul = fits.HDUList([primary_hdu, vis_hdu])
+        try:
+            hdul.writeto(path)
+        except Exception as e:
+            raise e
+
+
+class VisibiltyList(list, Visibility):
+    pass
 
 
 class RHESSIVisibility(Visibility):
@@ -276,11 +339,11 @@ class RHESSIVisibility(Visibility):
         Related to the grid/detector
     harm : `int`
         Harmonic used
-    energy_range : `numpy.ndarray`
+    erange : `numpy.ndarray`
         Energy range
-    time_range : `numpy.ndarray`
+    trange : `numpy.ndarray`
         Time range
-    total_flux : `numpy.ndarray`
+    totflux : `numpy.ndarray`
         Total flux
     sigamp : `numpy.ndarray`
         Sigma or error on visibility
@@ -288,11 +351,11 @@ class RHESSIVisibility(Visibility):
         Chi squared from fit
     xyoffset : `np.ndarray`
         Offset from Sun centre
-    type_string : `str`
+    type : `str`
         count, photon, electron
     units : `str`
         If it is in idl format it will be converted
-    attenuator_state : `int`
+    atten_state : `int`
         State of the attenuator
     count : `numpy.ndarray`
         detector counts
@@ -307,15 +370,21 @@ class RHESSIVisibility(Visibility):
 
     """
 
-    def __init__(self, uv, vis, isc=None, harm: int=1,
-                 energy_range: np.array=np.array([0.0, 0.0]),
-                 time_range: np.array=np.array([datetime.now(), datetime.now()]),
-                 total_flux=None, sigamp=None, chi2=None,
-                 xyoffset: np.array=np.array([0.0, 0.0]),
-                 type_string: str="photon",
-                 units: str="Photons cm!u-2!n s!u-1!n",
-                 attenuator_state: int=1, count=None,
-                 pixel_size: np.array=np.array([1.0, 1.0])):
+    # For single time and energy ranges these data columns should be constant
+    CONSTANT_DATA_COLUMNS = ['harm', 'erange', 'trange', 'xyoffset', 'type', 'units',
+                             'atten_state', 'norm_ph_factor']
+    DYANMIC_DATA_COLUMNS = ['isc', 'u', 'v', 'obsvs', 'totflux', 'sigamp', 'chi2', 'count']
+
+    def __init__(self, uv, vis, isc=None, harm: int = 1,
+                 erange: np.array = np.array([0.0, 0.0]),
+                 trange: np.array = np.array([datetime.now(), datetime.now()]),
+                 totflux=None, sigamp=None, chi2=None,
+                 xyoffset: np.array = np.array([0.0, 0.0]),
+                 type: str = "photon",
+                 units: str = "Photons cm!u-2!n s!u-1!n",
+                 atten_state: int = 1, count=None,
+                 pixel_size: np.array = np.array([1.0, 1.0]),
+                 norm_ph_factor=0):
         r"""
         Initialise a new RHESSI visibility.
 
@@ -325,17 +394,18 @@ class RHESSIVisibility(Visibility):
         vis
         isc
         harm
-        energy_range
-        time_range
-        total_flux
+        erange
+        trange
+        totflux
         sigamp
         chi2
         xyoffset
-        type_string
+        type
         units
-        attenuator_state
+        atten_state
         count
         pixel_size
+        norm_ph_factor
 
         """
         super().__init__(uv, vis, xyoffset, pixel_size)
@@ -344,12 +414,12 @@ class RHESSIVisibility(Visibility):
         else:
             self.isc = isc
         self.harm = harm
-        self.erange = energy_range
-        self.trange = time_range
-        if total_flux is None:
+        self.erange = erange
+        self.trange = trange
+        if totflux is None:
             self.totflux = np.zeros(vis.shape)
         else:
-            self.totflux = total_flux
+            self.totflux = totflux
         if sigamp is None:
             self.sigamp = np.zeros(vis.shape)
         else:
@@ -358,13 +428,46 @@ class RHESSIVisibility(Visibility):
             self.chi2 = np.zeros(vis.shape)
         else:
             self.chi2 = chi2
-        self.type_string = type_string
+        self.type = type
         self.units = RHESSIVisibility.convert_units_to_tex(units)
-        self.atten_state = attenuator_state
+        self.atten_state = atten_state
         if count is None:
             self.count = np.zeros(vis.shape)
         else:
             self.count = count
+
+    @staticmethod
+    def exists_and_unique(hdu, column, indices):
+        """
+        Check if the data column exits have the same value for all indices
+
+        Parameters
+        ----------
+        hdu : `astropy.io.fits.BinTableHDU` header data unit
+            HDU to check
+
+        column : `str`
+            The data column name
+
+        indices : `list`
+
+
+        Returns
+        -------
+
+        Raises
+        ------
+
+
+        """
+        if column.casefold() in [name.casefold() for name in hdu.data.columns.names]:
+            column = column.lower()
+            if np.all(hdu.data[column][indices] == hdu.data[column][indices[0]]):
+                return hdu.data[column][indices[0]]
+            else:
+                raise ValueError(f"Column: {column} was not constant")
+        else:
+            raise ValueError(f"Column: {column} does not exist")
 
     @staticmethod
     def convert_units_to_tex(string: str):
@@ -410,7 +513,7 @@ class RHESSIVisibility(Visibility):
         final_string += opened * "}"
         return final_string
 
-    @classmethod  # noqa
+    @classmethod
     def from_fits(cls, hdu_list):
         """
         Create RHESSIVisibility from compatible fits hdus.
@@ -434,70 +537,32 @@ class RHESSIVisibility(Visibility):
         ranges.
 
         """
-        for i in hdu_list:
-            if i.name == "VISIBILITY":
-                # Checking how many data structures we have
-                data_sort = {}
-                erange = i.data["erange"]
-                erange_unique = np.unique(erange, axis=0)
-                trange = i.data["trange"]
-                trange_unique = np.unique(trange, axis=0)
-
-                def find_erange(e):
-                    for i, j in enumerate(erange_unique):
-                        if np.allclose(j, e):
-                            return i
-
-                def find_trange(t):
-                    for i, j in enumerate(trange_unique):
-                        if np.allclose(j, t, rtol=1e-15):
-                            return i
-
-                for j, k in enumerate(erange_unique):
-                    data_sort[j] = {}
-
-                for j, k in enumerate(trange):
-                    eind = find_erange(erange[j])
-                    tind = find_trange(k)
-                    if tind not in data_sort[eind]:
-                        data_sort[eind][tind] = [j]
-                    else:
-                        data_sort[eind][tind].append(j)
+        for hdu in hdu_list:
+            if hdu.name == "VISIBILITY":
+                energy_ranges = hdu.data["erange"]
+                unique_energy_ranges = np.unique(energy_ranges, axis=0)
+                time_ranges = hdu.data["trange"]
+                unique_time_ranges = np.unique(time_ranges, axis=0)
 
                 # Creating the RHESSIVisibilities
                 visibilities = []
-                for j, k in data_sort.items():
-                    for l, m in k.items():
-                        visibilities.append(RHESSIVisibility(np.array([]),
-                                                             np.array([[], []]),
-                                                             energy_range=erange_unique[j],
-                                                             time_range=trange_unique[l]))
-                        uu = np.take(i.data["u"], m)
-                        vv = np.take(i.data["v"], m)
-                        visibilities[-1].uv = np.array([uu, vv])
-                        if "XYOFFSET" in i.header.values():
-                            visibilities[-1].xyoffset = i.data["xyoffset"][m[0]]
-                        if "ISC" in i.header.values():
-                            visibilities[-1].isc = np.take(i.data["isc"], m)
-                        if "HARM" in i.header.values():
-                            visibilities[-1].harm = i.data["harm"][m[0]]
-                        if "OBSVIS" in i.header.values():
-                            visibilities[-1].vis = np.take(i.data["obsvis"], m)
-                        if "TOTFLUX" in i.header.values():
-                            visibilities[-1].totflux = np.take(i.data["totflux"], m)
-                        if "SIGAMP" in i.header.values():
-                            visibilities[-1].sigamp = np.take(i.data["sigamp"], m)
-                        if "CHI2" in i.header.values():
-                            visibilities[-1].chi2 = np.take(i.data["chi2"], m)
-                        if "TYPE" in i.header.values():
-                            visibilities[-1].type_string = i.data["type"][m[0]]
-                        if "UNITS" in i.header.values():
-                            string = RHESSIVisibility.convert_units_to_tex(i.data["units"][m[0]])
-                            visibilities[-1].units = string
-                        if "ATTEN_STATE" in i.header.values():
-                            visibilities[-1].atten_state = i.data["atten_state"][m[0]]
-                        if "COUNT" in i.header.values():
-                            visibilities[-1].count = np.take(i.data["count"], m)
+                for time_range in unique_time_ranges:
+                    for energy_range in unique_energy_ranges:
+                        indices = np.argwhere((time_ranges[:, 0] == time_range[0]) &
+                                              (time_ranges[:, 1] == time_range[1]) &
+                                              (energy_ranges[:, 0] == energy_range[0]) &
+                                              (energy_ranges[:, 1] == energy_range[1]))
+
+                        static = {name: cls.exists_and_unique(hdu, name, indices)
+                                  for name in cls.CONSTANT_DATA_COLUMNS}
+
+                        cur_vis = RHESSIVisibility(np.hstack((hdu.data['u'][indices],
+                                                              hdu.data['v'][indices])),
+                                                   hdu.data['obsvis'][indices],
+                                                   **static)
+
+                        visibilities.append(cur_vis)
+
                 return visibilities
 
     def to_fits_file(self, path):

@@ -254,6 +254,27 @@ class TestVisibility(object):
         with pytest.raises(ValueError):
             vis.to_map((m, n), pixel_size=[1, 2, 3] * unit.arcsec)
 
+    def test_to_fits_file(self, tmpdir):
+        m = n = 32
+        u = generate_uv(m)
+        v = generate_uv(m)
+        u, v = np.meshgrid(u, v)
+        uv = np.array([u, v]).reshape(2, m * n) / unit.arcsec
+
+        header = {'crval1': 0, 'crval2': 0,
+                  'cdelt1': 1, 'cdelt2': 1,
+                  'cunit1': 'arcsec', 'cunit2': 'arcsec',
+                  'ctype1': 'HPLN-TAN', 'ctype2': 'HPLT-TAN'}
+        data = Gaussian2DKernel(stddev=2, x_size=n, y_size=m).array
+        mp = Map((data, header))
+
+        vis = Visibility.from_map(mp, uv)
+        p = tmpdir.join('test.fits')
+        vis.to_fits_file(p.strpath)
+        assert vis == Visibility.from_fits_file(p.strpath)
+
+
+
 
 class TestRHESSIVisibility(object):
 
@@ -283,7 +304,7 @@ class TestRHESSIVisibility(object):
         assert vis.sigamp == sigamp
         assert vis.chi2 == chi2
         assert vis.xyoffset == xyoffset
-        assert vis.type_string == type_string
+        assert vis.type == type_string
         assert vis.units == units
         assert vis.atten_state == atten_state
         assert vis.count == count
@@ -297,14 +318,21 @@ class TestRHESSIVisibility(object):
         assert out_str == RHESSIVisibility.convert_units_to_tex(in_str)
 
     def test_fits_file_data_read_successful(self):
-        i = RHESSIVisibility.from_fits_file(
+        vis = RHESSIVisibility.from_fits_file(
             "xrayvision/data/hsi_20020220_110600_1time_1energy.fits")
-        assert len(i) == 1
+        assert len(vis) == 1
 
-        i = RHESSIVisibility.from_fits_file(
+        vis = RHESSIVisibility.from_fits_file(
           "xrayvision/data/hsi_20020220_110600_1time_4energies.fits")
-        assert len(i) == 4
+        assert len(vis) == 4
 
-        i = RHESSIVisibility.from_fits_file(
+        vis = RHESSIVisibility.from_fits_file(
           "xrayvision/data/hsi_20020220_110600_9times_1energy.fits")
-        assert len(i) == 9
+        assert len(vis) == 9
+
+    def test_write_fits_file(self, tmpdir):
+        vis = RHESSIVisibility.from_fits_file(
+            "xrayvision/data/hsi_20020220_110600_9times_1energy.fits")
+
+        filenpath = tmpdir.join('rhessi.fits')
+        vis.to_fits_file(filenpath)
