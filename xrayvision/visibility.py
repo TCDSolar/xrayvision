@@ -66,7 +66,6 @@ class Visibility(object):
         self.vis = np.array(vis, dtype=complex)
         self.xyoffset = xyoffset
         self.pixel_size = pixel_size
-        self.meta = None
 
     def __repr__(self):
         r"""
@@ -102,7 +101,6 @@ class Visibility(object):
         else:
             return False
 
-
     @classmethod
     def from_fits_file(cls, filename):
         r"""
@@ -135,14 +133,23 @@ class Visibility(object):
                 raise TypeError("Currently only support reading of RHESSI visibility files")
 
     @classmethod
-    def from_fits(cls, hdu):
-        vis_hdu = hdu[1]
+    def from_fits(cls, hdu_list):
+        """
+
+        Parameters
+        ----------
+        hdu_list
+
+        Returns
+        -------
+
+        """
+        vis_hdu = hdu_list[1]
         spatial_unit = u.Unit(vis_hdu.header.get('unit', 'arcsec'))
         xyoffset = np.unique(vis_hdu.data['xyoffset'], axis=0)
         pixel_size = np.unique(vis_hdu.data['pixel_size'], axis=0)
         return Visibility(vis_hdu.data['uv'].T / spatial_unit, vis_hdu.data['vis'].T,
                           xyoffset.flatten() * spatial_unit, pixel_size.flatten() * spatial_unit)
-
 
     @classmethod
     @u.quantity_input(center=u.arcsec, pixel_size=u.arcsec)
@@ -321,10 +328,6 @@ class Visibility(object):
             raise e
 
 
-class VisibiltyList(list, Visibility):
-    pass
-
-
 class RHESSIVisibility(Visibility):
     """
     A set of RHESSI visibilities.
@@ -375,6 +378,11 @@ class RHESSIVisibility(Visibility):
                              'atten_state', 'norm_ph_factor']
     DYANMIC_DATA_COLUMNS = ['isc', 'u', 'v', 'obsvs', 'totflux', 'sigamp', 'chi2', 'count']
 
+    COLUMN_DEFS = {'ATTEN_STATE': 'I', 'CHI2': 'E', 'COUNT': 'E', 'ERANGE': '2E', 'HARM': 'I',
+                   'ISC': 'I', 'NORM_PH_FACTOR': 'E', 'OBSVIS': 'C', 'SIGAMP': 'E', 'TOTFLUX': 'E',
+                   'TRANGE': '2D', 'TYPE': '6A', 'U': 'E', 'UNITS': '24A', 'V': 'E',
+                   'XYOFFSET': '2E'}
+
     def __init__(self, uv, vis, isc=None, harm: int = 1,
                  erange: np.array = np.array([0.0, 0.0]),
                  trange: np.array = np.array([datetime.now(), datetime.now()]),
@@ -383,7 +391,7 @@ class RHESSIVisibility(Visibility):
                  type: str = "photon",
                  units: str = "Photons cm!u-2!n s!u-1!n",
                  atten_state: int = 1, count=None,
-                 pixel_size: np.array = np.array([1.0, 1.0]),
+                 pixel_size: np.array = np.array([[1.0, 1.0]]),
                  norm_ph_factor=0):
         r"""
         Initialise a new RHESSI visibility.
@@ -429,12 +437,13 @@ class RHESSIVisibility(Visibility):
         else:
             self.chi2 = chi2
         self.type = type
-        self.units = RHESSIVisibility.convert_units_to_tex(units)
+        self.units = units
         self.atten_state = atten_state
         if count is None:
             self.count = np.zeros(vis.shape)
         else:
             self.count = count
+        self.norm_ph_factor = norm_ph_factor
 
     @staticmethod
     def exists_and_unique(hdu, column, indices):
@@ -516,6 +525,31 @@ class RHESSIVisibility(Visibility):
     @classmethod
     def from_fits(cls, hdu_list):
         """
+
+        Parameters
+        ----------
+        hdu_list
+
+        Returns
+        -------
+
+        """
+        for hdu in hdu_list:
+            if hdu.name == "VISIBILITY":
+                rhessi_columns = cls.COLUMN_DEFS.copy()
+                [rhessi_columns.pop(x) for x in ('U', 'V', 'OBSVIS')]
+                data = {}
+
+                for prop, _ in rhessi_columns.items():
+                    data[prop.casefold()] = hdu.data[prop]
+
+                return RHESSIVisibility(uv=np.vstack((hdu.data['u'], hdu.data['v'])),
+                                        vis=hdu.data['obsvis'], **data)
+        raise ValueError('Fits HDUs did not contain visibility extension')
+
+    @classmethod
+    def from_fits_old(cls, hdu_list):
+        """
         Create RHESSIVisibility from compatible fits hdus.
 
         Parameters
@@ -563,7 +597,11 @@ class RHESSIVisibility(Visibility):
 
                         visibilities.append(cur_vis)
 
-                return visibilities
+                if len(visibilities) == 1:
+                    return visibilities[0]
+                else:
+                    # return RHESSIVisibilityList(visibilities)
+                    pass
 
     def to_fits_file(self, path):
         """
@@ -577,4 +615,30 @@ class RHESSIVisibility(Visibility):
         -------
 
         """
-        pass
+        primary_hdu = fits.PrimaryHDU()
+        primary_hdu.header['TELESCOP'] = 'RHESSI'
+        primary_hdu.header['INSTRUME'] = 'RHESSI'
+
+        modifed_colums = ('U', 'V', 'OBSVIS')
+        orig_columns = self.COLUMN_DEFS.copy()
+        modifed_colum_formats = [orig_columns.pop(x) for x in modifed_colums]
+
+        fits_columns = []
+        for name, format in orig_columns.items():
+            fits_columns.append(fits.Column(name=name, array=self.__dict__[name.casefold()],
+                                            format=format))
+
+        fits_columns.append(fits.Column(name='U', array=self.uv[0, :],
+                                        format=modifed_colum_formats[0]))
+
+        fits_columns.append(fits.Column(name='V', array=self.uv[1, :],
+                                        format=modifed_colum_formats[1]))
+
+        fits_columns.append(fits.Column(name='OBSVIS', array=self.vis,
+                                        format=modifed_colum_formats[2]))
+
+        vis_hdu = fits.BinTableHDU.from_columns(fits.ColDefs(fits_columns))
+
+        hdu_list = fits.HDUList([primary_hdu, vis_hdu])
+        hdu_list[1].name = 'VISIBILITY'
+        hdu_list.writeto(path)
