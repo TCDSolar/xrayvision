@@ -615,6 +615,10 @@ class RHESSIVisibility(Visibility):
         -------
 
         """
+
+        # TODO  Bit hacky need a better appraoch if the file orginally came from RHESSI should keep
+        # all the orgial hdus for later writing back to fits. If a new file need to figure out what
+        # minimal required headers and extensions are.
         primary_hdu = fits.PrimaryHDU()
         primary_hdu.header['TELESCOP'] = 'RHESSI'
         primary_hdu.header['INSTRUME'] = 'RHESSI'

@@ -120,12 +120,12 @@ class TestVisibility(object):
         res = vis.to_image((m, n), center=pos, pixel_size=pixel)
         assert np.allclose(res, data)
 
-    # def test_from_fits_file(self):
-    #     vis = Visibility.from_fits_file('xrayvision/data/hsi_20020220_110600_1time_1energy.fits')
-    #     assert np.array_equal(vis.pixel_size, [1, 1])
-    #     assert np.array_equal(vis.xyoffset, np.float32([914.168396, 255.66218567]))
-    #     assert np.array_equal(vis.erange, np.float32([6., 25.]))
-    #     assert np.array_equal(vis.trange,  np.float64([730206360.0, 730206364.0]))
+    def test_from_fits_file(self):
+        vis = Visibility.from_fits_file('xrayvision/data/hsi_20020220_110600_1time_1energy.fits')
+        assert np.array_equal(vis.pixel_size[0, :], [1, 1])
+        assert np.array_equal(vis.xyoffset[0, :], np.float32([914.168396, 255.66218567]))
+        assert np.array_equal(vis.erange[0, :], np.float32([6., 25.]))
+        assert np.array_equal(vis.trange[0, :],  np.float64([730206360.0, 730206364.0]))
 
     def test_from_fits_file_invalid(self, tmpdir):
         data = np.zeros((100, 100))
