@@ -31,7 +31,7 @@ conf.read(['setup.cfg'])
 metadata = dict(conf.items('metadata'))
 
 PACKAGENAME = metadata.get('package_name', 'xrayvision')
-DESCRIPTION = metadata.get('description', 'Image reconstruction methods for Fouier type X-ray Telescopes')
+DESCRIPTION = metadata.get('description', 'Image reconstruction methods for Fourier type X-ray Telescopes')
 AUTHOR = metadata.get('author', 'SunPy Developers')
 AUTHOR_EMAIL = metadata.get('author_email', '')
 LICENSE = metadata.get('license', 'unknown')

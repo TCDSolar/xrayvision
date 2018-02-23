@@ -43,10 +43,10 @@ def generate_xy(number_pixels, center=0.0 * u.arcsec, pixel_size=1.0 * u.arcsec)
     <Quantity [-4.,-3.,-2.,-1., 0., 1., 2., 3., 4.] arcsec>
 
     >>> generate_xy(9, pixel_size=2.5 * u.arcsec)
-    <Quantity [-10. ,  -7.5,  -5. ,  -2.5,   0. ,   2.5,   5. ,   7.5,  10. ] arcsec>
+    <Quantity [-10. , -7.5, -5. , -2.5,  0. ,  2.5,  5. ,  7.5, 10. ] arcsec>
 
     >>> generate_xy(9, center=10 * u.arcsec, pixel_size=2.5 * u.arcsec)
-    <Quantity [  0. ,   2.5,   5. ,   7.5,  10. ,  12.5,  15. ,  17.5,  20. ] arcsec>
+    <Quantity [  0. ,  2.5,  5. ,  7.5, 10. , 12.5, 15. , 17.5, 20. ] arcsec>
 
     """
     x = (np.arange(number_pixels) - number_pixels / 2 + 0.5) * pixel_size + center
@@ -124,29 +124,23 @@ def dft_map(input_array, uv, center=(0.0, 0.0) * u.arcsec, pixel_size=(1.0, 1.0)
 
     """
     m, n = input_array.shape
-    size = m * n
-    vis = np.zeros(uv.shape[1], dtype=complex)
 
-    x = generate_xy(m, center[0], pixel_size[0])
-    y = generate_xy(n, center[1], pixel_size[1])
+    y = generate_xy(m, center[1], pixel_size[1])
+    x = generate_xy(n, center[0], pixel_size[0])
 
     x, y = np.meshgrid(x, y)
-    x = x.reshape(size)
-    y = y.reshape(size)
 
     # Check units are correct for exp need to be dimensionless and then remove units for speed
-    if (uv[0, :] * x).unit == u.dimensionless_unscaled and \
-            (uv[1, :] * y).unit == u.dimensionless_unscaled:
+    if (uv[0, :] * x[0, 0]).unit == u.dimensionless_unscaled and \
+            (uv[1, :] * y[0, 0]).unit == u.dimensionless_unscaled:
 
         uv = uv.value
         x = x.value
         y = y.value
 
-        for i in range(uv.shape[1]):
-            vis[i] = np.sum(
-                input_array.reshape(size) * np.exp(
-                    -2j * np.pi * (uv[0, i] * x + uv[1, i] * y)))
-
+        vis = np.sum(input_array[..., np.newaxis] * np.exp(-2j * np.pi * (
+            x[..., np.newaxis] * uv[np.newaxis, 0, :] + y[..., np.newaxis] * uv[np.newaxis, 1, :])),
+                     axis=(0, 1))
 
         return vis
     else:
@@ -181,29 +175,24 @@ def idft_map(input_vis, shape, uv, center=(0.0, 0.0) * u.arcsec, pixel_size=(1.0
     m, n = shape
     size = m * n
 
-    x = generate_xy(m, center[0], pixel_size[0])
-    y = generate_xy(n, center[1], pixel_size[1])
+    y = generate_xy(m, center[1], pixel_size[1])
+    x = generate_xy(n, center[0], pixel_size[0])
 
     x, y = np.meshgrid(x, y)
-    x = x.reshape(size)
-    y = y.reshape(size)
-
-    im = np.zeros(size)
 
     # Check units are correct for exp need to be dimensionless and then remove units for speed
-    if (uv[0, :] * x).unit == u.dimensionless_unscaled and \
-            (uv[1, :] * y).unit == u.dimensionless_unscaled:
+    if (uv[0, :] * x[0, 0]).unit == u.dimensionless_unscaled and \
+            (uv[1, :] * y[0, 0]).unit == u.dimensionless_unscaled:
 
         uv = uv.value
         x = x.value
         y = y.value
 
-        for i in range(size):
-            im[i] = (1 / input_vis.size) * \
-                    np.real(np.sum(
-                        input_vis * np.exp(2j * np.pi * (uv[0, :] * x[i] + uv[1, :] * y[i]))))
+        image = np.sum((1 / size) * input_vis * np.exp(2j * np.pi * (
+            x[..., np.newaxis] * uv[np.newaxis, 0, :] + y[..., np.newaxis] * uv[np.newaxis, 1, :])),
+                       axis=2)
 
-        return im.reshape(m, n)
+        return np.real(image)
     else:
         raise UnitsError("Incompatible units on uv {uv.unit} should cancel with xy "
                          "to leave a dimensionless quantity")

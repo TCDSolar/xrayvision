@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 import astropy.units as u
 from astropy.convolution import Gaussian2DKernel
+from scipy import signal
 
 
 from ..transform import generate_xy, generate_uv, dft_map, idft_map
@@ -113,8 +114,8 @@ def test_generate_uv_offset_size(center, pixel_size):
 def test_dft_idft_map(shape):
     m, n = shape
     size = m * n
-    uu = generate_uv(m)
-    vv = generate_uv(n)
+    uu = generate_uv(n)
+    vv = generate_uv(m)
 
     uu, vv = np.meshgrid(uu, vv)  # Loses units
     uv = np.array([uu, vv]).reshape(2, size) / u.arcsec
@@ -195,8 +196,8 @@ def test_dft_idft_map_center(center):
     shape = (33, 33)
     m, n = shape
     size = m * n
-    uu = generate_uv(m, center=center[0])
-    vv = generate_uv(n, center=center[1])
+    uu = generate_uv(n, center=center[1])
+    vv = generate_uv(m, center=center[0])
 
     uu, vv = np.meshgrid(uu, vv)
     uv = np.array([uu, vv]).reshape(2, size) / u.arcsec
@@ -238,8 +239,9 @@ def test_dft_idft_map_shape_pixel_size(shape, pixel_size):
     pixel_size = pixel_size * u.arcsec
     m, n = shape
     size = m * n
-    uu = generate_uv(m, pixel_size=pixel_size[0])
-    vv = generate_uv(n, pixel_size=pixel_size[1])
+
+    vv = generate_uv(m, pixel_size=pixel_size[0])
+    uu = generate_uv(n, pixel_size=pixel_size[1])
 
     uu, vv = np.meshgrid(uu, vv)
     uv = np.array([uu, vv]).reshape(2, size) / u.arcsec
@@ -271,3 +273,44 @@ def test_dft_idft_map_shape_pixel_size(shape, pixel_size):
     vis = dft_map(gaussian, uv, pixel_size=pixel_size)
     out_map = idft_map(vis, shape, uv, pixel_size=pixel_size)
     assert np.allclose(gaussian, out_map)
+
+
+def test_equivalence_of_convolve():
+    data = np.zeros((33, 33))
+    #data[16,16] = 10.0
+    data[3:6,3:6] = 5.0
+
+    m, n = (33, 33)
+    size = m * n
+
+    vv = generate_uv(m)
+    uu = generate_uv(n)
+
+    uu, vv = np.meshgrid(uu, vv)  # Loses units
+    uv = np.array([uu, vv]).reshape(2, size) / u.arcsec
+
+    full_vis = dft_map(data, uv)
+
+    sampling = np.random.choice(2, size=(33**2))*1
+    sampling.reshape(33,33)[16,16] = 1
+    sub_vis = sampling * full_vis
+
+    bp1 = idft_map(full_vis, (33, 33), uv)
+
+    bp2 = idft_map(sub_vis, (33, 33), uv)
+
+    # Need to make the psf large enough to slide over entire data window
+    psf1 = idft_map(sampling*9, (33*3, 33*3), uv)
+
+    conv = signal.convolve(data, psf1, mode='same', method='fft')
+
+    non_zero = np.where(sampling != 0)[0]
+
+    psf2 = idft_map(sampling[non_zero], (33, 33), uv[:, non_zero])
+
+    bp3 = idft_map(full_vis[non_zero], (33, 33), uv[:, non_zero])
+
+    assert np.allclose(bp2, conv)
+    assert np.allclose(bp2, bp3)
+    # Due to the enlarged psf need to only use center portion
+    assert np.allclose(psf1[33:66,33:66], psf2)

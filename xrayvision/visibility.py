@@ -105,7 +105,6 @@ class Visibility(object):
                 raise TypeError("Currently only support reading of RHESSI visibility files")
 
     @classmethod
-
     @u.quantity_input(center=u.arcsec, pixel_size=u.arcsec)
     def from_image(cls, image, uv, center=(0.0, 0.0)*u.arcsec, pixel_size=(1.0, 1.0)*u.arcsec):
         r"""
