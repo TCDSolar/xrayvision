@@ -122,11 +122,10 @@ class TestVisibility(object):
 
     def test_from_fits_file(self):
         vis = Visibility.from_fits_file('xrayvision/data/hsi_20020220_110600_1time_1energy.fits')
-        assert len(vis) == 1
-        assert np.array_equal(vis[0].pixel_size, [1, 1])
-        assert np.array_equal(vis[0].xyoffset, np.float32([914.168396, 255.66218567]))
-        assert np.array_equal(vis[0].erange, np.float32([6., 25.]))
-        assert np.array_equal(vis[0].trange,  np.float64([730206360.0, 730206364.0]))
+        assert np.array_equal(vis.pixel_size[0, :], [1, 1])
+        assert np.array_equal(vis.xyoffset[0, :], np.float32([914.168396, 255.66218567]))
+        assert np.array_equal(vis.erange[0, :], np.float32([6., 25.]))
+        assert np.array_equal(vis.trange[0, :],  np.float64([730206360.0, 730206364.0]))
 
     def test_from_fits_file_invalid(self, tmpdir):
         data = np.zeros((100, 100))
@@ -254,6 +253,25 @@ class TestVisibility(object):
         with pytest.raises(ValueError):
             vis.to_map((m, n), pixel_size=[1, 2, 3] * unit.arcsec)
 
+    def test_to_fits_file(self, tmpdir):
+        m = n = 32
+        u = generate_uv(m)
+        v = generate_uv(m)
+        u, v = np.meshgrid(u, v)
+        uv = np.array([u, v]).reshape(2, m * n) / unit.arcsec
+
+        header = {'crval1': 0, 'crval2': 0,
+                  'cdelt1': 1, 'cdelt2': 1,
+                  'cunit1': 'arcsec', 'cunit2': 'arcsec',
+                  'ctype1': 'HPLN-TAN', 'ctype2': 'HPLT-TAN'}
+        data = Gaussian2DKernel(stddev=2, x_size=n, y_size=m).array
+        mp = Map((data, header))
+
+        vis = Visibility.from_map(mp, uv)
+        p = tmpdir.join('test.fits')
+        vis.to_fits_file(p.strpath)
+        assert vis == Visibility.from_fits_file(p.strpath)
+
 
 class TestRHESSIVisibility(object):
 
@@ -283,7 +301,7 @@ class TestRHESSIVisibility(object):
         assert vis.sigamp == sigamp
         assert vis.chi2 == chi2
         assert vis.xyoffset == xyoffset
-        assert vis.type_string == type_string
+        assert vis.type == type_string
         assert vis.units == units
         assert vis.atten_state == atten_state
         assert vis.count == count
@@ -297,14 +315,25 @@ class TestRHESSIVisibility(object):
         assert out_str == RHESSIVisibility.convert_units_to_tex(in_str)
 
     def test_fits_file_data_read_successful(self):
-        i = RHESSIVisibility.from_fits_file(
+        vis = RHESSIVisibility.from_fits_file(
             "xrayvision/data/hsi_20020220_110600_1time_1energy.fits")
-        assert len(i) == 1
+        assert isinstance(vis, RHESSIVisibility)
 
-        i = RHESSIVisibility.from_fits_file(
+        vis = RHESSIVisibility.from_fits_file(
           "xrayvision/data/hsi_20020220_110600_1time_4energies.fits")
-        assert len(i) == 4
+        assert isinstance(vis, RHESSIVisibility)
 
-        i = RHESSIVisibility.from_fits_file(
+        vis = RHESSIVisibility.from_fits_file(
           "xrayvision/data/hsi_20020220_110600_9times_1energy.fits")
-        assert len(i) == 9
+        assert isinstance(vis, RHESSIVisibility)
+
+    def test_write_fits_file(self, tmpdir):
+        vis = RHESSIVisibility.from_fits_file(
+            "xrayvision/data/hsi_20020220_110600_9times_1energy.fits")
+
+        filepath = tmpdir.join('rhessi.fits')
+        vis.to_fits_file(filepath.strpath)
+
+        read = RHESSIVisibility.from_fits_file(filepath.strpath)
+
+        assert vis == read
