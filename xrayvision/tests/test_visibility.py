@@ -285,7 +285,7 @@ class TestRHESSIVisibility(object):
                       chi2, xyoffset, type_string, units, atten_state, count):
         # Calculate uv and vis_in
         u, v = np.meshgrid(np.arange(M), np.arange(M))
-        uv_in = np.array([u, v]).reshape(2, N*M)
+        uv_in = np.array([u, v]).reshape(2, N*M)/unit.arcsec
         vis_in = np.zeros(N*M, dtype=complex)
 
         # Creating a RHESSI Visibility

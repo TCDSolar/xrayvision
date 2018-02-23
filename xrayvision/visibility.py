@@ -43,6 +43,8 @@ class Visibility(object):
 
     """
 
+    # TODO should really ensure vis has units to photons cm^-1 s^1 etc
+    @u.quantity_input(uv=1/u.arcsec, center=u.arcsec, pixel_size=u.arcsec)
     def __init__(self, uv, vis, xyoffset=(0., 0.) * u.arcsec, pixel_size=(1., 1.) * u.arcsec):
         r"""
         Initialise a new Visibility object.
@@ -291,7 +293,7 @@ class Visibility(object):
             else:
                 raise ValueError(f"pixel_size can have a length of 1 or 2 not {pixel_size.shape}")
 
-        data = self.to_image(shape, center=center, pixel_size=pixel_size)
+        data = self.to_image(shape, pixel_size=pixel_size)
         return Map((data, header))
 
     def to_fits_file(self, path):
@@ -391,7 +393,7 @@ class RHESSIVisibility(Visibility):
                  type: str = "photon",
                  units: str = "Photons cm!u-2!n s!u-1!n",
                  atten_state: int = 1, count=None,
-                 pixel_size: np.array = np.array([[1.0, 1.0]]),
+                 pixel_size: np.array = np.array([[1.0, 1.0]])*u.arcsec,
                  norm_ph_factor=0):
         r"""
         Initialise a new RHESSI visibility.
@@ -416,7 +418,7 @@ class RHESSIVisibility(Visibility):
         norm_ph_factor
 
         """
-        super().__init__(uv, vis, xyoffset, pixel_size)
+        super().__init__(uv=uv, vis=vis, xyoffset=xyoffset, pixel_size=pixel_size)
         if isc is None:
             self.isc = np.zeros(vis.shape)
         else:
@@ -541,9 +543,12 @@ class RHESSIVisibility(Visibility):
                 data = {}
 
                 for prop, _ in rhessi_columns.items():
-                    data[prop.casefold()] = hdu.data[prop]
+                    if prop.casefold() in ['xyoffset', 'pixel_size']:
+                        data[prop.casefold()] = hdu.data[prop] * u.arcsec
+                    else:
+                        data[prop.casefold()] = hdu.data[prop]
 
-                return RHESSIVisibility(uv=np.vstack((hdu.data['u'], hdu.data['v'])),
+                return RHESSIVisibility(uv=np.vstack((hdu.data['u'], hdu.data['v']))/u.arcsec,
                                         vis=hdu.data['obsvis'], **data)
         raise ValueError('Fits HDUs did not contain visibility extension')
 
