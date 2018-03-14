@@ -595,8 +595,9 @@ class RHESSIVisibility(Visibility):
                         static = {name: cls.exists_and_unique(hdu, name, indices)
                                   for name in cls.CONSTANT_DATA_COLUMNS}
 
-                        cur_vis = RHESSIVisibility(np.hstack((hdu.data['u'][indices],
-                                                              hdu.data['v'][indices])),
+                        # TODO Figure out why the minus signs are necessary RH vs LH coordsys?
+                        cur_vis = RHESSIVisibility(np.hstack((hdu.data['u'][indices]*-1.0,
+                                                              hdu.data['v'][indices]*-1.0)),
                                                    hdu.data['obsvis'][indices],
                                                    **static)
 

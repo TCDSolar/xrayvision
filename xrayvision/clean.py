@@ -163,11 +163,11 @@ def ms_clean(dirty_map, dirty_beam, scales=None,
 
     It is based on the on the implementation in the CASA software which can be found here_.
 
-    .. _here: https://github.com/casacore/casacore/blob/f4dc1c36287c766796ce3375cebdfc8af797a388/lattices/LatticeMath/LatticeCleaner.tcc#L956
+    .. _here: https://github.com/casacore/casacore/blob/f4dc1c36287c766796ce3375cebdfc8af797a388/lattices/LatticeMath/LatticeCleaner.tcc#L956 #noqa
 
     References
     ----------
-    .. [R1] Cornwell, T. J., "Multiscale CLEAN Deconvolution of Radio Synthesis Images", IEEE Journal of Selected Topics in Signal Processing, vol 2, p793-801, Paper_
+    .. [R1] Cornwell, T. J., "Multiscale CLEAN Deconvolution of Radio Synthesis Images", IEEE Journal of Selected Topics in Signal Processing, vol 2, p793-801, Paper_ #noqa
 
     .. _Paper: https://ieeexplore.ieee.org/document/4703304/
     """
@@ -301,7 +301,7 @@ def radial_prolate_sphereoidal(nu):
     Note this is a direct translation of the on the implementation the CASA code reference by [1] \
     and can be found here Link_
 
-    .. _Link: https://github.com/casacore/casacore/blob/f4dc1c36287c766796ce3375cebdfc8af797a388/lattices/LatticeMath/LatticeCleaner.tcc#L956
+    .. _Link: https://github.com/casacore/casacore/blob/f4dc1c36287c766796ce3375cebdfc8af797a388/lattices/LatticeMath/LatticeCleaner.tcc#L956 #noqa
 
     """
     if nu <= 0:
@@ -378,7 +378,7 @@ def vec_radial_prolate_sphereoidal(nu):
     Note this is based on the implementation the CASA code reference by [1] and can be found here
     Link_
 
-    .. _Link: https://github.com/casacore/casacore/blob/f4dc1c36287c766796ce3375cebdfc8af797a388/lattices/LatticeMath/LatticeCleaner.tcc#L956
+    .. _Link: https://github.com/casacore/casacore/blob/f4dc1c36287c766796ce3375cebdfc8af797a388/lattices/LatticeMath/LatticeCleaner.tcc#L956 #noqa
 
     """
     nu = np.array(nu)
