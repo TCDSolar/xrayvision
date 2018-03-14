@@ -295,16 +295,16 @@ def test_equivalence_of_convolve():
     sampling.reshape(33,33)[16,16] = 1
     sub_vis = sampling * full_vis
 
+    non_zero = np.where(sampling != 0)[0]
+
     bp1 = idft_map(full_vis, (33, 33), uv)
 
-    bp2 = idft_map(sub_vis, (33, 33), uv)
+    bp2 = idft_map(sub_vis[non_zero], (33, 33), uv[:, non_zero])
 
     # Need to make the psf large enough to slide over entire data window
-    psf1 = idft_map(sampling*9, (33*3, 33*3), uv)
+    psf1 = idft_map(sampling[non_zero], (33*3, 33*3), uv[:, non_zero])
 
     conv = signal.convolve(data, psf1, mode='same', method='fft')
-
-    non_zero = np.where(sampling != 0)[0]
 
     psf2 = idft_map(sampling[non_zero], (33, 33), uv[:, non_zero])
 
