@@ -272,8 +272,10 @@ class Visibility(object):
             offset and the pixel size
 
         """
-        header = {'crval1': self.xyoffset[0].value,
-                  'crval2': self.xyoffset[1].value,
+        header = {'crval1': self.xyoffset[0, 0].value if self.xyoffset.ndim == 2
+                  else self.xyoffset[0].value,
+                  'crval2': self.xyoffset[0, 1].value if self.xyoffset.ndim == 2
+                  else self.xyoffset[1].value,
                   'cdelt1': self.pixel_size[0].value,
                   'cdelt2': self.pixel_size[1].value,
                   'ctype1': 'HPLN-TAN',
