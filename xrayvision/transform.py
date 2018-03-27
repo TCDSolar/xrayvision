@@ -175,7 +175,7 @@ def idft_map(input_vis, shape, uv, center=(0.0, 0.0) * u.arcsec, pixel_size=(1.0
 
     """
     m, n = shape
-    size = m * n
+    # size = m * n
 
     y = generate_xy(m, center[1], pixel_size[1])
     x = generate_xy(n, center[0], pixel_size[0])
@@ -190,7 +190,7 @@ def idft_map(input_vis, shape, uv, center=(0.0, 0.0) * u.arcsec, pixel_size=(1.0
         x = x.value
         y = y.value
 
-        image = np.sum((1 / size) * input_vis * np.exp(2j * np.pi * (
+        image = np.sum((1 / input_vis.size) * input_vis * np.exp(2j * np.pi * (
             x[..., np.newaxis] * uv[np.newaxis, 0, :] + y[..., np.newaxis] * uv[np.newaxis, 1, :])),
                        axis=2)
 
