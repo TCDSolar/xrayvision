@@ -78,7 +78,7 @@ class Visibility(object):
         `str`
 
         """
-        return f"{self.uv}, {self.vis}"
+        return f"{self.uv.size}, {self.vis}"
 
     def __eq__(self, other):
         r"""
@@ -132,7 +132,7 @@ class Visibility(object):
                     primary_header.get('INSTRUME') == 'RHESSI':
                 return RHESSIVisibility.from_fits(hdu_list=hdu_list)
             else:
-                raise TypeError("Currently only support reading of RHESSI visibility files")
+                raise TypeError("This type of fits visibility file is not supported")
 
     @classmethod
     def from_fits(cls, hdu_list):
@@ -215,7 +215,7 @@ class Visibility(object):
                               pixel_size=new_psize * u.arcsec)
 
     @u.quantity_input(center=u.arcsec, pixel_size=u.arcsec)
-    def to_image(self, shape, center=None, pixel_size=None):
+    def to_image(self, shape, center=[0., 0.]*u.arcsec, pixel_size=None):
         r"""
         Create a image by performing a back projection or inverse transform on the visibilities.
 
@@ -237,9 +237,6 @@ class Visibility(object):
             Output image
 
         """
-        offset = self.xyoffset
-        if center:
-            offset = center
 
         pixel = self.pixel_size
         if pixel_size:
@@ -251,7 +248,7 @@ class Visibility(object):
                 raise ValueError(
                     f"Pixel_size must be scalar or of length of 2 not {pixel_size.shape}")  # noqa
 
-        return idft_map(self.vis, shape, self.uv, center=offset, pixel_size=pixel)
+        return idft_map(self.vis, shape, self.uv, center=center, pixel_size=pixel)
 
     @u.quantity_input(center=u.arcsec, pixel_size=u.arcsec)
     def to_map(self, shape=(33, 33), center=None, pixel_size=None):
@@ -278,7 +275,12 @@ class Visibility(object):
         header = {'crval1': self.xyoffset[0].value,
                   'crval2': self.xyoffset[1].value,
                   'cdelt1': self.pixel_size[0].value,
-                  'cdelt2': self.pixel_size[1].value}
+                  'cdelt2': self.pixel_size[1].value,
+                  'ctype1': 'HPLN-TAN',
+                  'ctype2': 'HPLT-TAN',
+                  'naxis': 2,
+                  'naxis1': shape[0],
+                  'naxis2': shape[1]}
         if center:
             header['crval1'] = center[0].value
             header['crval2'] = center[1].value
@@ -393,7 +395,7 @@ class RHESSIVisibility(Visibility):
                  type: str = "photon",
                  units: str = "Photons cm!u-2!n s!u-1!n",
                  atten_state: int = 1, count=None,
-                 pixel_size: np.array = np.array([[1.0, 1.0]])*u.arcsec,
+                 pixel_size: np.array = np.array([1.0, 1.0])*u.arcsec,
                  norm_ph_factor=0):
         r"""
         Initialise a new RHESSI visibility.
@@ -548,7 +550,8 @@ class RHESSIVisibility(Visibility):
                     else:
                         data[prop.casefold()] = hdu.data[prop]
 
-                return RHESSIVisibility(uv=np.vstack((hdu.data['u'], hdu.data['v']))/u.arcsec,
+                return RHESSIVisibility(uv=np.vstack((hdu.data['u']*-1.0,
+                                                      hdu.data['v']*-1.0))/u.arcsec,
                                         vis=hdu.data['obsvis'], **data)
         raise ValueError('Fits HDUs did not contain visibility extension')
 
@@ -638,10 +641,10 @@ class RHESSIVisibility(Visibility):
             fits_columns.append(fits.Column(name=name, array=self.__dict__[name.casefold()],
                                             format=format))
 
-        fits_columns.append(fits.Column(name='U', array=self.uv[0, :],
+        fits_columns.append(fits.Column(name='U', array=self.uv[0, :]*-1.0,
                                         format=modifed_colum_formats[0]))
 
-        fits_columns.append(fits.Column(name='V', array=self.uv[1, :],
+        fits_columns.append(fits.Column(name='V', array=self.uv[1, :]*-1.0,
                                         format=modifed_colum_formats[1]))
 
         fits_columns.append(fits.Column(name='OBSVIS', array=self.vis,
