@@ -13,12 +13,14 @@ Requirements: >Python3.6, >SunPy0.8
 The recommended way to install XRAYVISION is via pip
 
 .. code:: bash
+
     pip install git
 
 Usage
 -----
 
 .. code:: python
+
     from astropy import units as u
     from xrayvision.visibilty import RHESSIVisibilty
     rhessi_vis = RHESSIVisibilty.from_fits_file('<>')
