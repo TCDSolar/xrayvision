@@ -10,14 +10,14 @@ Begin by importing the necessary libraries
 
     from astropy import units as u
     from xrayvision.visibility import Visibility
-    from xrayvision import clean
+    from xrayvision import clean, SAMPLE_RHESSI_VISIBILITIES
 
 Next we will load in some sample data from the RHESSI spacecraft which has been stored
 as visibilities in a fits file using the RHESSI IDL software.
 
 .. code:: python
 
-    rhessi_vis = Visibilty.from_fits_file('')
+    rhessi_vis = Visibilty.from_fits_file(SAMPLE_RHESSI_VISIBILITIES)
 
 At this stage we can create a map with a back projection or inverse transform also known as the dirty map
 of the visibility data. The size of the map and the physical pixel size can be specified as

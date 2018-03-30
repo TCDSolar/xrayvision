@@ -5,8 +5,7 @@ XRAYVISION  - X-RAY VIsibility Synthesis ImagiNg
 
 XRAYVISION is an open-source Python library for Fourier or synthesis imaging of X-Rays. The most
 common usage of this technique is radio interferometry however there have been a number of solar
-X-ray mission which use also use this technique but obtain the visibilities in a very different
-manner.
+X-ray missions which also use this technique but obtain the visibilities via a different method.
 
 Installation
 ------------
@@ -26,10 +25,14 @@ Usage
 .. code:: python
 
     from astropy import units as u
+
     from xrayvision.visibilty import RHESSIVisibilty
-    rhessi_vis = RHESSIVisibilty.from_fits_file('<>')
+    fram xrayvisoin import SAMPLE_RHESSI_VISIBILITIES
+
+    rhessi_vis = RHESSIVisibilty.from_fits_file(SAMPLE_RHESSI_VISIBILITIES)
     rhessi_map = rhessi_vis.to_map(shape=(65, 65), pixel_size=[4., 4.] * u.arcsec)
     rhessi_map.peek()
+
 
 Getting Help
 ------------
