@@ -18,4 +18,4 @@ from ._sunpy_init import *
 
 from pkg_resources import resource_filename
 
-SAMPLE_RHESSI_VISIBILITIES = resource_filename('xrayvision', 'data/sample_rhessi_visibilities.fits')
+SAMPLE_RHESSI_VISIBILITIES = resource_filename('xrayvision', 'data/hsi_visibili_20131028_0156_20131028_0200_6_12.fits')

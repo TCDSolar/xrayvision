@@ -26,10 +26,10 @@ Usage
 
     from astropy import units as u
 
-    from xrayvision.visibilty import RHESSIVisibilty
-    fram xrayvisoin import SAMPLE_RHESSI_VISIBILITIES
+    from xrayvision.visibility import RHESSIVisibility
+    from xrayvision import SAMPLE_RHESSI_VISIBILITIES
 
-    rhessi_vis = RHESSIVisibilty.from_fits_file(SAMPLE_RHESSI_VISIBILITIES)
+    rhessi_vis = RHESSIVisibility.from_fits_file(SAMPLE_RHESSI_VISIBILITIES)
     rhessi_map = rhessi_vis.to_map(shape=(65, 65), pixel_size=[4., 4.] * u.arcsec)
     rhessi_map.peek()
 
