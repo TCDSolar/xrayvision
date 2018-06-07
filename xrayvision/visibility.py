@@ -11,6 +11,7 @@ import numpy as np
 from astropy.table import Table
 from sunpy.io.fits import fits
 from sunpy.map import Map
+from sunpy.time import parse_time
 
 from .transform import dft_map, idft_map
 
@@ -283,6 +284,7 @@ class Visibility(object):
                   'naxis': 2,
                   'naxis1': shape[0],
                   'naxis2': shape[1]}
+
         if center:
             header['crval1'] = center[0].value
             header['crval2'] = center[1].value
@@ -613,6 +615,14 @@ class RHESSIVisibility(Visibility):
                 else:
                     # return RHESSIVisibilityList(visibilities)
                     pass
+
+    def to_map(self, shape=(33, 33), center=None, pixel_size=None):
+        map = super().to_map(shape=(33, 33), center=None, pixel_size=None)
+
+        if self.trange.size != 0:
+            map.meta['date-obs'] = parse_time(self.trange[0, 0], time_format='utime').isoformat()
+
+        return map
 
     def to_fits_file(self, path):
         """

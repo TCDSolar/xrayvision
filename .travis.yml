@@ -1,5 +1,8 @@
 language: python
 
+os:
+    - linux
+
 # Setting sudo to false opts in to Travis-CI container-based builds.
 sudo: false
 
@@ -11,18 +14,13 @@ addons:
             - libatlas-dev
             - liblapack-dev
             - gfortran
-#             - graphviz
-#             - texlive-latex-extra
-#             - dvipng
+             - graphviz
+             - texlive-latex-extra
+             - dvipng
 
 # cache:
 #   directories:
 #   - $HOME/sunpy/data
-
-python:
-    - 3.4
-    - 3.5
-    - 3.6
 
 # Configure the build environment. Global varibles are defined for all configurations.
 env:
@@ -33,7 +31,7 @@ env:
         - ASTROPY_VERSION='stable'
         - MAIN_CMD='python setup.py'
         - SETUP_CMD='test'
-        - CONDA_CHANNELS='astropy astropy-ci-extras conda-forge'
+        - CONDA_CHANNELS='sunpy'
         - CONDA_DEPENDENCIES='sunpy'
         - PIP_DEPENDENCIES='pylama pylama-pylint'
         - EVENT_TYPE='pull_request push'

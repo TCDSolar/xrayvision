@@ -1,14 +1,59 @@
-Image reconstruction methods for Fouier type X-ray Telescopes
--------------------------------------------------------------
+XRAYVISION  - X-RAY VIsibility Synthesis ImagiNg
+================================================
 
-.. image:: http://img.shields.io/badge/powered%20by-SunPy-orange.svg?style=flat 
-    :target: http://www.sunpy.org                                               
-    :alt: Powered by SunPy Badge    
+|Powered By| |Build Status| |Doc Status|
+
+XRAYVISION is an open-source Python library for Fourier or synthesis imaging of X-Rays. The most
+common usage of this technique is radio interferometry however there have been a number of solar
+X-ray missions which also use this technique but obtain the visibilities via a different method.
+
+Installation
+------------
+
+Requirements: Python3.6+, SunPy0.8+
+
+As XRAYVISION is still a work in progress it has not been release to PyPI yet. The recommended way
+to install XRAYVISION is via pip from git.
+
+.. code:: bash
+
+    pip install git+https://github.com/sunpy/xrayvision.git
+
+Usage
+-----
+
+.. code:: python
+
+    from astropy import units as u
+
+    from xrayvision.visibility import RHESSIVisibility
+    from xrayvision import SAMPLE_RHESSI_VISIBILITIES
+
+    rhessi_vis = RHESSIVisibility.from_fits_file(SAMPLE_RHESSI_VISIBILITIES)
+    rhessi_map = rhessi_vis.to_map(shape=(65, 65), pixel_size=[4., 4.] * u.arcsec)
+    rhessi_map.peek()
+
+
+Getting Help
+------------
 
 
 
+Contributing
+~~~~~~~~~~~~
+When you are interacting with the SunPy community you are asked to
+follow our `Code of Conduct`_.
 
-License
--------
+.. |Powered By| image:: http://img.shields.io/badge/powered%20by-SunPy-orange.svg?style=flat
+    :target: http://www.sunpy.org
+    :alt: Powered by SunPy Badge
 
-This project is Copyright (c) SunPy Developers and licensed under the terms of the BSD 3-Clause license. See the licenses folder for more information.
+.. |Build Status| image:: https://travis-ci.org/samaloney/xrayvision.svg?branch=master
+    :target: https://travis-ci.org/sunpy/xrayvision
+    :alt: Travis-CI build status
+
+.. |Doc Status|  image:: https://readthedocs.org/projects/xrayvision/badge/?version=latest
+    :target: http://xrayvision.readthedocs.io/en/latest/?badge=latest
+    :alt: Documentation Status
+
+.. _Code of Conduct: http://docs.sunpy.org/en/stable/coc.html
