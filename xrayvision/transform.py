@@ -40,14 +40,13 @@ def generate_xy(number_pixels, center=0.0 * u.arcsec, pixel_size=1.0 * u.arcsec)
     use the function.
 
     >>> generate_xy(9)
-    <Quantity [-4., -3., -2., -1.,  0.,  1.,  2.,  3.,  4.] arcsec>
+    <Quantity [-4.,-3.,-2.,-1., 0., 1., 2., 3., 4.] arcsec>
 
     >>> generate_xy(9, pixel_size=2.5 * u.arcsec)
     <Quantity [-10. , -7.5, -5. , -2.5,  0. ,  2.5,  5. ,  7.5, 10. ] arcsec>
 
     >>> generate_xy(9, center=10 * u.arcsec, pixel_size=2.5 * u.arcsec)
-    <Quantity [ 0. ,  2.5,  5. ,  7.5, 10. , 12.5, 15. , 17.5, 20. ] arcsec>
-
+    <Quantity [  0. ,  2.5,  5. ,  7.5, 10. , 12.5, 15. , 17.5, 20. ] arcsec>
 
 
     """
@@ -84,16 +83,16 @@ def generate_uv(number_pixels, center=0.0 * u.arcsec, pixel_size=1.0 * u.arcsec)
     use the function.
 
     >>> generate_uv(9)
-    <Quantity [-0.44444444, -0.33333333, -0.22222222, -0.11111111,  0.        ,
-                0.11111111,  0.22222222,  0.33333333,  0.44444444] 1 / arcsec>
+    <Quantity [-0.44444444,-0.33333333,-0.22222222,-0.11111111, 0.        ,
+                0.11111111, 0.22222222, 0.33333333, 0.44444444] 1 / arcsec>
 
     >>> generate_uv(9, pixel_size=2.5 * u.arcsec)
-    <Quantity [-0.17777778, -0.13333333, -0.08888889, -0.04444444,  0.        ,
-                0.04444444,  0.08888889,  0.13333333,  0.17777778] 1 / arcsec>
+    <Quantity [-0.17777778,-0.13333333,-0.08888889,-0.04444444, 0.        ,
+                0.04444444, 0.08888889, 0.13333333, 0.17777778] 1 / arcsec>
 
     >>> generate_uv(9, center=10 * u.arcsec, pixel_size=2.5 * u.arcsec)
-    <Quantity [-0.07777778, -0.03333333,  0.01111111,  0.05555556,  0.1       ,
-                0.14444444,  0.18888889,  0.23333333,  0.27777778] 1 / arcsec>
+    <Quantity [-0.07777778,-0.03333333, 0.01111111, 0.05555556, 0.1       ,
+                0.14444444, 0.18888889, 0.23333333, 0.27777778] 1 / arcsec>
 
     """
     x = (np.arange(number_pixels) - number_pixels / 2 + 0.5) * (1 / (pixel_size * number_pixels))
