@@ -19,11 +19,6 @@ addons:
 #   directories:
 #   - $HOME/sunpy/data
 
-python:
-    - 3.4
-    - 3.5
-    - 3.6
-
 # Configure the build environment. Global varibles are defined for all configurations.
 env:
     global:
