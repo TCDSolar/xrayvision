@@ -1,7 +1,7 @@
 XRAYVISION  - X-RAY VIsibility Synthesis ImagiNg
 ================================================
 
-|Powered By| |Build Status| |Doc Status|
+|Powered By| |Build Status| |Doc Status| |Python Versions|
 
 XRAYVISION is an open-source Python library for Fourier or synthesis imaging of X-Rays. The most
 common usage of this technique is radio interferometry however there have been a number of solar
@@ -48,12 +48,16 @@ follow our `Code of Conduct`_.
     :target: http://www.sunpy.org
     :alt: Powered by SunPy Badge
 
-.. |Build Status| image:: https://travis-ci.org/samaloney/xrayvision.svg?branch=master
+.. |Build Status| image:: https://travis-ci.org/sunpy/xrayvision.svg?branch=master
     :target: https://travis-ci.org/sunpy/xrayvision
     :alt: Travis-CI build status
 
-.. |Doc Status|  image:: https://readthedocs.org/projects/xrayvision/badge/?version=latest
+.. |Doc Status| image:: https://readthedocs.org/projects/xrayvision/badge/?version=latest
     :target: http://xrayvision.readthedocs.io/en/latest/?badge=latest
     :alt: Documentation Status
+
+.. |Python Version| image:: https://img.shields.io/badge/python-3.6-blue.svg
+    :target: https://www.python.org/downloads/release/python-360/
+    :alt: Python Versions
 
 .. _Code of Conduct: http://docs.sunpy.org/en/stable/coc.html
