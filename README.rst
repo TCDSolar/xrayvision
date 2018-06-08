@@ -56,7 +56,7 @@ follow our `Code of Conduct`_.
     :target: http://xrayvision.readthedocs.io/en/latest/?badge=latest
     :alt: Documentation Status
 
-.. |Python Version| image:: https://img.shields.io/badge/python-3.6-blue.svg
+.. |Python Versions| image:: https://img.shields.io/badge/python-3.6-blue.svg
     :target: https://www.python.org/downloads/release/python-360/
     :alt: Python Versions
 
