@@ -131,7 +131,7 @@ class Visibility(object):
                 return Visibility.from_fits(hdu_list)
             elif primary_header.get('TELESCOP') == 'RHESSI' and \
                     primary_header.get('INSTRUME') == 'RHESSI':
-                return RHESSIVisibility.from_fits(hdu_list=hdu_list)
+                return RHESSIVisibility.from_fits_old(hdu_list=hdu_list)
             else:
                 raise TypeError("This type of fits visibility file is not supported")
 
@@ -384,7 +384,7 @@ class RHESSIVisibility(Visibility):
     # For single time and energy ranges these data columns should be constant
     CONSTANT_DATA_COLUMNS = ['harm', 'erange', 'trange', 'xyoffset', 'type', 'units',
                              'atten_state', 'norm_ph_factor']
-    DYANMIC_DATA_COLUMNS = ['isc', 'u', 'v', 'obsvs', 'totflux', 'sigamp', 'chi2', 'count']
+    DYANMIC_DATA_COLUMNS = ['isc', 'u', 'v', 'obsvis', 'totflux', 'sigamp', 'chi2', 'count']
 
     COLUMN_DEFS = {'ATTEN_STATE': 'I', 'CHI2': 'E', 'COUNT': 'E', 'ERANGE': '2E', 'HARM': 'I',
                    'ISC': 'I', 'NORM_PH_FACTOR': 'E', 'OBSVIS': 'C', 'SIGAMP': 'E', 'TOTFLUX': 'E',
@@ -400,7 +400,8 @@ class RHESSIVisibility(Visibility):
                  units: str = "Photons cm!u-2!n s!u-1!n",
                  atten_state: int = 1, count=None,
                  pixel_size: np.array = np.array([1.0, 1.0])*u.arcsec,
-                 norm_ph_factor=0):
+                 norm_ph_factor=0,
+                 *, meta):
         r"""
         Initialise a new RHESSI visibility.
 
@@ -452,6 +453,7 @@ class RHESSIVisibility(Visibility):
         else:
             self.count = count
         self.norm_ph_factor = norm_ph_factor
+        self.meta = meta
 
     @staticmethod
     def exists_and_unique(hdu, column, indices):
@@ -554,6 +556,8 @@ class RHESSIVisibility(Visibility):
                     else:
                         data[prop.casefold()] = hdu.data[prop]
 
+                data['meta'] = hdu_list[0].header
+
                 return RHESSIVisibility(uv=np.vstack((hdu.data['u']*-1.0,
                                                       hdu.data['v']*-1.0))/u.arcsec,
                                         vis=hdu.data['obsvis'], **data)
@@ -590,37 +594,49 @@ class RHESSIVisibility(Visibility):
                 time_ranges = hdu.data["trange"]
                 unique_time_ranges = np.unique(time_ranges, axis=0)
 
+                visibilities = np.zeros((unique_time_ranges.shape[0],
+                                         unique_energy_ranges.shape[0]), dtype=object)
+
                 # Creating the RHESSIVisibilities
-                visibilities = []
-                for time_range in unique_time_ranges:
-                    for energy_range in unique_energy_ranges:
+                for i, time_range in enumerate(unique_time_ranges):
+                    for j, energy_range in enumerate(unique_energy_ranges):
                         indices = np.argwhere((time_ranges[:, 0] == time_range[0]) &
                                               (time_ranges[:, 1] == time_range[1]) &
                                               (energy_ranges[:, 0] == energy_range[0]) &
-                                              (energy_ranges[:, 1] == energy_range[1]))
+                                              (energy_ranges[:, 1] == energy_range[1])).reshape(-1)
 
                         static = {name: cls.exists_and_unique(hdu, name, indices)
                                   for name in cls.CONSTANT_DATA_COLUMNS}
 
-                        # TODO Figure out why the minus signs are necessary RH vs LH coordsys?
-                        cur_vis = RHESSIVisibility(np.hstack((hdu.data['u'][indices]*-1.0,
-                                                              hdu.data['v'][indices]*-1.0)),
-                                                   hdu.data['obsvis'][indices],
-                                                   **static)
+                        static['meta'] = hdu_list[0].header
+                        static['xyoffset'] = static['xyoffset'] * u.arcsec
 
-                        visibilities.append(cur_vis)
+                        dynamic = {name: hdu.data[name][indices] for name in
+                                   cls.DYANMIC_DATA_COLUMNS if name not in ['u', 'v', 'obsvis']}
 
-                if len(visibilities) == 1:
-                    return visibilities[0]
+                        cur_vis = RHESSIVisibility(uv=np.vstack((hdu.data['u'][indices] * -1.0,
+                                                   hdu.data['v'][indices] * -1.0)) / u.arcsec,
+                                                   vis=hdu.data['obsvis'][indices],
+                                                   **{**static, **dynamic})
+
+                        visibilities[i, j] = cur_vis
+
+                if visibilities.size == 1:
+                    return visibilities[0, 0]
                 else:
                     # return RHESSIVisibilityList(visibilities)
-                    pass
+                    return visibilities
 
     def to_map(self, shape=(33, 33), center=None, pixel_size=None):
-        map = super().to_map(shape=(33, 33), center=None, pixel_size=None)
+        map = super().to_map(shape=shape, center=center, pixel_size=pixel_size)
+        map.meta['wavelnth'] = self.erange
+        map.meta['date_obs'] = parse_time(self.trange[0])
+        map.meta['date-obs'] = parse_time(self.trange[0])
+        map.meta['date_end'] = parse_time(self.trange[1])
 
-        if self.trange.size != 0:
-            map.meta['date-obs'] = parse_time(self.trange[0, 0], time_format='utime').isoformat()
+        for key, value in self.meta.items():
+            if key.casefold() not in map.header:
+                map.header[key.casefold()] = value
 
         return map
 
@@ -641,8 +657,7 @@ class RHESSIVisibility(Visibility):
         # all the orgial hdus for later writing back to fits. If a new file need to figure out what
         # minimal required headers and extensions are.
         primary_hdu = fits.PrimaryHDU()
-        primary_hdu.header['TELESCOP'] = 'RHESSI'
-        primary_hdu.header['INSTRUME'] = 'RHESSI'
+        primary_hdu.header = self.meta
 
         modifed_colums = ('U', 'V', 'OBSVIS')
         orig_columns = self.COLUMN_DEFS.copy()
@@ -650,7 +665,11 @@ class RHESSIVisibility(Visibility):
 
         fits_columns = []
         for name, format in orig_columns.items():
-            fits_columns.append(fits.Column(name=name, array=self.__dict__[name.casefold()],
+            value = getattr(self, name.casefold())
+            if name.casefold() in self.CONSTANT_DATA_COLUMNS:
+                value = np.tile(value, (self.vis.size, 1))
+
+            fits_columns.append(fits.Column(name=name, array=value,
                                             format=format))
 
         fits_columns.append(fits.Column(name='U', array=self.uv[0, :]*-1.0,

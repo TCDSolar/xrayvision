@@ -15,6 +15,12 @@ from scipy.ndimage.interpolation import shift
 
 __all__ = ['clean', 'ms_clean']
 
+import logging
+import sys
+
+logging.basicConfig(stream=sys.stdout, level=logging.WARNING)
+logger = logging.getLogger(__name__)
+
 
 def clean(dirty_map, dirty_beam, clean_beam_width=4.0, gain=0.1, thres=0.01, niter=5000):
     r"""
@@ -90,7 +96,7 @@ def clean(dirty_map, dirty_beam, clean_beam_width=4.0, gain=0.1, thres=0.01, nit
         # imax = imax * max_beam
         model[mx, my] += gain * imax
 
-        print(f"Iter: {i}, strength: {imax}, location: {mx, my}")
+        logger.info(f"Iter: {i}, strength: {imax}, location: {mx, my}")
 
         offset = map_center[0] - mx, map_center[1] - my
         shifted_beam_center = int(beam_center[0] + offset[0]), int(beam_center[1] + offset[1])
@@ -104,11 +110,11 @@ def clean(dirty_map, dirty_beam, clean_beam_width=4.0, gain=0.1, thres=0.01, nit
         dirty_map = np.subtract(dirty_map, comp)
 
         if dirty_map.max() <= thres:
-            print("Threshold reached")
+            logger.info("Threshold reached")
             # break
         # el
         if np.abs(dirty_map.min()) > dirty_map.max():
-            print("Largest residual negative")
+            logger.info("Largest residual negative")
             break
 
     else:
@@ -121,7 +127,7 @@ def clean(dirty_map, dirty_beam, clean_beam_width=4.0, gain=0.1, thres=0.01, nit
         model = signal.convolve2d(model, clean_beam, mode='same')
 
         # clean_beam = clean_beam * (1/clean_beam.max())
-        dirty_map = dirty_map / clean_beam.sum()
+        dirty_map = dirty_map * clean_beam.sum()
 
     return model, dirty_map
 
@@ -221,7 +227,7 @@ def ms_clean(dirty_map, dirty_beam, scales=None,
         # Adjust for the max of scaled beam
         strength = strength / max_scaled_dirty_beams[max_scale]
 
-        print(f"Iter: {i}, max scale: {max_scale}, strength: {strength}")
+        logger.info(f"Iter: {i}, max scale: {max_scale}, strength: {strength}")
 
         # Loop gain and scale dependent bias
         strength = strength * scale_biases[max_scale] * gain
@@ -260,16 +266,16 @@ def ms_clean(dirty_map, dirty_beam, scales=None,
 
         # End max(res(a)) or niter
         if scaled_residuals[:, :, max_scale].max() <= thres:
-            print("Threshold reached")
+            logger.info("Threshold reached")
             # break
 
         # Largest scales largest residual is negative
         if np.abs(scaled_residuals[:, :, 0].min()) > scaled_residuals[:, :, 0].max():
-            print("Max scale residual negative")
+            logger.info("Max scale residual negative")
             break
 
     else:
-        print("Max iterations reached")
+        logger.info("Max iterations reached")
 
     # Convolve model with clean beam  B_G * I^M
     if clean_beam_width != 0.0:
@@ -277,6 +283,7 @@ def ms_clean(dirty_map, dirty_beam, scales=None,
                                       y_size=dirty_beam.shape[0]).array
 
         model = signal.convolve2d(model, clean_beam, mode='same')  # noqa
+        return model, scaled_residuals.sum(axis=2) * clean_beam.sum()
 
     # Add residuals B_G * I^M + I^R
     return model, scaled_residuals.sum(axis=2)
