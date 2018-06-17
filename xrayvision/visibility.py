@@ -640,6 +640,14 @@ class RHESSIVisibility(Visibility):
 
         return map
 
+    def to_map(self, shape=(33, 33), center=None, pixel_size=None):
+        map = super().to_map(shape=(33, 33), center=None, pixel_size=None)
+
+        if self.trange.size != 0:
+            map.meta['date-obs'] = parse_time(self.trange[0, 0], time_format='utime').isoformat()
+
+        return map
+
     def to_fits_file(self, path):
         """
         Write the visibility to a fits file.
