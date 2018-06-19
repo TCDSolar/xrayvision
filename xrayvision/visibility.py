@@ -636,7 +636,7 @@ class RHESSIVisibility(Visibility):
 
         for key, value in self.meta.items():
             if key.casefold() not in map.header:
-                map.header[key.casefold()] = value
+                map.meta[key.casefold()] = value
 
         return map
 
