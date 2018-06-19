@@ -635,7 +635,7 @@ class RHESSIVisibility(Visibility):
         map.meta['date_end'] = parse_time(self.trange[1])
 
         for key, value in self.meta.items():
-            if key.casefold() not in map.header:
+            if key.casefold() not in map.meta:
                 map.meta[key.casefold()] = value
 
         return map
