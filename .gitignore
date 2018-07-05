@@ -16,8 +16,10 @@ htmlcov
 .coverage
 MANIFEST
 .ipynb_checkpoints
+v
 
 # Sphinx
+docs/generated
 docs/api
 docs/_build
 
@@ -55,6 +57,9 @@ distribute-*.tar.gz
 .project
 .pydevproject
 .settings
+.pytest_cache
+matplotlibrc
+notebooks
 
 # Mac OSX
 .DS_Store
