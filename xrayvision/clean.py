@@ -22,7 +22,7 @@ logging.basicConfig(stream=sys.stdout, level=logging.WARNING)
 logger = logging.getLogger(__name__)
 
 
-def clean(dirty_map, dirty_beam, clean_beam_width=4.0, gain=0.1, thres=0.01, niter=5000):
+def clean(dirty_map, dirty_beam, pixel=None, clean_beam_width=4.0, gain=0.1, thres=0.01, niter=5000):
     r"""
     Clean the image using Hogbom's original method.
 
@@ -88,13 +88,14 @@ def clean(dirty_map, dirty_beam, clean_beam_width=4.0, gain=0.1, thres=0.01, nit
 
     # Model for sources
     model = np.zeros(dirty_map.shape)
+    componets = []
     for i in range(niter):
         # Find max in dirty map and save to point source
         mx, my = np.unravel_index(dirty_map.argmax(), dirty_map.shape)
         imax = dirty_map[mx, my]
         # TODO check if correct and how to undo
         # imax = imax * max_beam
-        model[mx, my] += gain * imax
+        model[my, mx] += gain * imax
 
         logger.info(f"Iter: {i}, strength: {imax}, location: {mx, my}")
 
@@ -107,27 +108,32 @@ def clean(dirty_map, dirty_beam, clean_beam_width=4.0, gain=0.1, thres=0.01, nit
 
         comp = imax * gain * shifted
 
+        componets.append((mx, my, comp[mx, my]))
+
         dirty_map = np.subtract(dirty_map, comp)
 
-        if dirty_map.max() <= thres:
-            logger.info("Threshold reached")
+        # if dirty_map.max() <= thres:
+        #     logger.info("Threshold reached")
             # break
-        # el
-        if np.abs(dirty_map.min()) > dirty_map.max():
-            logger.info("Largest residual negative")
-            break
+        # # el
+        # if np.abs(dirty_map.min()) > dirty_map.max():
+        #     logger.info("Largest residual negative")
+        #     break
 
     else:
         print("Max iterations reached")
 
     if clean_beam_width != 0.0:
-        clean_beam = Gaussian2DKernel(clean_beam_width, x_size=dirty_beam.shape[1],
+        clean_beam = Gaussian2DKernel(clean_beam_width/pixel, x_size=dirty_beam.shape[1],
                                       y_size=dirty_beam.shape[0]).array
+        # Normalise beam
+        clean_beam = clean_beam / clean_beam.max()
 
-        model = signal.convolve2d(model, clean_beam, mode='same')
+        # Convolve clean beam with model and scale
+        model = signal.convolve2d(model, clean_beam, mode='same') / clean_beam.sum() / pixel**2
 
-        # clean_beam = clean_beam * (1/clean_beam.max())
-        dirty_map = dirty_map * clean_beam.sum()
+        # Scale residual map with model and scale
+        dirty_map = dirty_map / clean_beam.sum() / (pixel**2)
 
     return model, dirty_map
 
