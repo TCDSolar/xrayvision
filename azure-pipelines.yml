@@ -2,15 +2,24 @@ name: $(BuildDefinitionName)_$(Date:yyyyMMdd)$(Rev:.rr)
 variables:
   CI_NAME: Azure Pipelines
   CI_BUILD_ID: $(Build.BuildId)
+<<<<<<< HEAD
   CI_BUILD_URL: "https://dev.azure.com/samaloney/xrayvision/_build/results?buildId=$(Build.BuildId)"
   CIBW_BUILD: cp37-* cp38-* cp39-*
+=======
+  CI_BUILD_URL: "https://dev.azure.com/sunpy/xrayvision/_build/results?buildId=$(Build.BuildId)"
+  CIBW_BUILD: cp36-* cp37-* cp38-*
+>>>>>>> 2982523 (Update temaple)
   CIBW_SKIP: "*-win32 *-manylinux1_i686"
 
 resources:
   repositories:
   - repository: OpenAstronomy
     type: github
+<<<<<<< HEAD
     endpoint: samaloney
+=======
+    endpoint: ?????
+>>>>>>> 2982523 (Update temaple)
     name: OpenAstronomy/azure-pipelines-templates
     ref: master
 
