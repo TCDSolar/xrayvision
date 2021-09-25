@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import numpy as np
 import pytest
 
@@ -9,6 +11,12 @@ from sunpy.map import Map
 
 from ..transform import generate_uv
 from ..visibility import Visibility, RHESSIVisibility
+
+
+@pytest.fixture
+def test_data_dir():
+    path = Path(__file__).parent.parent / 'data'
+    return path
 
 
 class TestVisibility(object):
@@ -73,7 +81,7 @@ class TestVisibility(object):
         cen = (2.0, -3.0) * unit.arcsec
         pix = (2, 3) * unit.arcsec
         # Set up empty map
-        image = Gaussian2DKernel(stddev=6, x_size=n, y_size=m).array
+        image = Gaussian2DKernel(6, x_size=n, y_size=m).array
 
         # Calculate full u, v coverage so will be equivalent to a discrete Fourier transform (DFT)
         u = generate_uv(m, center=cen[0], pixel_size=pix[0])
@@ -107,10 +115,11 @@ class TestVisibility(object):
         uv = np.array([u, v]).reshape(2, size) / unit.arcsec
 
         header = {'crval1': pos[0].value, 'crval2': pos[1].value,
-                  'cdelt1': pixel[0].value, 'cdelt2': pixel[1].value}
+                  'cdelt1': pixel[0].value, 'cdelt2': pixel[1].value,
+                  'cunit1': 'arcsec', 'cunit2': 'arcsec'}
 
         # Astropy index order is opposite to that of numpy, is 1st dim is across second down
-        data = Gaussian2DKernel(stddev=6, x_size=n, y_size=m).array
+        data = Gaussian2DKernel(6, x_size=n, y_size=m).array
         mp = Map((data, header))
         vis = Visibility.from_map(mp, uv)
 
@@ -120,9 +129,10 @@ class TestVisibility(object):
         res = vis.to_image((m, n), center=pos, pixel_size=pixel)
         assert np.allclose(res, data)
 
-    def test_from_fits_file(self):
-        vis = Visibility.from_fits_file('xrayvision/data/hsi_20020220_110600_1time_1energy.fits')
-        assert np.array_equal(vis.pixel_size, [1, 1])
+    def test_from_fits_file(self, test_data_dir):
+
+        vis = Visibility.from_fits_file(test_data_dir / 'hsi_20020220_110600_1time_1energy.fits')
+        assert np.array_equal(vis.pixel_size.value, [1, 1])
         assert np.array_equal(vis.xyoffset.value, np.float32([914.168396, 255.66218567]))
         assert np.array_equal(vis.erange, np.float32([6., 25.]))
         assert np.array_equal(vis.trange,  np.float64([730206360.0, 730206364.0]))
@@ -149,7 +159,7 @@ class TestVisibility(object):
         uv = np.array([u, v]).reshape(2, size) / unit.arcsec
 
         # Astropy index order is opposite to that of numpy, is 1st dim is across second down
-        data = Gaussian2DKernel(stddev=6, x_size=n, y_size=m).array
+        data = Gaussian2DKernel(6, x_size=n, y_size=m).array
 
         vis = Visibility.from_image(data, uv)
         res = vis.to_image((m, n))
@@ -167,7 +177,7 @@ class TestVisibility(object):
         uv = np.array([u, v]).reshape(2, size) / unit.arcsec
 
         # Astropy index order is opposite to that of numpy, is 1st dim is across second down
-        data = Gaussian2DKernel(stddev=6, x_size=n, y_size=m).array
+        data = Gaussian2DKernel(6, x_size=n, y_size=m).array
 
         vis = Visibility.from_image(data, uv, pixel_size=(2., 2.) * unit.arcsec)
         res = vis.to_image((m, n), pixel_size=2. * unit.arcsec)
@@ -185,7 +195,7 @@ class TestVisibility(object):
         uv = np.array([u, v]).reshape(2, size) / unit.arcsec
 
         # Astropy index order is opposite to that of numpy, is 1st dim is across second down
-        data = Gaussian2DKernel(stddev=6, x_size=n, y_size=m).array
+        data = Gaussian2DKernel(6, x_size=n, y_size=m).array
 
         vis = Visibility.from_image(data, uv)
         with pytest.raises(ValueError):
@@ -202,8 +212,9 @@ class TestVisibility(object):
         uv = np.array([u, v]).reshape(2, m * n) / unit.arcsec
 
         header = {'crval1': pos[0].value, 'crval2': pos[1].value,
-                  'cdelt1': pixel[0].value, 'cdelt2': pixel[1].value}
-        data = Gaussian2DKernel(stddev=2, x_size=n, y_size=m).array
+                  'cdelt1': pixel[0].value, 'cdelt2': pixel[1].value,
+                  'cunit1': 'arcsec', 'cunit2': 'arcsec'}
+        data = Gaussian2DKernel(2, x_size=n, y_size=m).array
         mp = Map((data, header))
 
         vis = Visibility.from_map(mp, uv)
@@ -226,8 +237,9 @@ class TestVisibility(object):
         uv = np.array([u, v]).reshape(2, m * n) / unit.arcsec
 
         header = {'crval1': 0, 'crval2': 0,
-                  'cdelt1': 2, 'cdelt2': 2}
-        data = Gaussian2DKernel(stddev=2, x_size=n, y_size=m).array
+                  'cdelt1': 2, 'cdelt2': 2,
+                  'cunit1': 'arcsec', 'cunit2': 'arcsec'}
+        data = Gaussian2DKernel(2, x_size=n, y_size=m).array
         mp = Map((data, header))
 
         vis = Visibility.from_map(mp, uv)
@@ -244,8 +256,9 @@ class TestVisibility(object):
         uv = np.array([u, v]).reshape(2, m * n) / unit.arcsec
 
         header = {'crval1': 0, 'crval2': 0,
-                  'cdelt1': 1, 'cdelt2': 1}
-        data = Gaussian2DKernel(stddev=2, x_size=n, y_size=m).array
+                  'cdelt1': 1, 'cdelt2': 1,
+                  'cunit1': 'arcsec', 'cunit2': 'arcsec'}
+        data = Gaussian2DKernel(2, x_size=n, y_size=m).array
         mp = Map((data, header))
 
         vis = Visibility.from_map(mp, uv)
@@ -264,7 +277,7 @@ class TestVisibility(object):
                   'cdelt1': 1, 'cdelt2': 1,
                   'cunit1': 'arcsec', 'cunit2': 'arcsec',
                   'ctype1': 'HPLN-TAN', 'ctype2': 'HPLT-TAN'}
-        data = Gaussian2DKernel(stddev=2, x_size=n, y_size=m).array
+        data = Gaussian2DKernel(2, x_size=n, y_size=m).array
         mp = Map((data, header))
 
         vis = Visibility.from_map(mp, uv)
@@ -314,9 +327,9 @@ class TestRHESSIVisibility(object):
     def test_unit_string_conversation(self, in_str, out_str):
         assert out_str == RHESSIVisibility.convert_units_to_tex(in_str)
 
-    def test_fits_file_data_read_successful(self):
+    def test_fits_file_data_read_successful(self, test_data_dir):
         vis = RHESSIVisibility.from_fits_file(
-            "xrayvision/data/hsi_20020220_110600_1time_1energy.fits")
+            test_data_dir / "hsi_20020220_110600_1time_1energy.fits")
         assert isinstance(vis, RHESSIVisibility)
 
         # vis = RHESSIVisibility.from_fits_file(
@@ -327,9 +340,9 @@ class TestRHESSIVisibility(object):
         #   "xrayvision/data/hsi_20020220_110600_9times_1energy.fits")
         # assert isinstance(vis, RHESSIVisibility)
 
-    def test_write_fits_file(self, tmpdir):
+    def test_write_fits_file(self, tmpdir, test_data_dir):
         vis = RHESSIVisibility.from_fits_file(
-            "xrayvision/data/hsi_20020220_110600_1time_1energy.fits")
+            test_data_dir / "hsi_20020220_110600_1time_1energy.fits")
 
         filepath = tmpdir.join('rhessi.fits')
         vis.to_fits_file(filepath.strpath)

@@ -97,7 +97,7 @@ def test_ms_clean_ideal():
 
 def test_clean_sim():
     n = m = 32
-    data = Gaussian2DKernel(stddev=3.0, x_size=n, y_size=m).array
+    data = Gaussian2DKernel(3.0, x_size=n, y_size=m).array
     # data = np.zeros((n, m))
     # data[13,13] = 10.0
     # data[12:14,12:14] = 10.0/4.0
@@ -127,4 +127,3 @@ def test_clean_sim():
 
     clean_map, res = clean(dirty_map, dirty_beam, clean_beam_width=0)
     np.allclose(data, clean_map + res, atol=dirty_beam.max() * 0.1)
-

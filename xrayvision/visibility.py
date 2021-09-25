@@ -283,7 +283,8 @@ class Visibility(object):
                   'ctype2': 'HPLT-TAN',
                   'naxis': 2,
                   'naxis1': shape[0],
-                  'naxis2': shape[1]}
+                  'naxis2': shape[1],
+                  'cunit1': 'arcsec', 'cunit2': 'arcsec'}
 
         if center:
             header['crval1'] = center[0].value
@@ -630,9 +631,10 @@ class RHESSIVisibility(Visibility):
     def to_map(self, shape=(33, 33), center=None, pixel_size=None):
         map = super().to_map(shape=shape, center=center, pixel_size=pixel_size)
         map.meta['wavelnth'] = self.erange
-        map.meta['date_obs'] = parse_time(self.trange[0])
-        map.meta['date-obs'] = parse_time(self.trange[0])
-        map.meta['date_end'] = parse_time(self.trange[1])
+        map.meta['date_obs'] = parse_time(self.trange[0], format='utime').fits
+        map.meta['date-obs'] = parse_time(self.trange[0], format='utime').fits
+        map.meta['date_end'] = parse_time(self.trange[1], format='utime').fits
+        map.meta['timesys'] = 'utc'
 
         for key, value in self.meta.items():
             if key.casefold() not in map.meta:

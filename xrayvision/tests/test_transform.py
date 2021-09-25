@@ -143,7 +143,7 @@ def test_dft_idft_map(shape):
     assert np.allclose(ones, out_map)
 
     # Gaussian - astropy has axis in reverse order compared to numpy
-    gaussian = Gaussian2DKernel(stddev=5, x_size=n, y_size=m).array
+    gaussian = Gaussian2DKernel(5, x_size=n, y_size=m).array
     vis = dft_map(gaussian, uv)
     out_map = idft_map(vis, shape, uv)
     assert np.allclose(gaussian, out_map)
@@ -184,7 +184,7 @@ def test_dft_idft_map_pixel_size(pixel_size):
     assert np.allclose(ones, out_map)
 
     # Gaussian - astropy has axis in reverse order compared to numpy
-    gaussian = Gaussian2DKernel(stddev=5, x_size=n, y_size=m).array
+    gaussian = Gaussian2DKernel(5, x_size=n, y_size=m).array
     vis = dft_map(gaussian, uv, pixel_size=pixel_size)
     out_map = idft_map(vis, shape, uv, pixel_size=pixel_size)
     assert np.allclose(gaussian, out_map)
@@ -225,7 +225,7 @@ def test_dft_idft_map_center(center):
     assert np.allclose(ones, out_map)
 
     # Gaussian - astropy has axis in reverse order compared to numpy
-    gaussian = Gaussian2DKernel(stddev=5, x_size=n, y_size=m).array
+    gaussian = Gaussian2DKernel(5, x_size=n, y_size=m).array
     vis = dft_map(gaussian, uv, center=center)
     out_map = idft_map(vis, shape, uv, center=center)
     assert np.allclose(gaussian, out_map)
@@ -269,7 +269,7 @@ def test_dft_idft_map_shape_pixel_size(shape, pixel_size):
     assert np.allclose(ones, out_map)
 
     # Gaussian - astropy has axis in reverse order compared to numpy
-    gaussian = Gaussian2DKernel(stddev=5, x_size=n, y_size=m).array
+    gaussian = Gaussian2DKernel(5, x_size=n, y_size=m).array
     vis = dft_map(gaussian, uv, pixel_size=pixel_size)
     out_map = idft_map(vis, shape, uv, pixel_size=pixel_size)
     assert np.allclose(gaussian, out_map)
