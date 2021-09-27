@@ -21,8 +21,8 @@ measured visibilities in f can the original map a be recovered?
 
 
     def make_data(noisy=False):
-        g1 = Gaussian2DKernel(stddev=2, x_size=65, y_size=65).array
-        g2 = Gaussian2DKernel(stddev=6, x_size=65, y_size=65).array
+        g1 = Gaussian2DKernel(2, x_size=65, y_size=65).array
+        g2 = Gaussian2DKernel(6, x_size=65, y_size=65).array
 
         temp = np.zeros((65, 65))
         temp[50,50] = 400.0

@@ -35,6 +35,7 @@ as to the :meth:`~xrayvision.visibility.Visibility.to_map` function of the visib
 .. plot::
 
     import numpy as np
+    from matplotlib import pyplot as plt
 
     from astropy import units as u
     from xrayvision.visibility import RHESSIVisibility
@@ -44,6 +45,8 @@ as to the :meth:`~xrayvision.visibility.Visibility.to_map` function of the visib
 
     rhessi_map = rhessi_vis.to_map(shape=(65, 65), pixel_size=[4., 4.] * u.arcsec)
     rhessi_map.plot()
+    plt.show()
+
 
 The artifacts due to the under sampling of the u, v plane are clear. The main goal
 of this library is to provide a number image reconstruction methods such as CLEAN.
@@ -64,6 +67,7 @@ inputs.
 .. plot::
 
     import numpy as np
+    from matplotlib import pyplot as plt
 
     from astropy import units as u
     from xrayvision.visibility import RHESSIVisibility
@@ -81,6 +85,7 @@ inputs.
 
     rhessi_map.data[:] = clean_data + residuals
     rhessi_map.plot()
+    plt.show()
 
 XRAYVISION also implements a multi-scale version of clean :meth:`~xrayvision.clean.ms_clean`
 
@@ -101,6 +106,7 @@ XRAYVISION also implements a multi-scale version of clean :meth:`~xrayvision.cle
 .. plot::
 
     import numpy as np
+    from matplotlib import pyplot as plt
 
     from astropy import units as u
     from sunpy.map import Map
@@ -122,3 +128,4 @@ XRAYVISION also implements a multi-scale version of clean :meth:`~xrayvision.cle
 
     rhessi_map.data[:] = ms_clean_data + ms_residuals
     rhessi_map.plot()
+    plt.show()

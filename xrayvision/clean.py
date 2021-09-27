@@ -121,7 +121,7 @@ def clean(dirty_map, dirty_beam, clean_beam_width=4.0, gain=0.1, thres=0.01, nit
         print("Max iterations reached")
 
     if clean_beam_width != 0.0:
-        clean_beam = Gaussian2DKernel(stddev=clean_beam_width, x_size=dirty_beam.shape[1],
+        clean_beam = Gaussian2DKernel(clean_beam_width, x_size=dirty_beam.shape[1],
                                       y_size=dirty_beam.shape[0]).array
 
         model = signal.convolve2d(model, clean_beam, mode='same')
@@ -279,7 +279,7 @@ def ms_clean(dirty_map, dirty_beam, scales=None,
 
     # Convolve model with clean beam  B_G * I^M
     if clean_beam_width != 0.0:
-        clean_beam = Gaussian2DKernel(stddev=clean_beam_width, x_size=dirty_beam.shape[1],
+        clean_beam = Gaussian2DKernel(clean_beam_width, x_size=dirty_beam.shape[1],
                                       y_size=dirty_beam.shape[0]).array
 
         model = signal.convolve2d(model, clean_beam, mode='same')  # noqa
