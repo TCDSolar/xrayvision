@@ -249,7 +249,7 @@ class Visibility(object):
                 raise ValueError(
                     f"Pixel_size must be scalar or of length of 2 not {pixel_size.shape}")  # noqa
 
-        return idft_map(self.vis, shape, self.uv, center=center, pixel_size=pixel)
+        return idft_map(self.uv, self.vis, shape, center=center, pixel_size=pixel)
 
     @u.quantity_input(center=u.arcsec, pixel_size=u.arcsec)
     def to_map(self, shape=(33, 33), center=None, pixel_size=None):

@@ -119,11 +119,11 @@ def test_clean_sim():
     sub_uv = np.hstack([sub_uv, np.zeros((2, 1))]) / u.arcsec
 
     # Factor of 9 is compensate for the factor of  3 * 3 increase in size
-    dirty_beam = idft_map(np.ones(321)*9, (n*3, m*3), sub_uv)
+    dirty_beam = idft_map(sub_uv, np.ones(321) * 9, (n * 3, m * 3))
 
     vis = dft_map(data, sub_uv)
 
-    dirty_map = idft_map(vis, (n, m), sub_uv)
+    dirty_map = idft_map(sub_uv, vis, (n, m))
 
     clean_map, res = clean(dirty_map, dirty_beam, clean_beam_width=0)
     np.allclose(data, clean_map + res, atol=dirty_beam.max() * 0.1)

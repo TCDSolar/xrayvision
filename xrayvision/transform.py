@@ -151,18 +151,21 @@ def dft_map(input_array, uv, center=(0.0, 0.0) * u.arcsec, pixel_size=(1.0, 1.0)
 
 
 @u.quantity_input(center='angle', pixel_size='angle')
-def idft_map(input_vis, shape, uv, center=(0.0, 0.0) * u.arcsec, pixel_size=(1.0, 1.0) * u.arcsec):
+def idft_map(uv, input_vis, shape, weights=None, center=(0.0, 0.0) * u.arcsec,
+             pixel_size=(1.0, 1.0) * u.arcsec):
     r"""
     Inverse discrete Fourier transform in terms of coordinates returning a 2D real array or image.
 
     Parameters
     ----------
+    uv : `numpy.ndarray`
+        Array of 2xN u, v coordinates corresponding to the input visibilities in `input_vis`
     input_vis : `numpy.ndarray`
         Array of N `complex` input visibilities
     shape : `float` (m,n)
-        The shape of the output arry to create
-    uv : `numpy.ndarray`
-        Array of 2xN u, v coordinates corresponding to the input visibilities in `input_vis`
+        The shape of the output array to create
+    weights : `numpy.ndarray`
+        Array of weights for visibilities
     center : `float` (x, y), optional
         Coordinates of the center of the map e.g. ``(0,0)`` or ``[5.0, -2.0]``
     pixel_size : `float` (dx, dy), optional
@@ -175,12 +178,12 @@ def idft_map(input_vis, shape, uv, center=(0.0, 0.0) * u.arcsec, pixel_size=(1.0
 
     """
     m, n = shape
-    # size = m * n
-
     y = generate_xy(m, center[1], pixel_size[1])
     x = generate_xy(n, center[0], pixel_size[0])
-
     x, y = np.meshgrid(x, y)
+
+    if weights is None:
+        weights = np.ones(input_vis.shape)
 
     # Check units are correct for exp need to be dimensionless and then remove units for speed
     if (uv[0, :] * x[0, 0]).unit == u.dimensionless_unscaled and \
@@ -190,7 +193,7 @@ def idft_map(input_vis, shape, uv, center=(0.0, 0.0) * u.arcsec, pixel_size=(1.0
         x = x.value
         y = y.value
 
-        image = np.sum(input_vis * np.exp(2j * np.pi * (
+        image = np.sum(input_vis * weights  * np.exp(2j * np.pi * (
             x[..., np.newaxis] * uv[np.newaxis, 0, :] + y[..., np.newaxis] * uv[np.newaxis, 1, :])),
                        axis=2)
 

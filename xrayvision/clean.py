@@ -6,9 +6,9 @@ for the true sky intensity which is a collection of point sources or in the case
 clean a collection of appropriate component shapes at different scales.
 
 """
-
-
 import numpy as np
+import astropy.units as u
+
 from astropy.convolution import Gaussian2DKernel
 from scipy import signal
 from scipy.ndimage.interpolation import shift
@@ -18,8 +18,23 @@ __all__ = ['clean', 'ms_clean']
 import logging
 import sys
 
+from xrayvision.transform import idft_map
+from xrayvision.visibility import Visibility
+
 logging.basicConfig(stream=sys.stdout, level=logging.WARNING)
 logger = logging.getLogger(__name__)
+
+
+def psf(vis, shape, pixel):
+    psf = idft_map(vis.uv, np.ones(vis.vis.shape), shape=shape,
+             weights=np.ones(vis.vis.shape) / vis.vis.shape[0], pixel_size=pixel)
+    return psf
+
+
+def back_project(vis, shape, pixel):
+    bp = idft_map(vis.uv, vis.vis, shape=shape,
+             weights=np.ones(vis.vis.shape) / vis.vis.shape[0], pixel_size=pixel)
+    return bp
 
 
 def clean(dirty_map, dirty_beam, pixel=None, clean_beam_width=4.0, gain=0.1, thres=0.01, niter=5000):
@@ -130,12 +145,21 @@ def clean(dirty_map, dirty_beam, pixel=None, clean_beam_width=4.0, gain=0.1, thr
         clean_beam = clean_beam / clean_beam.max()
 
         # Convolve clean beam with model and scale
-        model = signal.convolve2d(model, clean_beam, mode='same') / clean_beam.sum() / pixel**2
+        model = signal.convolve2d(model, clean_beam, mode='same') / clean_beam.sum() / (pixel**2)
 
         # Scale residual map with model and scale
         dirty_map = dirty_map / clean_beam.sum() / (pixel**2)
 
     return model, dirty_map
+
+
+def clean_wrapper(vis, shape, pixel, clean_beam_width=4.0, niter=100):
+    dirty_map = back_project(vis, shape=shape, pixel=pixel)
+    dirty_beam = psf(vis, shape=(shape[0]*3, shape[1]*3), pixel=pixel)
+    cmap, redidual = clean(dirty_map, dirty_beam, pixel=2, clean_beam_width=clean_beam_width,
+                           gain=0.1, niter=niter)
+
+    return cmap+redidual
 
 
 def ms_clean(dirty_map, dirty_beam, scales=None,

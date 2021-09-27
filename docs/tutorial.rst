@@ -81,7 +81,7 @@ inputs.
     dirty_beam = rhessi_vis.to_image(shape=(65*3, 65*3), pixel_size=[4., 4.] * u.arcsec)
 
     clean_data, residuals = clean.clean(dirty_map = rhessi_map.data, dirty_beam = dirty_beam,
-                                       gain=0.05, niter=1000, clean_beam_width = 1.0)
+                                       gain=0.05, niter=100, clean_beam_width = 1.0)
 
     rhessi_map.data[:] = clean_data + residuals
     rhessi_map.plot()
