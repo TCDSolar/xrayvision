@@ -53,7 +53,7 @@ measured visibilities in f can the original map a be recovered?
 
     full_vis = transform.dft_map(data, uv)
 
-    res = transform.idft_map(full_vis, (33, 33), uv)
+    res = transform.idft_map(uv, full_vis, (33, 33))
     # assert np.allclose(data, res)
 
     # Generate log spaced radial u, v sampeling
@@ -76,9 +76,9 @@ measured visibilities in f can the original map a be recovered?
 
     sub_vis = transform.dft_map(data, sub_uv)
 
-    psf1 = transform.idft_map(np.full(sub_vis.size, 1), (65, 65), sub_uv)
+    psf1 = transform.idft_map(sub_uv, np.full(sub_vis.size, 1), (65, 65))
 
-    sub_res = transform.idft_map(sub_vis, (65, 65), sub_uv)
+    sub_res = transform.idft_map(sub_uv, sub_vis, (65, 65))
 
     xp = np.round(x * 33 + 33/2 - 0.5 + 16).astype(int)
     yp = np.round(y * 33 + 33/2 - 0.5 + 16).astype(int)

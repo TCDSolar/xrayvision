@@ -4,9 +4,9 @@ from astropy.convolution.kernels import Gaussian2DKernel
 
 from scipy import signal
 
-from ..clean import clean, ms_clean, component, radial_prolate_sphereoidal,\
+from xrayvision.clean import clean, ms_clean, component, radial_prolate_sphereoidal,\
     vec_radial_prolate_sphereoidal
-from ..transform import dft_map, idft_map
+from xrayvision.transform import dft_map, idft_map
 
 
 def test_clean_ideal():
@@ -30,7 +30,7 @@ def test_clean_ideal():
     out_map = clean(dirty_map, dirty_beam, clean_beam_width=0.0)
 
     # Within threshold default threshold of 0.1
-    assert np.allclose(clean_map, (out_map[0]+out_map[1]), out_map, atol=dirty_beam.max() * 0.1)
+    assert np.allclose(clean_map, (out_map[0]+out_map[1]), atol=dirty_beam.max() * 0.1)
 
 
 def test_component():

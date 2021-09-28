@@ -32,13 +32,10 @@ def generate_xy(number_pixels, center=0.0 * u.arcsec, pixel_size=1.0 * u.arcsec)
 
     See Also
     --------
-    generate_uv : Generates corresponding coordinates but un u, v space
+    `generate_uv` : Generates corresponding coordinates but un u, v space
 
     Examples
     --------
-    These are written in doctest format, and should illustrate how to
-    use the function.
-
     >>> generate_xy(9)
     <Quantity [-4., -3., -2., -1.,  0.,  1.,  2.,  3.,  4.] arcsec>
 
@@ -47,8 +44,6 @@ def generate_xy(number_pixels, center=0.0 * u.arcsec, pixel_size=1.0 * u.arcsec)
 
     >>> generate_xy(9, center=10 * u.arcsec, pixel_size=2.5 * u.arcsec)
     <Quantity [ 0. ,  2.5,  5. ,  7.5, 10. , 12.5, 15. , 17.5, 20. ] arcsec>
-
-
 
     """
     x = (np.arange(number_pixels) - number_pixels / 2 + 0.5) * pixel_size + center
@@ -76,13 +71,10 @@ def generate_uv(number_pixels, center=0.0 * u.arcsec, pixel_size=1.0 * u.arcsec)
 
     See Also
     --------
-    generate_xy : Generates corresponding coordinate but un x, y space
+    `generate_xy` : Generates corresponding coordinate but un x, y space
 
     Examples
     --------
-    These are written in doctest format, and should illustrate how to
-    use the function.
-
     >>> generate_uv(9)
     <Quantity [-0.44444444, -0.33333333, -0.22222222, -0.11111111,  0.        ,
                 0.11111111,  0.22222222,  0.33333333,  0.44444444] 1 / arcsec>
@@ -121,8 +113,7 @@ def dft_map(input_array, uv, center=(0.0, 0.0) * u.arcsec, pixel_size=(1.0, 1.0)
     Returns
     -------
     `numpy.ndarray`
-        Array of N `complex` visibilities evaluated at the u, v coordinates \
-        given bu `uv`
+        Array of N `complex` visibilities evaluated at the u, v coordinates given bu `uv`
 
     """
     m, n = input_array.shape
@@ -193,7 +184,7 @@ def idft_map(uv, input_vis, shape, weights=None, center=(0.0, 0.0) * u.arcsec,
         x = x.value
         y = y.value
 
-        image = np.sum(input_vis * weights  * np.exp(2j * np.pi * (
+        image = np.sum(input_vis * weights * np.exp(2j * np.pi * (
             x[..., np.newaxis] * uv[np.newaxis, 0, :] + y[..., np.newaxis] * uv[np.newaxis, 1, :])),
                        axis=2)
 

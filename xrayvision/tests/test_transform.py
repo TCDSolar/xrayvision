@@ -127,26 +127,26 @@ def test_dft_idft_map(shape):
     assert np.array_equal(np.zeros(size, dtype=complex), vis)
     out_map = idft_map(uv, vis, shape)
     # Should get back original map after dft(idft())
-    assert np.array_equal(zeros, out_map)
+    assert np.allclose(zeros, out_map/np.prod(shape))
 
     # All ones
     ones = np.ones(shape)
     vis = dft_map(ones, uv)
     out_map = idft_map(uv, vis, shape)
-    assert np.allclose(ones, out_map)
+    assert np.allclose(ones, out_map/np.prod(shape))
 
     # Delta
     delta = zeros
     delta[m//2, n//2] = 1.0
     vis = dft_map(ones, uv)
     out_map = idft_map(uv, vis, shape)
-    assert np.allclose(ones, out_map)
+    assert np.allclose(ones, out_map/np.prod(shape))
 
     # Gaussian - astropy has axis in reverse order compared to numpy
     gaussian = Gaussian2DKernel(5, x_size=n, y_size=m).array
     vis = dft_map(gaussian, uv)
     out_map = idft_map(uv, vis, shape)
-    assert np.allclose(gaussian, out_map)
+    assert np.allclose(gaussian, out_map/np.prod(shape))
 
 
 @pytest.mark.parametrize("pixel_size", [(0.5, 3.0), (1.0, 2.0), (2.0, 1.0), (3.0, 0.5)])
@@ -168,26 +168,26 @@ def test_dft_idft_map_pixel_size(pixel_size):
     assert np.array_equal(np.zeros(size, dtype=complex), vis)
     out_map = idft_map(uv, vis, shape, pixel_size=pixel_size)
     # Should get back original map after dft(idft())
-    assert np.array_equal(zeros, out_map)
+    assert np.array_equal(zeros, out_map/np.prod(shape))
 
     # All ones
     ones = np.ones(shape)
     vis = dft_map(ones, uv, pixel_size=pixel_size)
     out_map = idft_map(uv, vis, shape, pixel_size=pixel_size)
-    assert np.allclose(ones, out_map)
+    assert np.allclose(ones, out_map/np.prod(shape))
 
     # Delta
     delta = zeros
     delta[m//2, n//2] = 1.0
     vis = dft_map(ones, uv, pixel_size=pixel_size)
     out_map = idft_map(uv, vis, shape, pixel_size=pixel_size)
-    assert np.allclose(ones, out_map)
+    assert np.allclose(ones, out_map/np.prod(shape))
 
     # Gaussian - astropy has axis in reverse order compared to numpy
     gaussian = Gaussian2DKernel(5, x_size=n, y_size=m).array
     vis = dft_map(gaussian, uv, pixel_size=pixel_size)
     out_map = idft_map(uv, vis, shape, pixel_size=pixel_size)
-    assert np.allclose(gaussian, out_map)
+    assert np.allclose(gaussian, out_map/np.prod(shape))
 
 
 @pytest.mark.parametrize("center", [(0, 0), (2.1, 2.1), (5.4, -5.4), (-5.6, 5.6)])
@@ -209,26 +209,26 @@ def test_dft_idft_map_center(center):
     assert np.array_equal(np.zeros(size, dtype=complex), vis)
     out_map = idft_map(uv, vis, shape, center=center)
     # Should get back original map after dft(idft())
-    assert np.array_equal(zeros, out_map)
+    assert np.array_equal(zeros, out_map/np.prod(shape))
 
     # All ones
     ones = np.ones(shape)
     vis = dft_map(ones, uv, center=center)
     out_map = idft_map(uv, vis, shape, center=center)
-    assert np.allclose(ones, out_map)
+    assert np.allclose(ones, out_map/np.prod(shape))
 
     # Delta
     delta = zeros
     delta[m//2, n//2] = 1.0
     vis = dft_map(ones, uv, center=center)
     out_map = idft_map(uv, vis, shape, center=center)
-    assert np.allclose(ones, out_map)
+    assert np.allclose(ones, out_map/np.prod(shape))
 
     # Gaussian - astropy has axis in reverse order compared to numpy
     gaussian = Gaussian2DKernel(5, x_size=n, y_size=m).array
     vis = dft_map(gaussian, uv, center=center)
     out_map = idft_map(uv, vis, shape, center=center)
-    assert np.allclose(gaussian, out_map)
+    assert np.allclose(gaussian, out_map/np.prod(shape))
 
 
 @pytest.mark.parametrize("shape, pixel_size", [((33, 32), (0.5, 0.5)),
@@ -253,26 +253,26 @@ def test_dft_idft_map_shape_pixel_size(shape, pixel_size):
     assert np.array_equal(np.zeros(size, dtype=complex), vis)
     out_map = idft_map(uv, vis, shape, pixel_size=pixel_size)
     # Should get back original map after dft(idft())
-    assert np.array_equal(zeros, out_map)
+    assert np.array_equal(zeros, out_map/np.prod(shape))
 
     # All ones
     ones = np.ones(shape)
     vis = dft_map(ones, uv, pixel_size=pixel_size)
     out_map = idft_map(uv, vis, shape, pixel_size=pixel_size)
-    assert np.allclose(ones, out_map)
+    assert np.allclose(ones, out_map/np.prod(shape))
 
     # Delta
     delta = zeros
     delta[m // 2, n // 2] = 1.0
     vis = dft_map(ones, uv, pixel_size=pixel_size)
     out_map = idft_map(uv, vis, shape, pixel_size=pixel_size)
-    assert np.allclose(ones, out_map)
+    assert np.allclose(ones, out_map/np.prod(shape))
 
     # Gaussian - astropy has axis in reverse order compared to numpy
     gaussian = Gaussian2DKernel(5, x_size=n, y_size=m).array
     vis = dft_map(gaussian, uv, pixel_size=pixel_size)
     out_map = idft_map(uv, vis, shape, pixel_size=pixel_size)
-    assert np.allclose(gaussian, out_map)
+    assert np.allclose(gaussian, out_map/np.prod(shape))
 
 
 def test_equivalence_of_convolve():

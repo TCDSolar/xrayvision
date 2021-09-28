@@ -25,16 +25,16 @@ logging.basicConfig(stream=sys.stdout, level=logging.WARNING)
 logger = logging.getLogger(__name__)
 
 
-def psf(vis, shape, pixel):
-    psf = idft_map(vis.uv, np.ones(vis.vis.shape), shape=shape,
-             weights=np.ones(vis.vis.shape) / vis.vis.shape[0], pixel_size=pixel)
-    return psf
-
-
-def back_project(vis, shape, pixel):
-    bp = idft_map(vis.uv, vis.vis, shape=shape,
-             weights=np.ones(vis.vis.shape) / vis.vis.shape[0], pixel_size=pixel)
-    return bp
+# def psf(vis, shape, pixel):
+#     psf = idft_map(vis.uv, np.ones(vis.vis.shape), shape=shape,
+#              weights=np.ones(vis.vis.shape) / vis.vis.shape[0], pixel_size=pixel)
+#     return psf
+#
+#
+# def back_project(vis, shape, pixel_):
+#     bp = idft_map(vis.uv, vis.vis, shape=shape,
+#              weights=np.ones(vis.vis.shape) / vis.vis.shape[0], pixel_size=pixel)
+#     return bp
 
 
 def clean(dirty_map, dirty_beam, pixel=None, clean_beam_width=4.0, gain=0.1, thres=0.01, niter=5000):
@@ -110,7 +110,7 @@ def clean(dirty_map, dirty_beam, pixel=None, clean_beam_width=4.0, gain=0.1, thr
         imax = dirty_map[mx, my]
         # TODO check if correct and how to undo
         # imax = imax * max_beam
-        model[my, mx] += gain * imax
+        model[mx, my] += gain * imax
 
         logger.info(f"Iter: {i}, strength: {imax}, location: {mx, my}")
 
@@ -128,8 +128,8 @@ def clean(dirty_map, dirty_beam, pixel=None, clean_beam_width=4.0, gain=0.1, thr
         dirty_map = np.subtract(dirty_map, comp)
 
         # if dirty_map.max() <= thres:
-        #     logger.info("Threshold reached")
-            # break
+        #      logger.info("Threshold reached")
+        #      break
         # # el
         # if np.abs(dirty_map.min()) > dirty_map.max():
         #     logger.info("Largest residual negative")
