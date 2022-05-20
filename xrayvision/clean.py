@@ -18,6 +18,7 @@ __all__ = ['clean', 'ms_clean']
 import logging
 import sys
 
+from xrayvision.imaging import back_project, psf
 from xrayvision.transform import idft_map
 from xrayvision.visibility import Visibility
 
@@ -87,7 +88,8 @@ def clean(dirty_map, dirty_beam, pixel=None, clean_beam_width=4.0, gain=0.1, thr
 
     """
     # Ensure both beam and map are even/odd on same axes
-    assert [x % 2 == 0 for x in dirty_map.shape] == [x % 2 == 0 for x in dirty_beam.shape]
+    if not [x % 2 == 0 for x in dirty_map.shape] == [x % 2 == 0 for x in dirty_beam.shape]:
+        raise ValueError('')
     pad = [0 if x % 2 == 0 else 1 for x in dirty_map.shape]
 
     # Assume beam, map center is in middle
@@ -139,25 +141,28 @@ def clean(dirty_map, dirty_beam, pixel=None, clean_beam_width=4.0, gain=0.1, thr
         print("Max iterations reached")
 
     if clean_beam_width != 0.0:
-        clean_beam = Gaussian2DKernel(clean_beam_width/pixel, x_size=dirty_beam.shape[1],
+        # Convert from FWHM to StDev
+        x_stdev = clean_beam_width/pixel[0] / ( 2.0 * np.sqrt( 2.0 * np.log(2.0) ))
+        y_stdev = clean_beam_width / pixel[1] / (2.0 * np.sqrt(2.0 * np.log(2.0)))
+        clean_beam = Gaussian2DKernel(x_stdev, y_stdev, x_size=dirty_beam.shape[1],
                                       y_size=dirty_beam.shape[0]).array
         # Normalise beam
         clean_beam = clean_beam / clean_beam.max()
 
         # Convolve clean beam with model and scale
-        model = signal.convolve2d(model, clean_beam, mode='same') / clean_beam.sum() / (pixel**2)
+        model = signal.convolve2d(model, clean_beam/clean_beam.sum(), mode='same') / (pixel[0]*pixel[1])
 
         # Scale residual map with model and scale
-        dirty_map = dirty_map / clean_beam.sum() / (pixel**2)
+        dirty_map = dirty_map / clean_beam.sum() / (pixel[0] * pixel[1])
 
     return model, dirty_map
 
 
-def clean_wrapper(vis, shape, pixel, clean_beam_width=4.0, niter=100):
-    dirty_map = back_project(vis, shape=shape, pixel=pixel)
-    dirty_beam = psf(vis, shape=(shape[0]*3, shape[1]*3), pixel=pixel)
-    cmap, redidual = clean(dirty_map, dirty_beam, pixel=2, clean_beam_width=clean_beam_width,
-                           gain=0.1, niter=niter)
+def clean_wrapper(vis, shape, pixel, clean_beam_width=4.0, niter=100, **kwargs):
+    dirty_map = back_project(vis, shape=shape, pixel_size=pixel)
+    dirty_beam = psf(vis, shape=shape*3, pixel_size=pixel)
+    cmap, redidual = clean(dirty_map.value, dirty_beam.value, pixel=pixel, clean_beam_width=clean_beam_width,
+                           niter=niter, **kwargs)
 
     return cmap+redidual
 

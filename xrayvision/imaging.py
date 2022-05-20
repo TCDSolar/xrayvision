@@ -23,11 +23,13 @@ def psf(vis, shape=(65, 65), pixel_size=2*u.arcsec):
         Point spread function
 
     """
-    if len(shape) == 1:
-        shape = [shape, shape]
+    if  shape.size == 1:
+        shape = shape.repeat(2)
 
     if pixel_size.size == 1:
         pixel_size = pixel_size.repeat(2)
+
+    shape = shape.to_value(u.pixel)
 
     # Make sure psf is aways odd so power is in exactly one pixel
     m, n = [s//2 * 2 +1 for s in shape]
@@ -61,6 +63,7 @@ def back_project(vis, shape=(65, 65)*u.pixel, pixel_size=2*u.arcsec):
     if pixel_size.size == 1:
         pixel_size = pixel_size.repeat(2)
 
+    shape = shape.to_value(u.pixel)
     bp = idft_map(vis.uv, vis.vis, shape=shape,
                   weights=np.ones(vis.vis.shape) / vis.vis.shape[0], pixel_size=pixel_size)
     return bp
