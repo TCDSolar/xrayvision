@@ -150,21 +150,21 @@ def clean(dirty_map, dirty_beam, pixel=None, clean_beam_width=4.0, gain=0.1, thr
         clean_beam = clean_beam / clean_beam.max()
 
         # Convolve clean beam with model and scale
-        model = signal.convolve2d(model, clean_beam/clean_beam.sum(), mode='same') / (pixel[0]*pixel[1])
+        clean_map = signal.convolve2d(model, clean_beam/clean_beam.sum(), mode='same') / (pixel[0]*pixel[1])
 
         # Scale residual map with model and scale
         dirty_map = dirty_map / clean_beam.sum() / (pixel[0] * pixel[1])
 
-    return model, dirty_map
+    return clean_map, dirty_map, model
 
 
 def clean_wrapper(vis, shape, pixel, clean_beam_width=4.0, niter=100, **kwargs):
     dirty_map = back_project(vis, shape=shape, pixel_size=pixel)
     dirty_beam = psf(vis, shape=shape*3, pixel_size=pixel)
-    cmap, redidual = clean(dirty_map.value, dirty_beam.value, pixel=pixel, clean_beam_width=clean_beam_width,
-                           niter=niter, **kwargs)
+    clean_map, residual, model = clean(dirty_map.value, dirty_beam.value, pixel=pixel,
+                                   clean_beam_width=clean_beam_width, niter=niter, **kwargs)
 
-    return cmap+redidual
+    return clean_map+residual, residual, model
 
 
 def ms_clean(dirty_map, dirty_beam, scales=None,
