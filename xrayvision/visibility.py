@@ -110,7 +110,7 @@ class Visibility:
         Parameters
         ----------
         filename : `basestring`
-            The path/filename of the the fits file to read
+            The path/filename of the fits file to read
 
         Returns
         -------

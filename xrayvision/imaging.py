@@ -1,12 +1,12 @@
 import astropy.units as u
 import numpy as np
 
-from xrayvision.transform import idft_map, dft_map
+from xrayvision.transform import idft_map
 
 
 def psf(vis, shape=(65, 65), pixel_size=2*u.arcsec):
     """
-    Create the point spread function of the given visibilities
+    Create the point spread function for given u, v point of the visibilities.
 
     Parameters
     ----------
@@ -23,7 +23,7 @@ def psf(vis, shape=(65, 65), pixel_size=2*u.arcsec):
         Point spread function
 
     """
-    if  shape.size == 1:
+    if shape.size == 1:
         shape = shape.repeat(2)
 
     if pixel_size.size == 1:
@@ -31,11 +31,11 @@ def psf(vis, shape=(65, 65), pixel_size=2*u.arcsec):
 
     shape = shape.to_value(u.pixel)
 
-    # Make sure psf is aways odd so power is in exactly one pixel
-    m, n = [s//2 * 2 +1 for s in shape]
-    psf = idft_map(vis.uv, np.ones(vis.vis.shape)*vis.vis.unit, shape=(m, n),
-                   weights=np.ones(vis.vis.shape) / vis.vis.shape[0], pixel_size=pixel_size)
-    return psf
+    # Make sure psf is always odd so power is in exactly one pixel
+    m, n = [s//2 * 2 + 1 for s in shape]
+    psf_arr = idft_map(vis.uv, np.ones(vis.vis.shape)*vis.vis.unit, shape=(m, n),
+                       weights=np.ones(vis.vis.shape) / vis.vis.shape[0], pixel_size=pixel_size)
+    return psf_arr
 
 
 def back_project(vis, shape=(65, 65)*u.pixel, pixel_size=2*u.arcsec):
