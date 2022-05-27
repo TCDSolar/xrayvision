@@ -9,7 +9,7 @@ from datetime import datetime
 import astropy.units as u
 import numpy as np
 from astropy.table import Table
-from sunpy.io.fits import fits
+from astropy.io import fits
 from sunpy.map import Map
 from sunpy.time import parse_time
 
