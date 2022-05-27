@@ -18,9 +18,8 @@ from xrayvision.imaging import back_project, psf
 
 __all__ = ['clean', 'vis_clean', 'ms_clean', 'vis_ms_clean']
 
-logging.basicConfig(stream=sys.stdout, level=logging.WARNING)
 logger = logging.getLogger(__name__)
-
+logger.setLevel('DEBUG')
 
 __common_clean_doc__ = r"""
     clean_beam_width : `float`
@@ -146,8 +145,9 @@ def clean(dirty_map, dirty_beam, pixel=None, clean_beam_width=4.0,
 
         # Scale residual map with model and scale
         dirty_map = dirty_map / clean_beam.sum() / (pixel[0] * pixel[1])
+        return clean_map, model, dirty_map
 
-    return clean_map, dirty_map, model
+    return model+dirty_map, model, dirty_map
 
 
 clean.__doc__ += __common_clean_doc__
@@ -215,7 +215,7 @@ __common_ms_clea_doc__ = r"""
     """
 
 
-def ms_clean(dirty_map, dirty_beam, scales=None,
+def ms_clean(dirty_map, dirty_beam, pixel, scales=None,
              clean_beam_width=4.0, gain=0.1, thres=0.01, niter=5000):
     r"""
     Clean the map using a multiscale clean algorithm.
@@ -329,12 +329,20 @@ def ms_clean(dirty_map, dirty_beam, scales=None,
 
     # Convolve model with clean beam  B_G * I^M
     if clean_beam_width != 0.0:
-        clean_beam = Gaussian2DKernel(clean_beam_width, x_size=dirty_beam.shape[1],
+        x_stdev = (clean_beam_width/pixel[0] / (2.0 * np.sqrt(2.0 * np.log(2.0)))).value
+        y_stdev = (clean_beam_width/pixel[1] / (2.0 * np.sqrt(2.0 * np.log(2.0)))).value
+        clean_beam = Gaussian2DKernel(x_stdev, y_stdev, x_size=dirty_beam.shape[1],
                                       y_size=dirty_beam.shape[0]).array
 
-        model = signal.convolve2d(model, clean_beam, mode='same')  # noqa
-        return model, scaled_residuals.sum(axis=2) * clean_beam.sum()
+        # Normalise beam
+        clean_beam = clean_beam / clean_beam.max()
 
+        clean_map = signal.convolve2d(model, clean_beam, mode='same') / (pixel[0]*pixel[1])
+
+        # Scale residual map with model and scale
+        dirty_map = (scaled_residuals / clean_beam.sum() / (pixel[0] * pixel[1])).sum(axis=2)
+
+        return clean_map+dirty_map, model, dirty_map
     # Add residuals B_G * I^M + I^R
     return model, scaled_residuals.sum(axis=2)
 

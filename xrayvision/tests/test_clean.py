@@ -27,10 +27,10 @@ def test_clean_ideal():
     dirty_map = signal.convolve(clean_map, dirty_beam, mode='same')
 
     # Disable convolution of model with gaussian for testing
-    out_map = clean(dirty_map, dirty_beam, clean_beam_width=0.0)
+    out_map, model, resid = clean(dirty_map, dirty_beam, clean_beam_width=0.0)
 
     # Within threshold default threshold of 0.1
-    assert np.allclose(clean_map, (out_map[0]+out_map[1]), atol=dirty_beam.max() * 0.1)
+    assert np.allclose(clean_map, out_map, atol=dirty_beam.max() * 0.1)
 
 
 def test_component():
@@ -88,7 +88,7 @@ def test_ms_clean_ideal():
     dirty_map = signal.convolve2d(clean_map, dirty_beam, mode='same')
 
     # Disable convolution of model with gaussian for testing
-    model, res = ms_clean(dirty_map, dirty_beam, scales=[1], clean_beam_width=0.0)
+    model, res = ms_clean(dirty_map, dirty_beam, [1, 1]*u.arcsec, scales=[1], clean_beam_width=0.0)
     recovered = model + res
 
     # Within threshold default threshold
@@ -125,5 +125,5 @@ def test_clean_sim():
 
     dirty_map = idft_map(sub_uv, vis, (n, m))
 
-    clean_map, res = clean(dirty_map, dirty_beam, clean_beam_width=0)
-    np.allclose(data, clean_map + res, atol=dirty_beam.max() * 0.1)
+    clean_map, model, res = clean(dirty_map, dirty_beam, clean_beam_width=0)
+    np.allclose(data, clean_map, atol=dirty_beam.max() * 0.1)

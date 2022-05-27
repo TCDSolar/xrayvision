@@ -84,7 +84,7 @@ inputs.
                                                gain=0.05, niter=100, clean_beam_width = 1*u.arcsec,
                                                pixel=[4., 4.] * u.arcsec)
 
-    rhessi_map.data[:] = clean_data.value + residuals
+    rhessi_map.data[:] = clean_data.value
     rhessi_map.plot()
     plt.show()
 
@@ -121,12 +121,13 @@ XRAYVISION also implements a multi-scale version of clean :meth:`~xrayvision.cle
     rhessi_vis.vis = np.ones(rhessi_vis.vis.shape)
     dirty_beam = rhessi_vis.to_image(shape=(65*3, 65*3), pixel_size=[4., 4.] * u.arcsec)
 
-    ms_clean_data, ms_residuals = clean.ms_clean(dirty_map = rhessi_map.data,
-                                                       dirty_beam = dirty_beam,
+    ms_clean, ms_model, ms_resid = clean.ms_clean(dirty_map=rhessi_map.data,
+                                                 dirty_beam=dirty_beam,
+                                                 pixel=[4., 4.] * u.arcsec,
                                                        gain=0.05, niter=1000,
                                                        clean_beam_width = 1.0,
                                                        scales=[1,2,4])
 
-    rhessi_map.data[:] = ms_clean_data + ms_residuals
+    rhessi_map.data[:] = ms_clean
     rhessi_map.plot()
     plt.show()
