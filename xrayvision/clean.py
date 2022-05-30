@@ -13,6 +13,7 @@ import numpy as np
 from astropy.convolution import Gaussian2DKernel
 from scipy import signal
 from scipy.ndimage.interpolation import shift
+from sunpy.map.map_factory import Map
 
 from xrayvision.imaging import back_project, psf
 
@@ -73,7 +74,7 @@ def clean(dirty_map, dirty_beam, pixel=None, clean_beam_width=4.0,
     dirty_map : `numpy.ndarray`
         The dirty map to be cleaned 2D
     dirty_beam : `numpy.ndarray`
-        The dirty beam or point spread function (PSF) 2D
+        The dirty beam or point spread function (PSF) 2D must
     pixel :
         Size of a pixel
     """
@@ -153,11 +154,11 @@ def clean(dirty_map, dirty_beam, pixel=None, clean_beam_width=4.0,
 clean.__doc__ += __common_clean_doc__
 
 
-def vis_clean(vis, shape, pixel, clean_beam_width=4.0, niter=100, **kwargs):
+def vis_clean(vis, shape, pixel, clean_beam_width=4.0, niter=100, map=True, **kwargs):
     r"""
     Clean the visibilities using Hogbom's original method.
 
-    A wrapper around `clean` which calculates the dirty map and psf.
+    A wrapper around lower level `clean` which calculates the dirty map and psf
 
     Parameters
     ----------
@@ -167,20 +168,24 @@ def vis_clean(vis, shape, pixel, clean_beam_width=4.0, niter=100, **kwargs):
         Size of map
     pixel :
         Size of pixel
+    map : `boolean` optional
+        Return an `sunpy.map.Map` by default or data only if `False`
     """
 
-    dirty_map = back_project(vis, shape=shape, pixel_size=pixel)
-    dirty_beam = psf(vis, shape=shape*3, pixel_size=pixel)
-    clean_map, residual, model = clean(dirty_map.value, dirty_beam.value, pixel=pixel,
+    dirty_map = back_project(vis, shape=shape, pixel_size=pixel, map=True)
+    dirty_beam = psf(vis, shape=shape*3, pixel_size=pixel, map=False)
+    clean_map, model, residual = clean(dirty_map.data, dirty_beam.value, pixel=pixel,
                                        clean_beam_width=clean_beam_width, niter=niter, **kwargs)
+    if not map:
+        return clean_map, model, residual
 
-    return clean_map+residual, residual, model
+    return [Map((data, dirty_map.meta)) for data in (clean_map, model, residual)]
 
 
 vis_clean.__doc__ += __common_clean_doc__
 
 
-__common_ms_clea_doc__ = r"""
+__common_ms_clean_doc__ = r"""
     scales : array-like, optional, optional
         The scales to use eg ``[1, 2, 4, 8]``
     clean_beam_width : `float`
@@ -347,11 +352,11 @@ def ms_clean(dirty_map, dirty_beam, pixel, scales=None,
     return model, scaled_residuals.sum(axis=2)
 
 
-ms_clean.__doc__ += __common_ms_clea_doc__
+ms_clean.__doc__ += __common_ms_clean_doc__
 
 
 def vis_ms_clean(vis, shape, pixel, scales=None, clean_beam_width=4.0,
-                 gain=0.1, thres=0.01, niter=5000):
+                 gain=0.1, thres=0.01, niter=5000, map=True):
     r"""
     Clean the visibilities using a multiscale clean method.
 
@@ -368,12 +373,16 @@ def vis_ms_clean(vis, shape, pixel, scales=None, clean_beam_width=4.0,
 
     """
     dirty_map = back_project(vis, shape=shape, pixel_size=pixel)
-    dirty_beam = psf(vis, shape=shape * 3, pixel_size=pixel)
-    ms_clean(dirty_map, dirty_beam, scales=scales,
-             clean_beam_width=clean_beam_width, gain=gain, thres=thres, niter=niter)
+    dirty_beam = psf(vis, shape=shape * 3, pixel_size=pixel, map=False)
+    clean_map, model, residual = ms_clean(dirty_map.data, dirty_beam, scales=scales,
+                                          clean_beam_width=clean_beam_width, gain=gain,
+                                          thres=thres, niter=niter)
+    if not map:
+        return clean_map, model, residual
 
+    return [Map((data, dirty_map.meta)) for data in (clean_map, model, residual)]
 
-vis_ms_clean.__doc__ += __common_ms_clea_doc__
+vis_ms_clean.__doc__ += __common_ms_clean_doc__
 
 
 def radial_prolate_sphereoidal(nu):
