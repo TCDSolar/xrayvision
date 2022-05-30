@@ -125,28 +125,28 @@ def test_dft_idft_map(shape):
     vis = dft_map(zeros, uv)
     # All visibilities should be zero
     assert np.array_equal(np.zeros(size, dtype=complex), vis)
-    out_map = idft_map(vis, shape, uv)
+    out_map = idft_map(uv, vis, shape)
     # Should get back original map after dft(idft())
-    assert np.array_equal(zeros, out_map)
+    assert np.allclose(zeros, out_map/np.prod(shape))
 
     # All ones
     ones = np.ones(shape)
     vis = dft_map(ones, uv)
-    out_map = idft_map(vis, shape, uv)
-    assert np.allclose(ones, out_map)
+    out_map = idft_map(uv, vis, shape)
+    assert np.allclose(ones, out_map/np.prod(shape))
 
     # Delta
     delta = zeros
     delta[m//2, n//2] = 1.0
     vis = dft_map(ones, uv)
-    out_map = idft_map(vis, shape, uv)
-    assert np.allclose(ones, out_map)
+    out_map = idft_map(uv, vis, shape)
+    assert np.allclose(ones, out_map/np.prod(shape))
 
     # Gaussian - astropy has axis in reverse order compared to numpy
     gaussian = Gaussian2DKernel(5, x_size=n, y_size=m).array
     vis = dft_map(gaussian, uv)
-    out_map = idft_map(vis, shape, uv)
-    assert np.allclose(gaussian, out_map)
+    out_map = idft_map(uv, vis, shape)
+    assert np.allclose(gaussian, out_map/np.prod(shape))
 
 
 @pytest.mark.parametrize("pixel_size", [(0.5, 3.0), (1.0, 2.0), (2.0, 1.0), (3.0, 0.5)])
@@ -166,28 +166,28 @@ def test_dft_idft_map_pixel_size(pixel_size):
     vis = dft_map(zeros, uv, pixel_size=pixel_size)
     # All visibilities should be zero
     assert np.array_equal(np.zeros(size, dtype=complex), vis)
-    out_map = idft_map(vis, shape, uv, pixel_size=pixel_size)
+    out_map = idft_map(uv, vis, shape, pixel_size=pixel_size)
     # Should get back original map after dft(idft())
-    assert np.array_equal(zeros, out_map)
+    assert np.array_equal(zeros, out_map/np.prod(shape))
 
     # All ones
     ones = np.ones(shape)
     vis = dft_map(ones, uv, pixel_size=pixel_size)
-    out_map = idft_map(vis, shape, uv, pixel_size=pixel_size)
-    assert np.allclose(ones, out_map)
+    out_map = idft_map(uv, vis, shape, pixel_size=pixel_size)
+    assert np.allclose(ones, out_map/np.prod(shape))
 
     # Delta
     delta = zeros
     delta[m//2, n//2] = 1.0
     vis = dft_map(ones, uv, pixel_size=pixel_size)
-    out_map = idft_map(vis, shape, uv, pixel_size=pixel_size)
-    assert np.allclose(ones, out_map)
+    out_map = idft_map(uv, vis, shape, pixel_size=pixel_size)
+    assert np.allclose(ones, out_map/np.prod(shape))
 
     # Gaussian - astropy has axis in reverse order compared to numpy
     gaussian = Gaussian2DKernel(5, x_size=n, y_size=m).array
     vis = dft_map(gaussian, uv, pixel_size=pixel_size)
-    out_map = idft_map(vis, shape, uv, pixel_size=pixel_size)
-    assert np.allclose(gaussian, out_map)
+    out_map = idft_map(uv, vis, shape, pixel_size=pixel_size)
+    assert np.allclose(gaussian, out_map/np.prod(shape))
 
 
 @pytest.mark.parametrize("center", [(0, 0), (2.1, 2.1), (5.4, -5.4), (-5.6, 5.6)])
@@ -207,28 +207,28 @@ def test_dft_idft_map_center(center):
     vis = dft_map(zeros, uv, center=center)
     # All visibilities should be zero
     assert np.array_equal(np.zeros(size, dtype=complex), vis)
-    out_map = idft_map(vis, shape, uv, center=center)
+    out_map = idft_map(uv, vis, shape, center=center)
     # Should get back original map after dft(idft())
-    assert np.array_equal(zeros, out_map)
+    assert np.array_equal(zeros, out_map/np.prod(shape))
 
     # All ones
     ones = np.ones(shape)
     vis = dft_map(ones, uv, center=center)
-    out_map = idft_map(vis, shape, uv, center=center)
-    assert np.allclose(ones, out_map)
+    out_map = idft_map(uv, vis, shape, center=center)
+    assert np.allclose(ones, out_map/np.prod(shape))
 
     # Delta
     delta = zeros
     delta[m//2, n//2] = 1.0
     vis = dft_map(ones, uv, center=center)
-    out_map = idft_map(vis, shape, uv, center=center)
-    assert np.allclose(ones, out_map)
+    out_map = idft_map(uv, vis, shape, center=center)
+    assert np.allclose(ones, out_map/np.prod(shape))
 
     # Gaussian - astropy has axis in reverse order compared to numpy
     gaussian = Gaussian2DKernel(5, x_size=n, y_size=m).array
     vis = dft_map(gaussian, uv, center=center)
-    out_map = idft_map(vis, shape, uv, center=center)
-    assert np.allclose(gaussian, out_map)
+    out_map = idft_map(uv, vis, shape, center=center)
+    assert np.allclose(gaussian, out_map/np.prod(shape))
 
 
 @pytest.mark.parametrize("shape, pixel_size", [((33, 32), (0.5, 0.5)),
@@ -251,28 +251,28 @@ def test_dft_idft_map_shape_pixel_size(shape, pixel_size):
     vis = dft_map(zeros, uv, pixel_size=pixel_size)
     # All visibilities should be zero
     assert np.array_equal(np.zeros(size, dtype=complex), vis)
-    out_map = idft_map(vis, shape, uv, pixel_size=pixel_size)
+    out_map = idft_map(uv, vis, shape, pixel_size=pixel_size)
     # Should get back original map after dft(idft())
-    assert np.array_equal(zeros, out_map)
+    assert np.array_equal(zeros, out_map/np.prod(shape))
 
     # All ones
     ones = np.ones(shape)
     vis = dft_map(ones, uv, pixel_size=pixel_size)
-    out_map = idft_map(vis, shape, uv, pixel_size=pixel_size)
-    assert np.allclose(ones, out_map)
+    out_map = idft_map(uv, vis, shape, pixel_size=pixel_size)
+    assert np.allclose(ones, out_map/np.prod(shape))
 
     # Delta
     delta = zeros
     delta[m // 2, n // 2] = 1.0
     vis = dft_map(ones, uv, pixel_size=pixel_size)
-    out_map = idft_map(vis, shape, uv, pixel_size=pixel_size)
-    assert np.allclose(ones, out_map)
+    out_map = idft_map(uv, vis, shape, pixel_size=pixel_size)
+    assert np.allclose(ones, out_map/np.prod(shape))
 
     # Gaussian - astropy has axis in reverse order compared to numpy
     gaussian = Gaussian2DKernel(5, x_size=n, y_size=m).array
     vis = dft_map(gaussian, uv, pixel_size=pixel_size)
-    out_map = idft_map(vis, shape, uv, pixel_size=pixel_size)
-    assert np.allclose(gaussian, out_map)
+    out_map = idft_map(uv, vis, shape, pixel_size=pixel_size)
+    assert np.allclose(gaussian, out_map/np.prod(shape))
 
 
 def test_equivalence_of_convolve():
@@ -297,18 +297,18 @@ def test_equivalence_of_convolve():
 
     non_zero = np.where(sampling != 0)[0]
 
-    bp1 = idft_map(full_vis, (33, 33), uv)
+    bp1 = idft_map(uv, full_vis, (33, 33))
 
-    bp2 = idft_map(sub_vis[non_zero], (33, 33), uv[:, non_zero])
+    bp2 = idft_map(uv[:, non_zero], sub_vis[non_zero], (33, 33))
 
     # Need to make the psf large enough to slide over entire data window
-    psf1 = idft_map(sampling[non_zero], (33*3, 33*3), uv[:, non_zero])
+    psf1 = idft_map(uv[:, non_zero], sampling[non_zero], (33 * 3, 33 * 3))
 
     conv = signal.convolve(data, psf1, mode='same', method='fft')
 
-    psf2 = idft_map(sampling[non_zero], (33, 33), uv[:, non_zero])
+    psf2 = idft_map(uv[:, non_zero], sampling[non_zero], (33, 33))
 
-    bp3 = idft_map(full_vis[non_zero], (33, 33), uv[:, non_zero])
+    bp3 = idft_map(uv[:, non_zero], full_vis[non_zero], (33, 33))
 
     assert np.allclose(bp2, conv)
     assert np.allclose(bp2, bp3)

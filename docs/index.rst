@@ -9,9 +9,4 @@ This is the documentation for xrayvision.
    whatsnew/index
    introduction
    tutorial
-
-
-Reference/API
-=============
-
-.. automodapi:: xrayvision
+   api

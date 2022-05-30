@@ -4,9 +4,9 @@ from astropy.convolution.kernels import Gaussian2DKernel
 
 from scipy import signal
 
-from ..clean import clean, ms_clean, component, radial_prolate_sphereoidal,\
+from xrayvision.clean import clean, ms_clean, component, radial_prolate_sphereoidal,\
     vec_radial_prolate_sphereoidal
-from ..transform import dft_map, idft_map
+from xrayvision.transform import dft_map, idft_map
 
 
 def test_clean_ideal():
@@ -27,10 +27,10 @@ def test_clean_ideal():
     dirty_map = signal.convolve(clean_map, dirty_beam, mode='same')
 
     # Disable convolution of model with gaussian for testing
-    out_map = clean(dirty_map, dirty_beam, clean_beam_width=0.0)
+    out_map, model, resid = clean(dirty_map, dirty_beam, clean_beam_width=0.0)
 
     # Within threshold default threshold of 0.1
-    assert np.allclose(clean_map, (out_map[0]+out_map[1]), out_map, atol=dirty_beam.max() * 0.1)
+    assert np.allclose(clean_map, out_map, atol=dirty_beam.max() * 0.1)
 
 
 def test_component():
@@ -88,7 +88,7 @@ def test_ms_clean_ideal():
     dirty_map = signal.convolve2d(clean_map, dirty_beam, mode='same')
 
     # Disable convolution of model with gaussian for testing
-    model, res = ms_clean(dirty_map, dirty_beam, scales=[1], clean_beam_width=0.0)
+    model, res = ms_clean(dirty_map, dirty_beam, [1, 1]*u.arcsec, scales=[1], clean_beam_width=0.0)
     recovered = model + res
 
     # Within threshold default threshold
@@ -119,11 +119,11 @@ def test_clean_sim():
     sub_uv = np.hstack([sub_uv, np.zeros((2, 1))]) / u.arcsec
 
     # Factor of 9 is compensate for the factor of  3 * 3 increase in size
-    dirty_beam = idft_map(np.ones(321)*9, (n*3, m*3), sub_uv)
+    dirty_beam = idft_map(sub_uv, np.ones(321) * 9, (n * 3, m * 3))
 
     vis = dft_map(data, sub_uv)
 
-    dirty_map = idft_map(vis, (n, m), sub_uv)
+    dirty_map = idft_map(sub_uv, vis, (n, m))
 
-    clean_map, res = clean(dirty_map, dirty_beam, clean_beam_width=0)
-    np.allclose(data, clean_map + res, atol=dirty_beam.max() * 0.1)
+    clean_map, model, res = clean(dirty_map, dirty_beam, clean_beam_width=0)
+    np.allclose(data, clean_map, atol=dirty_beam.max() * 0.1)

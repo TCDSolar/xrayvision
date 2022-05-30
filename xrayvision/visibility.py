@@ -9,7 +9,7 @@ from datetime import datetime
 import astropy.units as u
 import numpy as np
 from astropy.table import Table
-from sunpy.io.fits import fits
+from astropy.io import fits
 from sunpy.map import Map
 from sunpy.time import parse_time
 
@@ -18,7 +18,7 @@ from .transform import dft_map, idft_map
 __all__ = ['Visibility', 'RHESSIVisibility']
 
 
-class Visibility(object):
+class Visibility:
     r"""
     Hold a set of related visibilities and information.
 
@@ -43,8 +43,6 @@ class Visibility(object):
     -----
 
     """
-
-    # TODO should really ensure vis has units to photons cm^-1 s^1 etc
     @u.quantity_input(uv=1/u.arcsec, center=u.arcsec, pixel_size=u.arcsec)
     def __init__(self, uv, vis, xyoffset=(0., 0.) * u.arcsec, pixel_size=(1., 1.) * u.arcsec):
         r"""
@@ -66,7 +64,7 @@ class Visibility(object):
 
         """
         self.uv = uv
-        self.vis = np.array(vis, dtype=complex)
+        self.vis = vis
         self.xyoffset = xyoffset
         self.pixel_size = pixel_size
 
@@ -79,7 +77,7 @@ class Visibility(object):
         `str`
 
         """
-        return f"{self.uv.size}, {self.vis}"
+        return f"{self.__class__.__name__}< {self.uv.size}, {self.vis}>"
 
     def __eq__(self, other):
         r"""
@@ -112,7 +110,7 @@ class Visibility(object):
         Parameters
         ----------
         filename : `basestring`
-            The path/filename of the the fits file to read
+            The path/filename of the fits file to read
 
         Returns
         -------
@@ -249,7 +247,8 @@ class Visibility(object):
                 raise ValueError(
                     f"Pixel_size must be scalar or of length of 2 not {pixel_size.shape}")  # noqa
 
-        return idft_map(self.vis, shape, self.uv, center=center, pixel_size=pixel)
+        return idft_map(self.uv, self.vis, shape, center=center, pixel_size=pixel,
+                        weights=1/self.vis.shape[0])
 
     @u.quantity_input(center=u.arcsec, pixel_size=u.arcsec)
     def to_map(self, shape=(33, 33), center=None, pixel_size=None):
