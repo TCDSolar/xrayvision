@@ -146,7 +146,7 @@ def clean(dirty_map, dirty_beam, pixel=None, clean_beam_width=4.0,
 
         # Scale residual map with model and scale
         dirty_map = dirty_map / clean_beam.sum() / (pixel[0] * pixel[1])
-        return clean_map, model, dirty_map
+        return clean_map+dirty_map, model, dirty_map
 
     return model+dirty_map, model, dirty_map
 

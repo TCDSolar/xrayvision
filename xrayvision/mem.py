@@ -225,9 +225,9 @@ def get_mean_visibilities(vis, shape, pixel):
     ru = np.around(iu)
     rv = np.around(iv)
 
-    # index of the u coordinates of the sampling frequencies in the discretization of the u axis
+    # index of the u coordinates of the sampling frequencies in the discretisation of the u axis
     ru = ru + imsize2
-    # index of the v coordinates of the sampling frequencies in the discretization of the v axis
+    # index of the v coordinates of the sampling frequencies in the discretisation of the v axis
     rv = rv + imsize2
 
     # matrix that represents the discretization of the (u,v)-plane
@@ -530,8 +530,8 @@ def resistant_mean(data, sigma_cut):
     sigma = np.sqrt((((good_points - mean)**2).sum()) / good_points.size)
 
     # Compensate Sigma for truncation (formula by HF):
-    if cutoff.max() <= 4.50:
-        sigma = sigma / np.poly(cutoff.max(), sig_coeff)
+    if sigma_cut <= 4.50:
+        sigma = sigma / np.polyval(sig_coeff[::-1], sigma_cut)
 
     cutoff = sigma_cut * sigma
 
@@ -540,6 +540,10 @@ def resistant_mean(data, sigma_cut):
 
     mean = np.mean(good_points)
     sigma = np.sqrt((((good_points - mean)**2).sum()) / good_points.size)
+
+    if sigma_cut <= 4.50:
+        sigma = sigma / np.polyval(sig_coeff[::-1], sigma_cut)
+
     # Now the standard deviation of the mean:
     sigma = sigma / np.sqrt(good_points.size - 1)
 
