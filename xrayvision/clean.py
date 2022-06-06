@@ -15,7 +15,7 @@ from scipy import signal
 from scipy.ndimage.interpolation import shift
 from sunpy.map.map_factory import Map
 
-from xrayvision.imaging import back_project, psf
+from xrayvision.imaging import vis_to_image, vis_psf_image
 
 __all__ = ['clean', 'vis_clean', 'ms_clean', 'vis_ms_clean']
 
@@ -172,8 +172,8 @@ def vis_clean(vis, shape, pixel, clean_beam_width=4.0, niter=100, map=True, **kw
         Return an `sunpy.map.Map` by default or data only if `False`
     """
 
-    dirty_map = back_project(vis, shape=shape, pixel_size=pixel, map=True)
-    dirty_beam = psf(vis, shape=shape*3, pixel_size=pixel, map=False)
+    dirty_map = vis_to_map(vis, shape=shape, pixel_size=pixel)
+    dirty_beam = vis_psf_image(vis, shape=shape*3, pixel_size=pixel, map=False)
     clean_map, model, residual = clean(dirty_map.data, dirty_beam.value, pixel=pixel,
                                        clean_beam_width=clean_beam_width, niter=niter, **kwargs)
     if not map:
@@ -372,8 +372,8 @@ def vis_ms_clean(vis, shape, pixel, scales=None, clean_beam_width=4.0,
         Size of pixel
 
     """
-    dirty_map = back_project(vis, shape=shape, pixel_size=pixel)
-    dirty_beam = psf(vis, shape=shape * 3, pixel_size=pixel, map=False)
+    dirty_map = vis_to_map(vis, shape=shape, pixel_size=pixel)
+    dirty_beam = vis_psf_image(vis, shape=shape * 3, pixel_size=pixel, map=False)
     clean_map, model, residual = ms_clean(dirty_map.data, dirty_beam, scales=scales,
                                           clean_beam_width=clean_beam_width, gain=gain,
                                           thres=thres, niter=niter)
