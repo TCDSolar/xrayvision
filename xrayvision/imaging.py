@@ -6,12 +6,17 @@ import astropy.units as apu
 from xrayvision.transform import dft_map, idft_map
 from xrayvision.visibility import Visibility
 
+__all__ = ['get_weights', 'validate_and_expand_kwarg', 'vis_psf_image', 'vis_psf_map',
+           'vis_to_image', 'vis_to_map', 'generate_header', 'image_to_vis', 'map_to_vis']
+
+ANGLE = apu.get_physical_type('angle')
+
 
 def get_weights(vis, natural=True, norm=True):
     r"""
     Return natural spatial frequency weight factor for each visibility.
 
-    Defaults to use natural weighting scheme given by `(vis.u**2 + vis.v**2)^{1/2}`
+    Defaults to use natural weighting scheme given by `(vis.u**2 + vis.v**2)^{1/2}`.
 
     Parameters
     ----------
@@ -37,7 +42,43 @@ def get_weights(vis, natural=True, norm=True):
     return weights
 
 
-def vis_psf_image(vis, shape=(65, 65), pixel_size=2*apu.arcsec, natural=True):
+def validate_and_expand_kwarg(q, name=''):
+    r"""
+    Expand a scalar or array of size one to size two by repeating.
+
+    Parameters
+    ----------
+    q : `astropy.units.quantity.Quantity`
+        Input value
+    name : `str`
+        Name of the keyword
+
+    Examples
+    --------
+    >>> import astropy.units as u
+    >>> validate_and_expand_kwarg(1*u.cm)
+        <Quantity [1., 1.] cm>
+    >>> validate_and_expand_kwarg([1]*u.cm)
+        <Quantity [1., 1.] cm>
+    >>> validate_and_expand_kwarg([1,1]*u.cm)
+        <Quantity [1., 1.] cm>
+    >>> validate_and_expand_kwarg([1, 2, 3]*u.cm)  #doctest: +SKIP
+        Traceback (most recent call last):
+        ValueError:  argument must be scalar or an 1D array of size 1 or 2.
+
+    """
+    q = np.atleast_1d(q)
+    if q.shape == (1,):
+        q = np.repeat(q, 2)
+
+    if q.shape != (2,):
+        raise ValueError(f'{name} argument must be scalar or an 1D array of size 1 or 2.')
+
+    return q
+
+
+@apu.quantity_input(shape=apu.pixel, pixel_size='angle')
+def vis_psf_image(vis, *, shape=(65, 65)*apu.pixel, pixel_size=2*apu.arcsec, natural=True):
     """
     Create the point spread function for given u, v point of the visibilities.
 
@@ -45,25 +86,21 @@ def vis_psf_image(vis, shape=(65, 65), pixel_size=2*apu.arcsec, natural=True):
     ----------
     vis : `xrayvision.visibility.Visibility`
         Input visibilities
-    shape : `Tuple[~astropy.units.Quantity]`, optional
-        Shape of the image, if only one value is given assume square.
-    pixel_size : `Tuple[~astropy.units.Quantity]`, optional
-        Size of pixels, if only one value is given assume square pixels.
+    shape : `astropy.units.quantity.Quantity`, optional
+        Shape of the image, if only one value is given assume square (repeating the value).
+    pixel_size : `astropy.units.quantity.Quantity`, optional
+        Size of pixels, if only one value is given assume square pixels (repeating the value).
     natural : `boolean` optional
         Weight scheme use natural by default, uniform if `False`
 
     Returns
     -------
-    `~astropy.units.Quantity`
+    `astropy.units.quantity.Quantity`
         Point spread function
 
     """
-    if shape.size == 1:
-        shape = shape.repeat(2)
-
-    if pixel_size.size == 1:
-        pixel_size = pixel_size.repeat(2)
-
+    shape = validate_and_expand_kwarg(shape, 'shape')
+    pixel_size = validate_and_expand_kwarg(pixel_size, 'pixel_size')
     shape = shape.to_value(apu.pixel)
     weights = get_weights(vis, natural=natural)
 
@@ -74,7 +111,8 @@ def vis_psf_image(vis, shape=(65, 65), pixel_size=2*apu.arcsec, natural=True):
     return psf_arr
 
 
-def vis_psf_map(vis, shape=(65, 65), pixel_size=2*apu.arcsec, natural=True):
+@apu.quantity_input(shape=apu.pixel, pixel_size='angle')
+def vis_psf_map(vis, *, shape=(65, 65)*apu.pixel, pixel_size=2*apu.arcsec, natural=True):
     r"""
     Create a map of the point spread function for given the visibilities.
 
@@ -82,10 +120,10 @@ def vis_psf_map(vis, shape=(65, 65), pixel_size=2*apu.arcsec, natural=True):
     ----------
     vis : `xrayvision.visibility.Visibility`
         Input visibilities
-    shape : `Tuple[~astropy.units.Quantity]`, optional
-        Shape of the image, if only one value is given assume square.
+    shape : `astropy.units.quantity.Quantity`, optional
+        Shape of the image, if only one value is given assume square (repeating the value).
     pixel_size : `Tuple[~astropy.units.Quantity]`, optional
-        Size of pixels, if only one value is given assume square pixels.
+        Size of pixels, if only one value is given assume square pixels (repeating the value).
     natural : `boolean` optional
         Weight scheme use natural by default, uniform if `False`
 
@@ -93,12 +131,15 @@ def vis_psf_map(vis, shape=(65, 65), pixel_size=2*apu.arcsec, natural=True):
     -------
 
     """
-    header = generate_header(vis.center, pixel_size, shape, vis)
+    shape = validate_and_expand_kwarg(shape, 'shape')
+    pixel_size = validate_and_expand_kwarg(pixel_size, 'pixel_size')
+    header = generate_header(vis, shape=shape, pixel_size=pixel_size)
     psf = vis_psf_image(vis, shape=shape, pixel_size=pixel_size, natural=natural)
     return Map((psf, header))
 
 
-def vis_to_image(vis, shape=(33, 33)*apu.pixel, pixel_size=1*apu.arcsec, natural=True):
+@apu.quantity_input(shape=apu.pixel, pixel_size='angle')
+def vis_to_image(vis, shape=(65, 65)*apu.pixel, pixel_size=2*apu.arcsec, natural=True):
     """
     Create an image by 'back projecting' the given visibilities onto the sky.
 
@@ -107,9 +148,9 @@ def vis_to_image(vis, shape=(33, 33)*apu.pixel, pixel_size=1*apu.arcsec, natural
     vis : `xrayvision.visibility.Visibility`
         Input visibilities
     shape : `~astropy.units.Quantity`
-        Shape of the image, if only one value is given assume square.
+        Shape of the image, if only one value is given assume square (repeating the value).
     pixel_size : `~astropy.units.Quantity`
-        Size of pixels, if only one value is given assume square pixels.
+        Size of pixels, if only one value is given assume square pixels (repeating the value).
     natural : `boolean` optional
         Weight scheme use natural by default, uniform if `False`
 
@@ -119,14 +160,8 @@ def vis_to_image(vis, shape=(33, 33)*apu.pixel, pixel_size=1*apu.arcsec, natural
         Back projection image
 
     """
-    if shape.size == 1:
-        shape = shape.repeat(2)
-
-    if pixel_size.size == 1:
-        pixel_size = pixel_size.repeat(2)
-    elif pixel_size.size > 2:
-        raise ValueError('Pixel size must have one two values no %d', pixel_size.size)
-
+    shape = validate_and_expand_kwarg(shape, 'shape')
+    pixel_size = validate_and_expand_kwarg(pixel_size, 'pixel_size')
     shape = shape.to_value(apu.pixel)
     weights = get_weights(vis, natural=natural)
     bp_arr = idft_map(vis.vis, u=vis.u, v=vis.v, shape=shape,
@@ -135,42 +170,52 @@ def vis_to_image(vis, shape=(33, 33)*apu.pixel, pixel_size=1*apu.arcsec, natural
     return bp_arr
 
 
+@apu.quantity_input(shape=apu.pixel, pixel_size='angle')
 def vis_to_map(vis, shape=(65, 65)*apu.pixel, pixel_size=2*apu.arcsec, natural=True):
     r"""
     Create a map by performing a back projection of inverse transform on the visibilities.
 
     Parameters
     ----------
+    vis : `xrayvision.visibility.Visibility`
+        Input visibilities
     shape : `int` (m, n)
-        Shape of the output map in pixels
-    center : `float` (x, y)
-        Coordinates of the map center if given will override `self.xyoffset`
+        Shape of the image, if only one value is given assume square (repeating the value).
     pixel_size : `float` (dx, dy), optional
-        Size of the pixels in x, y if only one give assumed same in both directions
+        Size of pixels, if only one value is given assume square pixels (repeating the value).
+    natural : `boolean` optional
+        Weight scheme use natural by default, uniform if `False`.
 
     Returns
     -------
     `sunpy.map.Map`
-        Map object with the map created from the visibilities and the meta data will contain the
+        Map object with the map created from the visibilities and the metadata will contain the
         offset and the pixel size
 
     """
-
-    if shape.size == 1:
-        shape = shape.repeat(2)
-
-    if pixel_size.size == 1:
-        pixel_size = pixel_size.repeat(2)
-    elif pixel_size.size > 2:
-        raise ValueError('Pixel size must have one two values no %d', pixel_size.size)
-
+    shape = validate_and_expand_kwarg(shape, 'shape')
+    pixel_size = validate_and_expand_kwarg(pixel_size, 'pixel_size')
     header = generate_header(vis, shape=shape, pixel_size=pixel_size)
 
     image = vis_to_image(vis, shape=shape, pixel_size=pixel_size, natural=natural)
     return Map((image, header))
 
 
-def generate_header(vis, *, pixel_size, shape):
+def generate_header(vis, *, shape, pixel_size):
+    r"""
+    Generate a map head given the visibilities, pixel size and shape
+
+    Parameters
+    ----------
+    vis :
+    shape : `~astropy.units.Quantity`
+        Shape of the image, if only one value is given assume square (repeating the value).
+    pixel_size : `~astropy.units.Quantity`
+        Size of pixels, if only one value is given assume square pixels (repeating the value)
+    Returns
+    -------
+
+    """
     header = {'crval1': vis.center[0, 0].value if vis.center.ndim == 2 else vis.center[0].value,
               'crval2': vis.center[0, 1].value if vis.center.ndim == 2 else vis.center[1].value,
               'cdelt1': pixel_size[0].value,
@@ -196,7 +241,8 @@ def generate_header(vis, *, pixel_size, shape):
     return header
 
 
-def image_to_vis(image, *, u, v, center=(0.0, 0.0) * apu.arcsec, pixel_size=(1.0, 1.0) * apu.arcsec):
+@apu.quantity_input(center='angle', pixel_size='angle')
+def image_to_vis(image, *, u, v, center=(0.0, 0.0) * apu.arcsec, pixel_size=2.0*apu.arcsec):
     r"""
     Return a Visibility created from the image and u, v sampling.
 
@@ -204,12 +250,14 @@ def image_to_vis(image, *, u, v, center=(0.0, 0.0) * apu.arcsec, pixel_size=(1.0
     ----------
     image : `numpy.ndarray`
         The 2D input image
-    uv : `numpy.ndarray`
-        Array of 2xN u, v coordinates where the visibilities will be evaluated
-    center : `float` (x, y)
-        The coordinates of the center of the image
-    pixel_size : `float` (dx, dy)
-        The pixel size in  x and y directions
+    u : `astropy.units.Quantity`
+        Array of u coordinates where the visibilities will be evaluated
+    v : `astropy.units.Quantity`
+        Array of v coordinates where the visibilities will be evaluated
+    center : `~astropy.units.Quantity` (x, y)
+        The coordinates of the center of the image.
+    pixel_size : `~astropy.units.Quantity`
+        Size of pixels, if only one value is given assume square pixels (repeating the value).
 
     Returns
     -------
@@ -218,17 +266,20 @@ def image_to_vis(image, *, u, v, center=(0.0, 0.0) * apu.arcsec, pixel_size=(1.0
         The new visibility object
 
     """
+    pixel_size = validate_and_expand_kwarg(pixel_size, 'pixel_size')
+    if not apu.get_physical_type(1/u) == ANGLE and apu.get_physical_type(1 / v) == ANGLE:
+        raise ValueError('u and v must be inverse angle (e.g. 1/deg or 1/arcsec')
     vis = dft_map(image, u=u, v=v, center=center, pixel_size=pixel_size)
     return Visibility(vis, u=u, v=v, center=center)
 
 
-def map_to_vis(map, *, u, v):
+def map_to_vis(amap, *, u, v):
     r"""
     Return a Visibility object created from the map and u, v sampling.
 
     Parameters
     ----------
-    map : `sunpy.map.Map`
+    amap : `sunpy.map.Map`
         The input map
     u : `numpy.ndarray`
         Array of u coordinates where the visibilities will be evaluated
@@ -241,7 +292,9 @@ def map_to_vis(map, *, u, v):
         The new visibility object
 
     """
-    meta = map.meta
+    if not apu.get_physical_type(1/u) == ANGLE and apu.get_physical_type(1 / v) == ANGLE:
+        raise ValueError('u and v must be inverse angle (e.g. 1/deg or 1/arcsec')
+    meta = amap.meta
     new_pos = np.array([0., 0.])
     if "crval1" in meta:
         new_pos[0] = float(meta["crval1"])
@@ -254,5 +307,5 @@ def map_to_vis(map, *, u, v):
     if "cdelt2" in meta:
         new_psize[1] = float(meta["cdelt2"])
 
-    return image_to_vis(map.data, u=u, v=v, center=new_pos * apu.arcsec,
+    return image_to_vis(amap.data, u=u, v=v, center=new_pos * apu.arcsec,
                         pixel_size=new_psize * apu.arcsec)
