@@ -7,15 +7,15 @@ appropriate component shapes at different scales.
 
 """
 import logging
-import sys
 
 import numpy as np
-from astropy.convolution import Gaussian2DKernel
 from scipy import signal
 from scipy.ndimage.interpolation import shift
 from sunpy.map.map_factory import Map
 
-from xrayvision.imaging import vis_to_image, vis_psf_image
+from astropy.convolution import Gaussian2DKernel
+
+from xrayvision.imaging import vis_psf_image
 
 __all__ = ['clean', 'vis_clean', 'ms_clean', 'vis_ms_clean']
 
@@ -381,6 +381,7 @@ def vis_ms_clean(vis, shape, pixel, scales=None, clean_beam_width=4.0,
         return clean_map, model, residual
 
     return [Map((data, dirty_map.meta)) for data in (clean_map, model, residual)]
+
 
 vis_ms_clean.__doc__ += __common_ms_clean_doc__
 

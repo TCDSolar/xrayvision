@@ -1,11 +1,16 @@
 import numpy as np
+from scipy import signal
+
 import astropy.units as u
 from astropy.convolution.kernels import Gaussian2DKernel
 
-from scipy import signal
-
-from xrayvision.clean import clean, ms_clean, component, radial_prolate_sphereoidal,\
-    vec_radial_prolate_sphereoidal
+from xrayvision.clean import (
+    clean,
+    component,
+    ms_clean,
+    radial_prolate_sphereoidal,
+    vec_radial_prolate_sphereoidal,
+)
 from xrayvision.transform import dft_map, idft_map
 
 

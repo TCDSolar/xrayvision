@@ -5,8 +5,9 @@ Implementation of Maximum Entropy Method
 from types import SimpleNamespace
 
 import numpy as np
-import astropy.units as apu
 from numpy.linalg import norm
+
+import astropy.units as apu
 
 from xrayvision.transform import generate_xy
 from xrayvision.utils import get_logger

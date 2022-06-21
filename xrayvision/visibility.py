@@ -4,11 +4,10 @@ Modules contains visibility related classes.
 This contains classes to hold general visibilities and specialised classes hold visibilities from
 certain spacecraft or instruments
 """
-from datetime import datetime
 
-import astropy.units as apu
 import numpy as np
 
+import astropy.units as apu
 
 __all__ = ['Visibility']
 
@@ -88,7 +87,7 @@ class Visibility:
         """
         props_equal = []
         for key in self.__dict__.keys():
-                props_equal.append(np.array_equal(self.__dict__[key], other.__dict__[key]))
+            props_equal.append(np.array_equal(self.__dict__[key], other.__dict__[key]))
 
         if all(props_equal):
             return True
