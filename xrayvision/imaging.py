@@ -1,8 +1,9 @@
-import astropy.units as apu
 import numpy as np
 from sunpy.map import Map
 
-from xrayvision.transform import idft_map, dft_map
+import astropy.units as apu
+
+from xrayvision.transform import dft_map, idft_map
 from xrayvision.visibility import Visibility
 
 
@@ -123,6 +124,8 @@ def vis_to_image(vis, shape=(33, 33)*apu.pixel, pixel_size=1*apu.arcsec, natural
 
     if pixel_size.size == 1:
         pixel_size = pixel_size.repeat(2)
+    elif pixel_size.size > 2:
+        raise ValueError('Pixel size must have one two values no %d', pixel_size.size)
 
     shape = shape.to_value(apu.pixel)
     weights = get_weights(vis, natural=natural)
@@ -152,6 +155,15 @@ def vis_to_map(vis, shape=(65, 65)*apu.pixel, pixel_size=2*apu.arcsec, natural=T
         offset and the pixel size
 
     """
+
+    if shape.size == 1:
+        shape = shape.repeat(2)
+
+    if pixel_size.size == 1:
+        pixel_size = pixel_size.repeat(2)
+    elif pixel_size.size > 2:
+        raise ValueError('Pixel size must have one two values no %d', pixel_size.size)
+
     header = generate_header(vis, shape=shape, pixel_size=pixel_size)
 
     image = vis_to_image(vis, shape=shape, pixel_size=pixel_size, natural=natural)

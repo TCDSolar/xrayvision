@@ -1,11 +1,12 @@
-import astropy.units as apu
 import numpy as np
 import pytest
-from astropy.convolution.kernels import Gaussian2DKernel
 from sunpy.map import Map
 
-from xrayvision.imaging import vis_psf_image, vis_to_image, vis_to_map, image_to_vis, map_to_vis
-from xrayvision.transform import idft_map, dft_map, generate_uv
+import astropy.units as apu
+from astropy.convolution.kernels import Gaussian2DKernel
+
+from xrayvision.imaging import image_to_vis, map_to_vis, vis_psf_image, vis_to_image, vis_to_map
+from xrayvision.transform import dft_map, generate_uv, idft_map
 from xrayvision.visibility import Visibility
 
 
@@ -35,7 +36,7 @@ def test_psf_to_image(pixel_size, uv):
     obs_vis = dft_map(img, u=u, v=v, pixel_size=[2., 2.]*apu.arcsec)
     weights = np.sqrt(u**2 + v**2).value
     weights /= weights.sum()
-    psf_calc = idft_map(obs_vis, u=u, v=v, shape=[65, 65], pixel_size=[2,2]*apu.arcsec,
+    psf_calc = idft_map(obs_vis, u=u, v=v, shape=[65, 65], pixel_size=[2, 2]*apu.arcsec,
                         weights=weights)
     vis = Visibility(obs_vis, u=u, v=v)
     res = vis_psf_image(vis, shape=[65, 65]*apu.pixel, pixel_size=2*apu.arcsec)
@@ -50,7 +51,7 @@ def test_vis_to_image(uv):
     weights = np.sqrt(u**2 + v**2).value
     weights /= weights.sum()
     bp_calc = idft_map(obs_vis, u=u, v=v, shape=[65, 65], pixel_size=[2, 2] * apu.arcsec,
-                        weights=weights)
+                       weights=weights)
     vis = Visibility(obs_vis, u=u, v=v)
     res = vis_to_image(vis, shape=[65, 65] * apu.pixel, pixel_size=2 * apu.arcsec)
     assert np.allclose(bp_calc, res)
@@ -227,17 +228,18 @@ def test_to_sunpy_single_pixel_size():
     mp = Map((data, header))
 
     vis = map_to_vis(mp, u=u, v=v)
-    res = vis_to_map(vis, shape=(m, n)*apu.pixel, pixel_size=2 * apu.arcsec)
+    res = vis_to_map(vis, shape=(m, n)*apu.pixel, pixel_size=2 * apu.arcsec, natural=False)
     assert res.meta['cdelt1'] == 2.
     assert res.meta['cdelt1'] == 2.
     assert np.allclose(data, res.data)
+
 
 def test_to_sunpy_map_invalid_pixel_size():
     m = n = 32
     u = generate_uv(m)
     v = generate_uv(m)
     u, v = np.meshgrid(u, v)
-    uv = np.array([u, v]).reshape(2, m * n) / unit.arcsec
+    uv = np.array([u, v]).reshape(2, m * n) / apu.arcsec
     u, v = uv
 
     header = {'crval1': 0, 'crval2': 0,
