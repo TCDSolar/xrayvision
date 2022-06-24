@@ -1,6 +1,10 @@
 import numpy as np
 
-from xrayvision.mem import resistant_mean
+import astropy.units as u
+from astropy.convolution.kernels import Gaussian2DKernel
+
+from xrayvision.imaging import image_to_vis
+from xrayvision.mem import mem, resistant_mean
 
 
 def test_resistant_mean():
@@ -28,3 +32,38 @@ def test_resistant_mean():
     # values for IDL routine "RESISTANT_Mean, xx, 3, rmean, rsig, num"
     assert np.allclose(rmean, -0.10947954)
     assert np.allclose(rsigma, 0.096651256)
+
+
+def test_mem():
+    n = m = 64
+    data = Gaussian2DKernel(3.0, x_size=n, y_size=m).array
+    # data = np.zeros((n, m))
+    # data[13,13] = 10.0
+    # data[12:14,12:14] = 10.0/4.0
+
+    # half_log_space = np.logspace(np.log10(0.03030303), np.log10(0.48484848), 10)
+    # RHESSI like spatial res
+    half_log_space = 1 / 10 ** np.logspace(np.log10(0.665), np.log10(2.56), 10)[::-1]
+
+    theta = np.linspace(-1*np.pi/2, np.pi/2, 33)[1:-1]
+    theta = theta[np.newaxis, :]
+    theta = np.repeat(theta, 5, axis=0)
+
+    # Since the source is only 3 * 2 = 6 arecsec don't use the finest resolutions
+    r = half_log_space[:5]
+    r = r[:, np.newaxis]
+    r = np.repeat(r, 31, axis=1)
+
+    x = r * np.sin(theta)
+    y = r * np.cos(theta)
+
+    sub_uv = np.vstack([x.flatten(), y.flatten()]) / u.arcsec
+    # sub_uv = np.hstack([sub_uv, np.zeros((2, 1))]) / u.arcsec
+
+    vis = image_to_vis(data, u=sub_uv[0, :], v=sub_uv[1, :], pixel_size=2*u.arcsec)
+    setattr(vis, 'amplitude_error', np.sqrt(np.abs(vis.vis)))
+    setattr(vis, 'label', [str(x) for x in np.sqrt((x**2 + y**2)).flatten()])
+
+    res = mem(vis, percent_lambda=None, shape=(m, n)*u.pix, pixel=[2, 2]*u.arcsec,
+              maxiter=1000, tol=1e-3)
+    np.testing.assert_allclose(res.value - data/4, 0.0, atol=1e-3)

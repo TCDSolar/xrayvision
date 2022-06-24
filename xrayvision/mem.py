@@ -71,10 +71,11 @@ def get_fourier_matrix(vis, shape=[64, 64]*apu.pix, pixel_size=[4.0312500, 4.031
     y = generate_xy(m, 0 * apu.arcsec, pixel_size[1])
     x = generate_xy(n, 0 * apu.arcsec, pixel_size[0])
     x, y = np.meshgrid(x, y)
+    uv = np.vstack([vis.u, vis.v])
     # Check apu are correct for exp need to be dimensionless and then remove apu for speed
-    if (vis.uv[0, :] * x[0, 0]).unit == apu.dimensionless_unscaled and \
-            (vis.uv[1, :] * y[0, 0]).unit == apu.dimensionless_unscaled:
-        uv = vis.uv.value
+    if (vis.u * x[0, 0]).unit == apu.dimensionless_unscaled and \
+            (vis.v * y[0, 0]).unit == apu.dimensionless_unscaled:
+        uv = uv.value
         x = x.value
         y = y.value
 
@@ -221,8 +222,8 @@ def get_mean_visibilities(vis, shape, pixel):
     imsize2 = shape[0] / 2
     pixel_size = 1/(shape[0]*pixel[0])
 
-    iu = vis.uv[0, :] / pixel_size
-    iv = vis.uv[1, :] / pixel_size
+    iu = vis.u / pixel_size
+    iv = vis.v / pixel_size
     ru = np.around(iu)
     rv = np.around(iv)
 
@@ -235,7 +236,7 @@ def get_mean_visibilities(vis, shape, pixel):
     iuarr = np.zeros(shape.to_value('pixel').astype(int))
 
     count = 0
-    n_vis = vis.uv.shape[1]
+    n_vis = vis.u.shape[0]
     u = np.zeros(n_vis) * (1 / apu.arcsec)
     v = np.zeros(n_vis) * (1 / apu.arcsec)
     den = np.zeros(n_vis)
@@ -248,8 +249,8 @@ def get_mean_visibilities(vis, shape, pixel):
         # (i, j) is the position of the spatial frequency in
         # the discretization of the (u,v)-plane 'iuarr'
         if iuarr[i, j] == 0.:
-            u[count] = vis.uv[0, ip]
-            v[count] = vis.uv[1, ip]
+            u[count] = vis.u[ip]
+            v[count] = vis.v[ip]
             # we save in 'u' and 'v' the u and v coordinates of the first frequency that corresponds
             # to the position (i, j) of the discretization of the (u,v)-plane 'iuarr'
 
@@ -280,7 +281,7 @@ def get_mean_visibilities(vis, shape, pixel):
     # correspond to the same position in the discretization of the (u,v)-plane
     weights = np.sqrt(weights[:count])/den
 
-    return SimpleNamespace(uv=np.vstack((u, v)), vis=visib, amplitude_error=weights)
+    return SimpleNamespace(u=u, v=v, vis=visib, amplitude_error=weights)
 
 
 def proximal_entropy(y, m, lamba, Lip, tol=10**-10):
@@ -616,7 +617,7 @@ def mem(vis, percent_lambda=None, shape=None, pixel=None, maxiter=1000, tol=1e-3
     -------
 
     """
-    total_flux = estimate_flux(vis, (64, 64) * apu.pix, [4.0312500, 4.0312500] * apu.arcsec)
+    total_flux = estimate_flux(vis, shape, pixel)
     if percent_lambda is None:
         percent_lambda = get_percent_lambda(vis)
 
