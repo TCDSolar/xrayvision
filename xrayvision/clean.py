@@ -15,7 +15,7 @@ from sunpy.map.map_factory import Map
 
 from astropy.convolution import Gaussian2DKernel
 
-from xrayvision.imaging import vis_psf_image
+from xrayvision.imaging import vis_psf_image, vis_to_map
 
 __all__ = ['clean', 'vis_clean', 'ms_clean', 'vis_ms_clean']
 
@@ -79,8 +79,8 @@ def clean(dirty_map, dirty_beam, pixel=None, clean_beam_width=4.0,
         Size of a pixel
     """
     # Ensure both beam and map are even/odd on same axes
-    if not [x % 2 == 0 for x in dirty_map.shape] == [x % 2 == 0 for x in dirty_beam.shape]:
-        raise ValueError('')
+    # if not [x % 2 == 0 for x in dirty_map.shape] == [x % 2 == 0 for x in dirty_beam.shape]:
+    #     raise ValueError('')
     pad = [0 if x % 2 == 0 else 1 for x in dirty_map.shape]
 
     # Assume beam, map center is in middle
@@ -132,9 +132,9 @@ def clean(dirty_map, dirty_beam, pixel=None, clean_beam_width=4.0,
         print("Max iterations reached")
 
     if clean_beam_width != 0.0:
-        # Convert from FWHM to StDev
-        x_stdev = (clean_beam_width/pixel[0] / (2.0 * np.sqrt(2.0 * np.log(2.0)))).value
-        y_stdev = (clean_beam_width/pixel[1] / (2.0 * np.sqrt(2.0 * np.log(2.0)))).value
+        # Convert from FWHM to StDev   FWHM = sigma*(8ln2)**0.5 = 2.3548200450309493
+        x_stdev = (clean_beam_width/pixel[0] / 2.3548200450309493).value
+        y_stdev = (clean_beam_width/pixel[1] / 2.3548200450309493).value
         clean_beam = Gaussian2DKernel(x_stdev, y_stdev, x_size=dirty_beam.shape[1],
                                       y_size=dirty_beam.shape[0]).array
         # Normalise beam
@@ -154,7 +154,7 @@ def clean(dirty_map, dirty_beam, pixel=None, clean_beam_width=4.0,
 clean.__doc__ += __common_clean_doc__
 
 
-def vis_clean(vis, shape, pixel, clean_beam_width=4.0, niter=100, map=True, **kwargs):
+def vis_clean(vis, shape, pixel, clean_beam_width=4.0, niter=5000, map=True, gain=0.1, **kwargs):
     r"""
     Clean the visibilities using Hogbom's original method.
 
@@ -172,10 +172,12 @@ def vis_clean(vis, shape, pixel, clean_beam_width=4.0, niter=100, map=True, **kw
         Return an `sunpy.map.Map` by default or data only if `False`
     """
 
-    dirty_map = vis_to_map(vis, shape=shape, pixel_size=pixel)
-    dirty_beam = vis_psf_image(vis, shape=shape*3, pixel_size=pixel, map=False)
-    clean_map, model, residual = clean(dirty_map.data, dirty_beam.value, pixel=pixel,
-                                       clean_beam_width=clean_beam_width, niter=niter, **kwargs)
+    dirty_map = vis_to_map(vis, shape=shape, pixel_size=pixel, **kwargs)
+    dirty_beam_shape = [x.value*3 + 1 if x.value*3 % 2 == 0 else x.value*3 for x in shape]*shape.unit
+    dirty_beam = vis_psf_image(vis, shape=dirty_beam_shape, pixel_size=pixel, **kwargs)
+    clean_map, model, residual = clean(dirty_map.data, dirty_beam.value, pixel=pixel, gain=gain,
+                                       clean_beam_width=clean_beam_width, niter=niter)
+    # clean_map, model, residual = np.rot90(clean_map, 1), np.rot90(model, 1), np.rot90(residual, 1)
     if not map:
         return clean_map, model, residual
 

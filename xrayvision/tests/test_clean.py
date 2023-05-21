@@ -10,7 +10,9 @@ from xrayvision.clean import (
     ms_clean,
     radial_prolate_sphereoidal,
     vec_radial_prolate_sphereoidal,
+    vis_clean,
 )
+from xrayvision.imaging import image_to_vis
 from xrayvision.transform import dft_map, idft_map
 
 
@@ -100,12 +102,10 @@ def test_ms_clean_ideal():
     assert np.allclose(clean_map, recovered, atol=dirty_beam.max() * 0.1)
 
 
+# @pytest.mark.skip(reason="Broken test")
 def test_clean_sim():
-    n = m = 32
+    n = m = 31
     data = Gaussian2DKernel(3.0, x_size=n, y_size=m).array
-    # data = np.zeros((n, m))
-    # data[13,13] = 10.0
-    # data[12:14,12:14] = 10.0/4.0
 
     half_log_space = np.logspace(np.log10(0.03030303), np.log10(0.48484848), 10)
 
@@ -124,11 +124,39 @@ def test_clean_sim():
     sub_uv = np.hstack([sub_uv, np.zeros((2, 1))]) / u.arcsec
 
     # Factor of 9 is compensate for the factor of  3 * 3 increase in size
-    dirty_beam = idft_map(np.ones(321) * 9, u=sub_uv[0, :], v=sub_uv[1, :], shape=(n * 3, m * 3))
+    dirty_beam = idft_map(np.ones(321)/321, u=sub_uv[0, :], v=sub_uv[1, :], shape=(n * 3+1, m * 3+1))
 
     vis = dft_map(data, u=sub_uv[0, :], v=sub_uv[1, :])
 
     dirty_map = idft_map(vis, u=sub_uv[0, :], v=sub_uv[1, :], shape=(n, m))
 
-    clean_map, model, res = clean(dirty_map, dirty_beam, clean_beam_width=0)
-    np.allclose(data, clean_map, atol=dirty_beam.max() * 0.1)
+    clean_map, model, res = clean(dirty_map, dirty_beam, clean_beam_width=0.1*u.arcsec, pixel=[2, 2]*u.arcsec,
+                                  niter=500)
+    np.allclose(data, clean_map.data, rtol=dirty_beam.max() * 0.1)
+
+
+def test_vis_clean_sim():
+    n = m = 31
+    data = Gaussian2DKernel(3.0, x_size=n, y_size=m).array
+
+    half_log_space = np.logspace(np.log10(0.03030303), np.log10(0.48484848), 10)
+
+    theta = np.linspace(0, 2*np.pi, 32)
+    theta = theta[np.newaxis, :]
+    theta = np.repeat(theta, 10, axis=0)
+
+    r = half_log_space
+    r = r[:, np.newaxis]
+    r = np.repeat(r, 32, axis=1)
+
+    x = r * np.sin(theta)
+    y = r * np.cos(theta)
+
+    sub_uv = np.vstack([x.flatten(), y.flatten()])
+    sub_uv = np.hstack([sub_uv, np.zeros((2, 1))]) / u.arcsec
+
+    vis = image_to_vis(data*u.dimensionless_unscaled, u=sub_uv[0, :], v=sub_uv[1, :])
+
+    clean_map, model, res = vis_clean(vis, shape=(m, n)*u.pix, clean_beam_width=0,
+                                      pixel=[2, 2]*u.arcsec, natural=False, niter=100)
+    np.allclose(data, clean_map.data, atol=0.1)

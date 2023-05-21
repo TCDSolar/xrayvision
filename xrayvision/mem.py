@@ -6,9 +6,11 @@ from types import SimpleNamespace
 
 import numpy as np
 from numpy.linalg import norm
+from sunpy.map import Map
 
 import astropy.units as apu
 
+from xrayvision.imaging import generate_header
 from xrayvision.transform import generate_xy
 from xrayvision.utils import get_logger
 
@@ -593,7 +595,7 @@ def get_percent_lambda(vis):
     return percent_lambda
 
 
-def mem(vis, percent_lambda=None, shape=None, pixel=None, maxiter=1000, tol=1e-3):
+def mem(vis, percent_lambda=None, shape=None, pixel=None, maxiter=1000, tol=1e-3, map=True):
     r"""
     Maximum Entropy Method for visibility based image reconstruction
 
@@ -634,4 +636,11 @@ def mem(vis, percent_lambda=None, shape=None, pixel=None, maxiter=1000, tol=1e-3
     lambd = 2 * np.abs((np.matmul((Hvx.value - Visib), Hv))).max()*percent_lambda
 
     im = optimise_fb(Hv, Visib, Lip, total_flux, lambd, shape, pixel, maxiter, tol)
+
+    # This is needed to match IDL output
+    # im = np.rot90(im, -1)
+
+    if map:
+        header = generate_header(vis, shape=shape, pixel_size=pixel)
+        return Map((im, header))
     return im

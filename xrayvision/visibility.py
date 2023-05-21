@@ -40,25 +40,29 @@ class Visibility:
         The x, y offset of phase center
 
     """
-    @apu.quantity_input(uv=1/apu.arcsec, center=apu.arcsec, pixel_size=apu.arcsec)
-    def __init__(self, vis, *, u, v, center=(0., 0.) * apu.arcsec):
+    @apu.quantity_input(uv=1/apu.arcsec, offset=apu.arcsec, center=apu.arcsec, pixel_size=apu.arcsec)
+    def __init__(self, vis, *, u, v, offset=(0., 0.) * apu.arcsec, center=(0., 0.) * apu.arcsec):
         r"""
         Initialise a new Visibility object.
 
         Parameters
         ----------
         vis : `numpy.ndarray`
-            Array of N complex visibilities at coordinates in `uv`
+            Array of N complex visibilities at coordinates in `uv`.
         u : `numpy.ndarray`
-            Array of `u` coordinates where visibilities will be evaluated
+            Array of `u` coordinates where visibilities will be evaluated.
         v : `numpy.ndarray`
-            Array of `v` coordinates where visibilities will be evaluated
-
+            Array of `v` coordinates where visibilities will be evaluated.
+        offset :
+            Offset of the visibility phase center.
+        center :
+            Phase center
         """
         self.u = u
         self.v = v
         self.vis = vis
         self.center = center
+        self.offset = offset
 
     def __repr__(self):
         r"""

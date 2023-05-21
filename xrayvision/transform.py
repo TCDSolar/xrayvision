@@ -89,7 +89,7 @@ def generate_uv(number_pixels, center=0.0 * apu.arcsec, pixel_size=1.0 * apu.arc
                 0.14444444,  0.18888889,  0.23333333,  0.27777778] 1 / arcsec>
 
     """
-    x = (np.arange(number_pixels) - number_pixels / 2 + 0.5) * (1 / (pixel_size * number_pixels))
+    x = (np.arange(number_pixels) - number_pixels / 2 + 0.5) / (pixel_size * number_pixels)
     if center.value != 0.0:
         x += 1 / center
     return x

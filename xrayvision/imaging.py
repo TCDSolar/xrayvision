@@ -9,7 +9,7 @@ from xrayvision.visibility import Visibility
 __all__ = ['get_weights', 'validate_and_expand_kwarg', 'vis_psf_image', 'vis_psf_map',
            'vis_to_image', 'vis_to_map', 'generate_header', 'image_to_vis', 'map_to_vis']
 
-ANGLE = apu.get_physical_type('angle')
+ANGLE = apu.get_physical_type(apu.deg)
 
 
 def get_weights(vis, natural=True, norm=True):
@@ -212,23 +212,24 @@ def generate_header(vis, *, shape, pixel_size):
         Shape of the image, if only one value is given assume square (repeating the value).
     pixel_size : `~astropy.units.Quantity`
         Size of pixels, if only one value is given assume square pixels (repeating the value)
+    offset
+
     Returns
     -------
 
     """
-    header = {'crval1': vis.center[0, 0].value if vis.center.ndim == 2 else vis.center[0].value,
-              'crval2': vis.center[0, 1].value if vis.center.ndim == 2 else vis.center[1].value,
-              'cdelt1': pixel_size[0].value,
-              'cdelt2': pixel_size[1].value,
+    header = {'crval1': (vis.center[0] + vis.offset[0]).to_value(apu.arcsec),
+              'crval2': (vis.center[1] + vis.offset[1]).to_value(apu.arcsec),
+              'cdelt1': pixel_size[0].to_value(apu.arcsec),
+              'cdelt2': pixel_size[1].to_value(apu.arcsec),
               'ctype1': 'HPLN-TAN',
               'ctype2': 'HPLT-TAN',
               'naxis': 2,
-              'naxis1': shape[0].value,
-              'naxis2': shape[1].value,
-              'cunit1': 'arcsec', 'cunit2': 'arcsec'}
-    if vis.center:
-        header['crval1'] = vis.center[0].value
-        header['crval2'] = vis.center[1].value
+              'naxis1': shape[0].to_value(apu.pixel),
+              'naxis2': shape[1].to_value(apu.pixel),
+              'cunit1': 'arcsec',
+              'cunit2': 'arcsec'}
+
     if pixel_size:
         if pixel_size.ndim == 0:
             header['cdelt1'] = pixel_size.value
@@ -267,7 +268,8 @@ def image_to_vis(image, *, u, v, center=(0.0, 0.0) * apu.arcsec, pixel_size=2.0*
 
     """
     pixel_size = validate_and_expand_kwarg(pixel_size, 'pixel_size')
-    if not apu.get_physical_type(1/u) == ANGLE and apu.get_physical_type(1 / v) == ANGLE:
+    if not (apu.get_physical_type((1/u).unit) == ANGLE
+            and apu.get_physical_type((1/v).unit) == ANGLE):
         raise ValueError('u and v must be inverse angle (e.g. 1/deg or 1/arcsec')
     vis = dft_map(image, u=u, v=v, center=center, pixel_size=pixel_size)
     return Visibility(vis, u=u, v=v, center=center)

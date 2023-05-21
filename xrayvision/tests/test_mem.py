@@ -66,4 +66,4 @@ def test_mem():
 
     res = mem(vis, percent_lambda=None, shape=(m, n)*u.pix, pixel=[2, 2]*u.arcsec,
               maxiter=1000, tol=1e-3)
-    np.testing.assert_allclose(res.value - data/4, 0.0, atol=1e-3)
+    np.testing.assert_allclose(res.data - data/4, 0.0, atol=1e-3)
