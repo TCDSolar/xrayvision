@@ -152,8 +152,8 @@ def test_dft_idft_map(shape):
     assert_allclose(out_map/np.prod(shape), gaussian)
 
 
-@pytest.mark.skip('UV coordinate generation off somewhere')
-@pytest.mark.parametrize("pixel_size", [(0.5, 0.5), (1.5, 1.5), (2.0, 0.5), (0.5, 2.0)])
+# @pytest.mark.skip('UV coordinate generation off somewhere')
+@pytest.mark.parametrize("pixel_size", [(1.0, 1.0), (0.5, 0.5), (1.5, 1.5), (2.0, 0.5), (0.5, 2.0)])
 def test_dft_idft_map_pixel_size(pixel_size):
     pixel_size = pixel_size * apu.arcsec
     shape = (32, 32)
@@ -183,9 +183,9 @@ def test_dft_idft_map_pixel_size(pixel_size):
     # Delta
     delta = zeros[:, :]
     delta[m//2, n//2] = 1.0
-    vis = dft_map(ones, u=u, v=v, pixel_size=pixel_size)
+    vis = dft_map(delta, u=u, v=v, pixel_size=pixel_size)
     out_map = idft_map(vis, u=u, v=v, shape=shape, pixel_size=pixel_size)
-    assert_allclose(out_map/np.prod(shape), delta)
+    assert_allclose(out_map/np.prod(shape), delta, atol=1e-14)
 
     # Gaussian - astropy has axis in reverse order compared to numpy
     gaussian = Gaussian2DKernel(5, x_size=n, y_size=m).array
@@ -194,7 +194,7 @@ def test_dft_idft_map_pixel_size(pixel_size):
     assert_allclose(out_map/np.prod(shape), gaussian)
 
 
-@pytest.mark.skip('UV coordinate generation off somewhere')
+# @pytest.mark.skip('UV coordinate generation off somewhere')
 @pytest.mark.parametrize("center", [(0, 0), (2.1, 2.1), (5.4, -5.4), (-5.6, 5.6)])
 def test_dft_idft_map_center(center):
     center = center * apu.arcsec
@@ -225,9 +225,9 @@ def test_dft_idft_map_center(center):
     # Delta
     delta = zeros[:, :]
     delta[m//2, n//2] = 1.0
-    vis = dft_map(ones, u=u, v=v, center=center)
+    vis = dft_map(delta, u=u, v=v, center=center)
     out_map = idft_map(vis, u=u, v=v, shape=shape, center=center)
-    assert_allclose(out_map/np.prod(shape), delta)
+    assert_allclose(out_map/np.prod(shape), delta, atol=1e-14)
 
     # Gaussian - astropy has axis in reverse order compared to numpy
     gaussian = Gaussian2DKernel(5, x_size=n, y_size=m).array
@@ -236,11 +236,11 @@ def test_dft_idft_map_center(center):
     assert_allclose(out_map/np.prod(shape), gaussian)
 
 
-@pytest.mark.skip('UV coordinate generation off somewhere')
-@pytest.mark.parametrize("shape, pixel_size", [((33, 32), (0.5, 0.5)),
-                                               ((33, 32), (1.0, 1.0)),
-                                               ((33, 32), (2.0, 2.0)),
-                                               ((33, 32), (3.0, 3.0))])
+# @pytest.mark.skip('UV coordinate generation off somewhere')
+@pytest.mark.parametrize("shape, pixel_size", [((11, 10), (0.5, 0.5)),
+                                               ((11, 10), (1.0, 1.0)),
+                                               ((11, 10), (2.0, 2.0)),
+                                               ((11, 10), (3.0, 3.0))])
 def test_dft_idft_map_shape_pixel_size(shape, pixel_size):
     pixel_size = pixel_size * apu.arcsec
     m, n = shape
@@ -270,9 +270,9 @@ def test_dft_idft_map_shape_pixel_size(shape, pixel_size):
     # Delta
     delta = zeros[:, :]
     delta[m // 2, n // 2] = 1.0
-    vis = dft_map(ones, u=u, v=v, pixel_size=pixel_size)
+    vis = dft_map(delta, u=u, v=v, pixel_size=pixel_size)
     out_map = idft_map(vis, u=u, v=v, shape=shape, pixel_size=pixel_size)
-    assert_allclose(out_map/np.prod(shape), ones)
+    assert_allclose(out_map/np.prod(shape), delta, atol=1e-14)
 
     # Gaussian - astropy has axis in reverse order compared to numpy
     gaussian = Gaussian2DKernel(5, x_size=n, y_size=m).array

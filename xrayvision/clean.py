@@ -385,7 +385,7 @@ def vis_ms_clean(vis, shape, pixel, scales=None, clean_beam_width=4.0,
     return [Map((data, dirty_map.meta)) for data in (clean_map, model, residual)]
 
 
-vis_ms_clean.__doc__ += __common_ms_clean_doc__
+# vis_ms_clean.__doc__ += __common_ms_clean_doc__
 
 
 def radial_prolate_sphereoidal(nu):

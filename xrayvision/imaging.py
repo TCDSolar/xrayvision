@@ -225,12 +225,14 @@ def generate_header(vis, *, shape, pixel_size):
               'ctype1': 'HPLN-TAN',
               'ctype2': 'HPLT-TAN',
               'naxis': 2,
-              'naxis1': shape[0].to_value(apu.pixel),
-              'naxis2': shape[1].to_value(apu.pixel),
+              'naxis1': shape[0].value,
+              'naxis2': shape[1].value,
               'cunit1': 'arcsec',
               'cunit2': 'arcsec'}
-
-    if pixel_size:
+    if vis.center is not None:
+        header['crval1'] = vis.center[0].value
+        header['crval2'] = vis.center[1].value
+    if pixel_size is not None:
         if pixel_size.ndim == 0:
             header['cdelt1'] = pixel_size.value
             header['cdelt2'] = pixel_size.value

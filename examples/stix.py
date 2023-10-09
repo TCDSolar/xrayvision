@@ -19,11 +19,11 @@ from xrayvision.mem import mem
 # The STIX data has already been prepared and stored in python pickle format
 # the variables can be simply restored.
 
-with open('/Users/shane/Projects/stixpy/examples/stix_vis.pkl', 'rb') as f:
+with open('/Users/sm/Downloads/stix_vis.pkl', 'rb') as f:
     stix_data = pickle.load(f)
 
 time_range, energy_range, offset, stix_vis = stix_data
-stix_vis.offset = offset
+stix_vis.center = offset
 
 ###############################################################################
 # Lets have a look at the point spread function (PSF) or dirty beam
