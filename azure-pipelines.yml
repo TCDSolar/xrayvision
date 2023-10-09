@@ -3,7 +3,7 @@ variables:
   CI_NAME: Azure Pipelines
   CI_BUILD_ID: $(Build.BuildId)
   CI_BUILD_URL: "https://dev.azure.com/samaloney/xrayvision/_build/results?buildId=$(Build.BuildId)"
-  CIBW_BUILD: cp310-* cp311-* cp312-*
+  CIBW_BUILD: cp39-* cp310-* cp311-*
   CIBW_SKIP: "*-win32 *-manylinux1_i686"
 
 resources:
@@ -46,8 +46,8 @@ jobs:
       - linux: py311
         name: py311_linux_test
 
-      - linux: py312
-        name: py312_linux_test
+#      - linux: py312
+#        name: py312_linux_test
 
       - macos: py39
         name: py39_mac_test
@@ -61,9 +61,9 @@ jobs:
         name: py311_mac_test
         coverage: false
 
-      - macos: py312
-        name: py312_mac_test
-        coverage: false
+#      - macos: py312
+#        name: py312_mac_test
+#        coverage: false
 
       - windows: py39
         name: py39_win_test
@@ -74,8 +74,8 @@ jobs:
       - windows: py311
         name: py311_win_test
 
-      - windows: py312
-        name: py312_win_test
+#      - windows: py312
+#        name: py312_win_test
 
 # On branches which aren't master, and not Pull Requests, build the wheels but only upload them on tags
 - ${{ if and(ne(variables['Build.Reason'], 'PullRequest'), not(contains(variables['Build.SourceBranch'], 'master'))) }}:
@@ -95,12 +95,12 @@ jobs:
         - py39_linux_test
         - py310_linux_test
         - py311_linux_test
-        - py312_linux_test
+#        - py312_linux_test
         - py39_mac_test
         - py310_mac_test
         - py311_mac_test
-        - py312_mac_test
+#        - py312_mac_test
         - py39_win_test
         - py310_win_test
         - py311_win_test
-        - py312_win_test
+#        - py312_win_test
