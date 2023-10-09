@@ -283,7 +283,7 @@ def test_dft_idft_map_shape_pixel_size(shape, pixel_size):
 
 def test_equivalence_of_convolve():
     data = np.zeros((33, 33))
-    #data[16,16] = 10.0
+    # data[16,16] = 10.0
     data[3:6, 3:6] = 5.0
 
     m, n = (33, 33)
