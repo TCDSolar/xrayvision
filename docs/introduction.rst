@@ -21,8 +21,8 @@ measured visibilities in f can the original map a be recovered?
 
 
     def make_data(noisy=False):
-        g1 = Gaussian2DKernel(stddev=2, x_size=65, y_size=65).array
-        g2 = Gaussian2DKernel(stddev=6, x_size=65, y_size=65).array
+        g1 = Gaussian2DKernel(2, x_size=65, y_size=65).array
+        g2 = Gaussian2DKernel(6, x_size=65, y_size=65).array
 
         temp = np.zeros((65, 65))
         temp[50,50] = 400.0
@@ -51,9 +51,9 @@ measured visibilities in f can the original map a be recovered?
     # uv coordinates require unit
     uv = np.array([uu, vv]).reshape(2, 33**2)/u.arcsec
 
-    full_vis = transform.dft_map(data, uv)
+    full_vis = transform.dft_map(data, u=uv[0,:], v=uv[1,:])
 
-    res = transform.idft_map(full_vis, (33, 33), uv)
+    res = transform.idft_map(full_vis, u=uv[0,:], v=uv[1,:], shape=(33, 33))
     # assert np.allclose(data, res)
 
     # Generate log spaced radial u, v sampeling
@@ -74,11 +74,12 @@ measured visibilities in f can the original map a be recovered?
     sub_uv = np.vstack([x.flatten(), y.flatten()])
     sub_uv = np.hstack([sub_uv, np.zeros((2,1))])/u.arcsec
 
-    sub_vis = transform.dft_map(data, sub_uv)
+    sub_vis = transform.dft_map(data, u=sub_uv[0,:], v=sub_uv[1,:])
 
-    psf1 = transform.idft_map(np.full(sub_vis.size, 1), (65, 65), sub_uv)
+    psf1 = transform.idft_map(np.full(sub_vis.size, 1), u=sub_uv[0,:], v=sub_uv[1,:],
+                              shape=(65, 65))
 
-    sub_res = transform.idft_map(sub_vis, (65, 65), sub_uv)
+    sub_res = transform.idft_map(sub_vis, u=sub_uv[0,:], v=sub_uv[1,:], shape=(65, 65))
 
     xp = np.round(x * 33 + 33/2 - 0.5 + 16).astype(int)
     yp = np.round(y * 33 + 33/2 - 0.5 + 16).astype(int)

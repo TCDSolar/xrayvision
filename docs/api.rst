@@ -6,3 +6,5 @@ Reference/API
 .. automodapi:: xrayvision.transform
 
 .. automodapi:: xrayvision.clean
+
+.. automodapi:: xrayvision.mem
