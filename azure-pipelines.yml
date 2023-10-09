@@ -51,15 +51,19 @@ jobs:
 
       - macos: py39
         name: py39_mac_test
+        coverage: false
 
       - macos: py310
         name: py310_mac_test
+        coverage: false
 
       - macos: py311
         name: py311_mac_test
+        coverage: false
 
       - macos: py312
         name: py312_mac_test
+        coverage: false
 
       - windows: py39
         name: py39_win_test
