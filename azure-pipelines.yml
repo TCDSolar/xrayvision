@@ -37,14 +37,20 @@ jobs:
       - linux: codestyle
         name: codestyle
 
+      - linux: py39
+        name: py39_linux_test
+
       - linux: py310
         name: py310_linux_test
 
       - linux: py311
         name: py311_linux_test
 
-      - linux: py12
-        name: py12_linux_test
+      - linux: py312
+        name: py312_linux_test
+
+      - macos: py39
+        name: py39_mac_test
 
       - macos: py310
         name: py310_mac_test
@@ -54,6 +60,9 @@ jobs:
 
       - macos: py312
         name: py312_mac_test
+
+      - windows: py39
+        name: py39_win_test
 
       - windows: py310
         name: py310_win_test
@@ -79,12 +88,15 @@ jobs:
         - wheels_universal
         - sdist
       dependsOn:
+        - py39_linux_test
         - py310_linux_test
         - py311_linux_test
         - py312_linux_test
-        - py310_linux_test
-        - py311_linux_test
-        - py32_linux_test
+        - py39_mac_test
+        - py310_mac_test
+        - py311_mac_test
+        - py312_mac_test
+        - py39_win_test
         - py310_win_test
         - py311_win_test
         - py312_win_test
