@@ -3,7 +3,8 @@
 Solar Orbiter/STIX Visibility Imaging
 ======================================
 
-Create images from STIX visibility data
+Imports
+
 """
 import pickle
 import urllib.request
@@ -17,6 +18,8 @@ from xrayvision.imaging import vis_psf_map, vis_to_map
 from xrayvision.mem import mem
 
 ###############################################################################
+# Create images from STIX visibility data.
+#
 # The STIX data has already been prepared and stored in python pickle format
 # the variables can be simply restored.
 

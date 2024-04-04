@@ -13,6 +13,7 @@ project = 'xrayvision'
 copyright = '2020, '
 author = ''
 
+import pathlib
 # The full version, including alpha/beta/rc tags
 from xrayvision import __version__
 release = __version__
@@ -25,6 +26,7 @@ is_development = '.dev' in __version__
 # ones.
 extensions = [
     'matplotlib.sphinxext.plot_directive',
+    'sphinx_gallery.gen_gallery',
     'sphinx.ext.autodoc',
     'sphinx.ext.intersphinx',
     'sphinx.ext.todo',
@@ -84,11 +86,7 @@ intersphinx_mapping = {
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 
-try:
-    from sunpy_sphinx_theme.conf import *
-except ImportError:
-    html_theme = 'default'
-
+html_theme = 'pydata_sphinx_theme'
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
@@ -106,3 +104,18 @@ graphviz_dot_args = [
     '-Gfontsize=10',
     '-Gfontname=Helvetica Neue, Helvetica, Arial, sans-serif'
 ]
+
+# -- Options for the Sphinx gallery -------------------------------------------
+path = pathlib.Path.cwd()
+example_dir = path.parent.joinpath("examples")
+sphinx_gallery_conf = {
+    "backreferences_dir": str(path.joinpath("generated", "modules")),
+    "filename_pattern": "^((?!skip_).)*$",
+    "examples_dirs": example_dir,
+    "gallery_dirs": path.joinpath("generated", "gallery"),
+    "default_thumb_file": path.joinpath("logo", "sunpy_icon_128x128.png"),
+    "abort_on_example_error": False,
+    "plot_gallery": "True",
+    "remove_config_comments": True,
+    "only_warn_on_example_error": True,
+}

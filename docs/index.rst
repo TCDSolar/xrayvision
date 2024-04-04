@@ -10,3 +10,4 @@ This is the documentation for xrayvision.
    introduction
    tutorial
    api
+   generated/gallery/index
