@@ -105,7 +105,7 @@ def clean(dirty_map, dirty_beam, pixel=None, clean_beam_width=4.0,
         # imax = imax * max_beam
         model[mx, my] += gain * imax
 
-        logger.info(f"Iter: {i}, strength: {imax}, location: {mx, my}")
+        logger.debug(f"Iter: {i}, strength: {imax}, location: {mx, my}")
 
         offset = map_center[0] - mx, map_center[1] - my
         shifted_beam_center = int(beam_center[0] + offset[0]), int(beam_center[1] + offset[1])
@@ -124,9 +124,9 @@ def clean(dirty_map, dirty_beam, pixel=None, clean_beam_width=4.0,
         #      logger.info("Threshold reached")
         #      break
         # # el
-        # if np.abs(dirty_map.min()) > dirty_map.max():
-        #     logger.info("Largest residual negative")
-        #     break
+        if np.abs(dirty_map.min()) > dirty_map.max():
+            logger.info("Largest residual negative")
+            break
 
     else:
         print("Max iterations reached")
@@ -177,7 +177,6 @@ def vis_clean(vis, shape, pixel, clean_beam_width=4.0, niter=5000, map=True, gai
     dirty_beam = vis_psf_image(vis, shape=dirty_beam_shape, pixel_size=pixel, **kwargs)
     clean_map, model, residual = clean(dirty_map.data, dirty_beam.value, pixel=pixel, gain=gain,
                                        clean_beam_width=clean_beam_width, niter=niter)
-    # clean_map, model, residual = np.rot90(clean_map, 1), np.rot90(model, 1), np.rot90(residual, 1)
     if not map:
         return clean_map, model, residual
 

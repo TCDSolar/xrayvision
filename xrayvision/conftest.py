@@ -1,6 +1,8 @@
 # Force MPL to use non-gui backends for testing.
+import matplotlib
+
 try:
-    import matplotlib
+    pass
 except ImportError:
     pass
 else:

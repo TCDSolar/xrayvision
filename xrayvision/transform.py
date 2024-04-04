@@ -132,7 +132,7 @@ def dft_map(input_array, *, u, v, center=(0.0, 0.0) * apu.arcsec, pixel_size=(1.
         x = x.value
         y = y.value
 
-        vis = np.sum(input_array[..., np.newaxis] * np.exp(-2j * np.pi * (
+        vis = np.sum(input_array[..., np.newaxis] * np.exp(2j * np.pi * (
             x[..., np.newaxis] * uv[np.newaxis, 0, :] + y[..., np.newaxis] * uv[np.newaxis, 1, :])),
             axis=(0, 1))
 
@@ -185,7 +185,7 @@ def idft_map(input_vis, *, u, v, shape, weights=None, center=(0.0, 0.0) * apu.ar
         x = x.value
         y = y.value
 
-        image = np.sum(input_vis * weights * np.exp(2j * np.pi * (
+        image = np.sum(input_vis * weights * np.exp(-2j * np.pi * (
             x[..., np.newaxis] * uv[np.newaxis, 0, :] + y[..., np.newaxis] * uv[np.newaxis, 1, :])),
             axis=2)
 

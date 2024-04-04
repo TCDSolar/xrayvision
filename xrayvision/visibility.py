@@ -53,10 +53,8 @@ class Visibility:
             Array of `u` coordinates where visibilities will be evaluated.
         v : `numpy.ndarray`
             Array of `v` coordinates where visibilities will be evaluated.
-        offset :
-            Offset of the visibility phase center.
         center :
-            Phase center
+            Phase centre
         """
         self.u = u
         self.v = v

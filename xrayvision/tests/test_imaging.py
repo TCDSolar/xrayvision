@@ -39,7 +39,7 @@ def test_psf_to_image(pixel_size, uv):
     psf_calc = idft_map(obs_vis, u=u, v=v, shape=[65, 65], pixel_size=[2, 2]*apu.arcsec,
                         weights=weights)
     vis = Visibility(obs_vis, u=u, v=v)
-    res = vis_psf_image(vis, shape=[65, 65]*apu.pixel, pixel_size=2*apu.arcsec)
+    res = vis_psf_image(vis, shape=[65, 65]*apu.pixel, pixel_size=2*apu.arcsec, natural=False)
     assert np.allclose(psf_calc, res)
 
 
@@ -53,7 +53,7 @@ def test_vis_to_image(uv):
     bp_calc = idft_map(obs_vis, u=u, v=v, shape=[65, 65], pixel_size=[2, 2] * apu.arcsec,
                        weights=weights)
     vis = Visibility(obs_vis, u=u, v=v)
-    res = vis_to_image(vis, shape=[65, 65] * apu.pixel, pixel_size=2 * apu.arcsec)
+    res = vis_to_image(vis, shape=[65, 65] * apu.pixel, pixel_size=2 * apu.arcsec, natural=False)
     assert np.allclose(bp_calc, res)
 
 
@@ -119,13 +119,13 @@ def test_map_to_vis(pos, pixel):
     mp = Map((data, header))
     vis = map_to_vis(mp, u=u, v=v)
 
-    assert np.array_equal(vis.center, pos)
+    assert np.array_equal(vis.offset, pos)
 
-    res = vis_to_image(vis, shape=(m, n)*apu.pixel, pixel_size=pixel, natural=False)
+    res = vis_to_image(vis, shape=(m, n)*apu.pixel, pixel_size=pixel)
     assert np.allclose(res, data)
 
 
-def test_vis_to_image():
+def test_vis_to_image1():
     m = n = 33
     size = m * n
 
@@ -140,7 +140,7 @@ def test_vis_to_image():
     data = Gaussian2DKernel(6, x_size=n, y_size=m).array
 
     vis = image_to_vis(data, u=u, v=v)
-    res = vis_to_image(vis, shape=(m, n)*apu.pixel, natural=False)
+    res = vis_to_image(vis, shape=(m, n)*apu.pixel)
     assert np.allclose(data, res)
     assert res.shape == (m, n)
 
@@ -159,7 +159,7 @@ def test_vis_to_image_single_pixel_size():
     data = Gaussian2DKernel(6, x_size=n, y_size=m).array
 
     vis = image_to_vis(data, u=u, v=v, pixel_size=(2., 2.) * apu.arcsec)
-    res = vis_to_image(vis, shape=(m, n)*apu.pixel, pixel_size=2. * apu.arcsec, natural=False)
+    res = vis_to_image(vis, shape=(m, n)*apu.pixel, pixel_size=2. * apu.arcsec)
     assert res.shape == (m, n)
     assert np.allclose(data, res)
 
@@ -228,7 +228,7 @@ def test_to_sunpy_single_pixel_size():
     mp = Map((data, header))
 
     vis = map_to_vis(mp, u=u, v=v)
-    res = vis_to_map(vis, shape=(m, n)*apu.pixel, pixel_size=2 * apu.arcsec, natural=False)
+    res = vis_to_map(vis, shape=(m, n)*apu.pixel, pixel_size=2 * apu.arcsec)
     assert res.meta['cdelt1'] == 2.
     assert res.meta['cdelt1'] == 2.
     assert np.allclose(data, res.data)

@@ -576,10 +576,14 @@ def get_percent_lambda(vis):
     # TODO this start at 3 not 10?
     isc_min = 3
     nbig = 0
-    isc_sizes = np.array([float(s[:-1]) for s in vis.label])
-    while isc_min >= 0 and nbig < 2:
-        ibig = np.argwhere(isc_sizes >= isc_min)
-        isc_min = isc_min - 1
+
+    if hasattr(vis, 'label'):
+        isc_sizes = np.array([float(s[:-1]) for s in vis.label])
+        while isc_min >= 0 and nbig < 2:
+            ibig = np.argwhere(isc_sizes >= isc_min)
+            isc_min = isc_min - 1
+    elif hasattr(vis, 'isc'):
+        ibig = np.arange(vis.isc.size)
 
     # If still don't have at least 2 vis, return -1, otherwise calculate mean
     # (but reject points > sigma away from mean)

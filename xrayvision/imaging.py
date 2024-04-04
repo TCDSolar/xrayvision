@@ -33,7 +33,7 @@ def get_weights(vis, natural=True, norm=True):
 
     """
     weights = np.sqrt(vis.u**2 + vis.v**2).value
-    if not natural:
+    if natural:
         weights = np.ones_like(vis.vis, dtype=float)
 
     if norm:
@@ -218,8 +218,8 @@ def generate_header(vis, *, shape, pixel_size):
     -------
 
     """
-    header = {'crval1': (vis.center[0] + vis.offset[0]).to_value(apu.arcsec),
-              'crval2': (vis.center[1] + vis.offset[1]).to_value(apu.arcsec),
+    header = {'crval1': (vis.offset[0]).to_value(apu.arcsec),
+              'crval2': (vis.offset[1]).to_value(apu.arcsec),
               'cdelt1': pixel_size[0].to_value(apu.arcsec),
               'cdelt2': pixel_size[1].to_value(apu.arcsec),
               'ctype1': 'HPLN-TAN',
@@ -229,9 +229,9 @@ def generate_header(vis, *, shape, pixel_size):
               'naxis2': shape[1].value,
               'cunit1': 'arcsec',
               'cunit2': 'arcsec'}
-    if vis.center is not None:
-        header['crval1'] = vis.center[0].value
-        header['crval2'] = vis.center[1].value
+    # if vis.center is not None:
+    #     header['crval1'] = vis.center[0].value
+    #     header['crval2'] = vis.center[1].value
     if pixel_size is not None:
         if pixel_size.ndim == 0:
             header['cdelt1'] = pixel_size.value
@@ -311,5 +311,6 @@ def map_to_vis(amap, *, u, v):
     if "cdelt2" in meta:
         new_psize[1] = float(meta["cdelt2"])
 
-    return image_to_vis(amap.data, u=u, v=v, center=new_pos * apu.arcsec,
-                        pixel_size=new_psize * apu.arcsec)
+    vis = image_to_vis(amap.data, u=u, v=v, pixel_size=new_psize * apu.arcsec)
+    vis.offset = new_pos * apu.arcsec
+    return vis
