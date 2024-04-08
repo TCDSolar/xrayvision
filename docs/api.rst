@@ -1,5 +1,5 @@
-Reference/API
-=============
+API
+===
 
 .. automodapi:: xrayvision.visibility
 

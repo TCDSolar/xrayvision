@@ -39,6 +39,7 @@ extensions = [
     'sphinx_changelog',
     'sphinx_automodapi.automodapi',
     'sphinx_automodapi.smart_resolver',
+    'sphinx_design'
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -87,6 +88,10 @@ intersphinx_mapping = {
 # a list of builtin themes.
 
 html_theme = 'pydata_sphinx_theme'
+
+html_sidebars = {
+    "**": ["sidebar-nav-bs", "sidebar-ethical-ads"]
+}
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
