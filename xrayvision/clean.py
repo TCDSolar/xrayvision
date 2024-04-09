@@ -374,8 +374,8 @@ def vis_ms_clean(vis, shape, pixel, scales=None, clean_beam_width=4.0,
 
     """
     dirty_map = vis_to_map(vis, shape=shape, pixel_size=pixel)
-    dirty_beam = vis_psf_image(vis, shape=shape * 3, pixel_size=pixel, map=False)
-    clean_map, model, residual = ms_clean(dirty_map.data, dirty_beam, scales=scales,
+    dirty_beam = vis_psf_image(vis, shape=shape * 3, pixel_size=pixel)
+    clean_map, model, residual = ms_clean(dirty_map.data, dirty_beam, pixel, scales=scales,
                                           clean_beam_width=clean_beam_width, gain=gain,
                                           thres=thres, niter=niter)
     if not map:

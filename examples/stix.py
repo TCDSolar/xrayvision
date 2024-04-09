@@ -42,6 +42,7 @@ psf_map.plot()
 backproj_map = vis_to_map(stix_vis, shape=(129, 129)*apu.pixel,
                           pixel_size=2*apu.arcsec, natural=False)
 backproj_map.plot()
+
 ###############################################################################
 # Clean
 
@@ -50,6 +51,8 @@ clean_map, model_map, resid_map = vis_clean(stix_vis, shape=[129, 129]*apu.pixel
                                             clean_beam_width=20*apu.arcsec)
 clean_map.plot()
 
+###############################################################################
+# MEM
 
 mem_map = mem(stix_vis, shape=[129, 129]*apu.pixel, pixel=[2, 2]*apu.arcsec)
 mem_map.plot()
