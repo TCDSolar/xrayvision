@@ -2,13 +2,12 @@
 Discrete Fourier Transform (DFT) and Inverse Discrete Fourier Transform (IDFT) related functions.
 
 There are two implementations one a standard DFT `dft` and IDFT `idft` in terms of pixel space, i.e.
-the input has no positional information other than an arbitary 0 origin and a length. The second
+the input has no positional information other than an arbitrary 0 origin and a length. The second
 takes inputs which have positional information `dft_map` and the inverse `idft_map`
 
 """
-import numpy as np
-
 import astropy.units as apu
+import numpy as np
 from astropy.units.core import UnitsError
 
 
@@ -114,7 +113,7 @@ def dft_map(input_array, *, u, v, center=(0.0, 0.0) * apu.arcsec, pixel_size=(1.
     Returns
     -------
     `numpy.ndarray`
-        Array of N `complex` visibilities evaluated at the u, v coordinates given bu `uv`
+        Array of N `complex` visibilities evaluated at the u, v coordinates given by `uv`
 
     """
     m, n = input_array.shape
@@ -212,7 +211,7 @@ def idft_map(input_vis, *, u, v, shape, weights=None, center=(0.0, 0.0) * apu.ar
 #     Returns
 #     -------
 #     vis : `numpy.ndarray`
-#         The complex visibilities evaluated at the u, v coordinates given bu `uv`
+#         The complex visibilities evaluated at the u, v coordinates given by `uv`
 #
 #     """
 #     m, n = im.shape

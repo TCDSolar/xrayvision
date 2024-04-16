@@ -1,10 +1,9 @@
+import astropy.units as apu
 import numpy as np
 import pytest
+from astropy.convolution import Gaussian2DKernel
 from numpy.testing import assert_allclose, assert_array_equal
 from scipy import signal
-
-import astropy.units as apu
-from astropy.convolution import Gaussian2DKernel
 
 from xrayvision.transform import dft_map, generate_uv, generate_xy, idft_map
 
@@ -303,7 +302,7 @@ def test_equivalence_of_convolve():
 
     non_zero = np.where(sampling != 0)[0]
 
-    bp1 = idft_map(full_vis, u=u, v=v, shape=(33, 33))
+    # bp1 = idft_map(full_vis, u=u, v=v, shape=(33, 33))
 
     bp2 = idft_map(sub_vis[non_zero], u=u[non_zero], v=v[non_zero], shape=(33, 33))
 

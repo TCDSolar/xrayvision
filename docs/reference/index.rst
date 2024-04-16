@@ -1,5 +1,8 @@
-Reference/API
-=============
+.. _reference:
+
+*********
+Reference
+*********
 
 .. automodapi:: xrayvision.visibility
 
@@ -12,3 +15,9 @@ Reference/API
 .. automodapi:: xrayvision.mem
 
 .. automodapi:: xrayvision.utils
+
+
+.. toctree::
+   :maxdepth: 2
+
+   ../whatsnew/index

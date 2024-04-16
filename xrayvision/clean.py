@@ -9,11 +9,10 @@ appropriate component shapes at different scales.
 import logging
 
 import numpy as np
+from astropy.convolution import Gaussian2DKernel
 from scipy import signal
 from scipy.ndimage.interpolation import shift
 from sunpy.map.map_factory import Map
-
-from astropy.convolution import Gaussian2DKernel
 
 from xrayvision.imaging import vis_psf_image, vis_to_map
 
@@ -96,7 +95,7 @@ def clean(dirty_map, dirty_beam, pixel=None, clean_beam_width=4.0,
 
     # Model for sources
     model = np.zeros(dirty_map.shape)
-    componets = []
+    components = []
     for i in range(niter):
         # Find max in dirty map and save to point source
         mx, my = np.unravel_index(dirty_map.argmax(), dirty_map.shape)
@@ -116,7 +115,7 @@ def clean(dirty_map, dirty_beam, pixel=None, clean_beam_width=4.0,
 
         comp = imax * gain * shifted
 
-        componets.append((mx, my, comp[mx, my]))
+        components.append((mx, my, comp[mx, my]))
 
         dirty_map = np.subtract(dirty_map, comp)
 
@@ -162,7 +161,7 @@ def vis_clean(vis, shape, pixel, clean_beam_width=4.0, niter=5000, map=True, gai
 
     Parameters
     ----------
-    vis : `xrayvision.visibilty.Visibly`
+    vis : `xrayvision.visibility.Visibly`
         The visibilities to clean
     shape :
         Size of map
@@ -365,7 +364,7 @@ def vis_ms_clean(vis, shape, pixel, scales=None, clean_beam_width=4.0,
 
     Parameters
     ----------
-    vis : `xrayvision.visibilty.Visibly`
+    vis : `xrayvision.visibility.Visibly`
         The visibilities to clean
     shape :
         Size of map
@@ -374,8 +373,8 @@ def vis_ms_clean(vis, shape, pixel, scales=None, clean_beam_width=4.0,
 
     """
     dirty_map = vis_to_map(vis, shape=shape, pixel_size=pixel)
-    dirty_beam = vis_psf_image(vis, shape=shape * 3, pixel_size=pixel, map=False)
-    clean_map, model, residual = ms_clean(dirty_map.data, dirty_beam, scales=scales,
+    dirty_beam = vis_psf_image(vis, shape=shape * 3, pixel_size=pixel)
+    clean_map, model, residual = ms_clean(dirty_map.data, dirty_beam, pixel, scales=scales,
                                           clean_beam_width=clean_beam_width, gain=gain,
                                           thres=thres, niter=niter)
     if not map:
