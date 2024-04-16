@@ -1,9 +1,8 @@
+import astropy.units as apu
 import numpy as np
 import pytest
-from sunpy.map import Map
-
-import astropy.units as apu
 from astropy.convolution.kernels import Gaussian2DKernel
+from sunpy.map import Map
 
 from xrayvision.imaging import image_to_vis, map_to_vis, vis_psf_image, vis_to_image, vis_to_map
 from xrayvision.transform import dft_map, generate_uv, idft_map

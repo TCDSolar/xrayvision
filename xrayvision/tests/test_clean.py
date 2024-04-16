@@ -1,8 +1,7 @@
-import numpy as np
-from scipy import signal
-
 import astropy.units as u
+import numpy as np
 from astropy.convolution.kernels import Gaussian2DKernel
+from scipy import signal
 
 from xrayvision.clean import (
     clean,

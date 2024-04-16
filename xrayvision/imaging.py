@@ -1,7 +1,6 @@
+import astropy.units as apu
 import numpy as np
 from sunpy.map import Map
-
-import astropy.units as apu
 
 from xrayvision.transform import dft_map, idft_map
 from xrayvision.visibility import Visibility
@@ -105,7 +104,7 @@ def vis_psf_image(vis, *, shape=(65, 65)*apu.pixel, pixel_size=2*apu.arcsec, nat
     weights = get_weights(vis, natural=natural)
 
     # Make sure psf is always odd so power is in exactly one pixel
-    m, n = [s//2 * 2 + 1 for s in shape]
+    m, n = (s//2 * 2 + 1 for s in shape)
     psf_arr = idft_map(np.ones(vis.vis.shape)*vis.vis.unit, u=vis.u, v=vis.v,
                        shape=(m, n), weights=weights, pixel_size=pixel_size)
     return psf_arr

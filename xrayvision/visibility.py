@@ -5,9 +5,8 @@ This contains classes to hold general visibilities and specialised classes hold 
 certain spacecraft or instruments
 """
 
-import numpy as np
-
 import astropy.units as apu
+import numpy as np
 
 __all__ = ['Visibility']
 

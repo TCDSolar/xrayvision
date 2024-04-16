@@ -1,6 +1,5 @@
-import numpy as np
-
 import astropy.units as u
+import numpy as np
 from astropy.convolution.kernels import Gaussian2DKernel
 
 from xrayvision.imaging import image_to_vis
@@ -62,7 +61,7 @@ def test_mem():
 
     vis = image_to_vis(data, u=sub_uv[0, :], v=sub_uv[1, :], pixel_size=2*u.arcsec)
     setattr(vis, 'amplitude_error', np.sqrt(np.abs(vis.vis)))
-    setattr(vis, 'label', [str(x) for x in np.sqrt((x**2 + y**2)).flatten()])
+    setattr(vis, 'label', [str(x) for x in np.sqrt(x**2 + y**2).flatten()])
 
     res = mem(vis, percent_lambda=None, shape=(m, n)*u.pix, pixel=[2, 2]*u.arcsec,
               maxiter=1000, tol=1e-3)

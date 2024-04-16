@@ -1,7 +1,7 @@
-xrayvision Documentation
-------------------------
+``xrayvision`` Documentation
+----------------------------
 
-Welcome to xrayvision, a sophisticated Python package providing visibility-based imaging algorithms tailored for solar X-ray observations.
+Welcome to ``xrayvision``, a Python package providing sophisticated visibility-based imaging algorithms tailored for solar X-ray observations.
 Harnessing the versatility and efficiency of Python, xrayvision seamlessly integrates advanced algorithms and visualization capabilities, offering a comprehensive toolkit for the analysis and interpretation of solar X-ray visibility data.
 xrayvision equips you with the means to extract meaningful insights from complex X-ray observations with ease.
 At its core, xrayvision is built upon a foundation of robust visibility-based imaging algorithms, carefully engineered to reconstruct high-fidelity images from intricate X-ray datasets. By leveraging state-of-the-art techniques, xrayvision illuminates the dynamic processes unfolding in the solar atmosphere, shedding light on the mysteries of our nearest star.
@@ -16,63 +16,49 @@ Whether you're a seasoned solar physicist or an enthusiastic newcomer, xrayvisio
 
 The xrayvision documentation is broken down into four keys areas.
 
-* **Tutorials** start here if you are new to  as this material wil help you lean to use xrayvision
-* **How-to Guides** provide short, focused guides on common tasks go here if you need to find out how to do X.
-* **Discussions** are longer explanations of design choices or historical aspects of xrayvision go here if you want or need to know more they 'why' than 'how'.
-* **Reference** technical descriptions of the software such as classes, functions, argument, keywords etc go here to get the details and also changes
-
-
 .. grid:: 1 2 2 2
     :gutter: 3
 
     .. grid-item-card::
         :class-card: card
 
-        Tutorials
-        ^^^^^^^^^
+        **Tutorials** start here if you are new as this material will help you lean to use ``xrayvision``.
 
         .. toctree::
             :maxdepth: 1
 
-            introduction
+            tutorials/index
 
 
     .. grid-item-card::
         :class-card: card
 
-        How-to Guides
-        ^^^^^^^^^^^^^
+        **How-to Guides** provide short, focused guides on common tasks go here if you need to find out how to do X.
 
         .. toctree::
             :maxdepth: 1
 
-            how_to
+            how_to_guides/index
 
     .. grid-item-card::
         :class-card: card
 
-        Discussions
-        ^^^^^^^^^^^
+        **Discussions** are longer explanations for example about the STIX instrument, software design choices or historical aspects of ``xrayvision`` go here if you want or need to know more they 'why' than 'how'.
 
         .. toctree::
             :maxdepth: 1
 
-            discussion
+            discussions/index
 
     .. grid-item-card::
         :class-card: card
 
-        Reference
-        ^^^^^^^^^
+        **Reference** technical descriptions of the software such as classes, functions, argument, keywords, change logs and similar.
 
         .. toctree::
             :maxdepth: 1
 
-            api
+            reference/index
 
 .. toctree::
     :maxdepth: 1
-
-    tutorial
-    generated/gallery/index
-    whatsnew/index

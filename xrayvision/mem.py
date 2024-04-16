@@ -4,11 +4,10 @@ Implementation of Maximum Entropy Method
 
 from types import SimpleNamespace
 
+import astropy.units as apu
 import numpy as np
 from numpy.linalg import norm
 from sunpy.map import Map
-
-import astropy.units as apu
 
 from xrayvision.imaging import generate_header
 from xrayvision.transform import generate_xy
@@ -59,7 +58,7 @@ def get_fourier_matrix(vis, shape=[64, 64]*apu.pix, pixel_size=[4.0312500, 4.031
     Parameters
     ----------
     vis :
-        Visibly object containg u, v sampling
+        Visibly object containing u, v sampling
     shape :
         Shape of the images
     pixel_size
@@ -119,7 +118,7 @@ def estimate_flux(vis, shape, pixel, maxiter=1000, tol=1e-3):
 
     Returns
     -------
-    Esimated total flux
+    Estimated total flux
 
     """
 
@@ -465,7 +464,7 @@ def optimise_fb(Hv, Visib, Lip, flux, lambd, shape, pixel, maxiter, tol):
         f_0 = (diff_Vp**2).sum()
         Jp = f_0 + lambd * f_Rp
 
-        # CHEK OF THE MONOTONICITY
+        # CHECK OF THE MONOTONICITY
         # we update 'x' only if 'Jp' is less than or equal to 'J_old'
         check = True
         if Jp > J_old:
@@ -559,7 +558,7 @@ def get_percent_lambda(vis):
     Return 'percent_lambda' use with MEM
 
     Calculate the signal-to-noise ratio (SNR) for the given visibility bag by trying to use the
-    coarser sub-collimators adding finer ones until there are at least 2 visiblities, then use
+    coarser sub-collimators adding finer ones until there are at least 2 visibilities, then use
     resistant mean of of abs(obsvis) / sigamp
 
     Parameters
@@ -637,7 +636,7 @@ def mem(vis, percent_lambda=None, shape=None, pixel=None, maxiter=1000, tol=1e-3
     x = x + total_flux/(shape[0]*shape[1]*pixel[0]*pixel[1]).value
     Hvx = np.matmul(Hv, x)
 
-    lambd = 2 * np.abs((np.matmul((Hvx.value - Visib), Hv))).max()*percent_lambda
+    lambd = 2 * np.abs(np.matmul((Hvx.value - Visib), Hv)).max()*percent_lambda
 
     im = optimise_fb(Hv, Visib, Lip, total_flux, lambd, shape, pixel, maxiter, tol)
 
