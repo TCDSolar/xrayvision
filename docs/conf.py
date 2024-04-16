@@ -88,9 +88,6 @@ intersphinx_mapping = {
 
 html_theme = 'pydata_sphinx_theme'
 
-html_sidebars = {
-    "**": ["sidebar-nav-bs", "sidebar-ethical-ads"]
-}
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
