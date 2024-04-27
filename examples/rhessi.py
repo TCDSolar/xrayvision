@@ -5,10 +5,9 @@ RHESSI Visibility Imaging
 
 Create images from RHESSI visibility data
 """
+import astropy.units as apu
 import matplotlib.pyplot as plt
 import numpy as np
-
-import astropy.units as apu
 from astropy.io import fits
 
 from xrayvision.clean import vis_clean
