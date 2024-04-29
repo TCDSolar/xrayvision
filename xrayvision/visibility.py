@@ -96,9 +96,23 @@ class VisibilityABC:
 
     @property
     @abc.abstractmethod   
-    def uncertaintly(self) -> np.ndarray:
+    def uncertainty(self) -> np.ndarray:
         """
         uncertainties on visibilities values. 
+        """
+
+    @property
+    @abc.abstractmethod   
+    def phase_uncertainty(self) -> np.ndarray:
+        """
+        uncertainties on phases of the visibilities. 
+        """
+        
+    @property
+    @abc.abstractmethod   
+    def amplitude_uncertainty(self) -> np.ndarray:
+        """
+        uncertainties on amplitudes of the visibilities. 
         """
 
 
