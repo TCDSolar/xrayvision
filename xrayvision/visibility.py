@@ -12,9 +12,9 @@ import astropy.coordinates
 import astropy.units as u
 
 
-__all__ = ['Visibility']
+__all__ = ['Visibilities']
 
-class VisibilityABC:
+class VisibilitiesABC:
     @property
     @abc.abstractmethod
     def amplitude(self) -> np.ndarray:
@@ -52,42 +52,35 @@ class VisibilityABC:
 
     @property
     @abc.abstractmethod   
-    def date(self) -> astropy.time.Time:
+    def date_range(self) -> Iterable[astropy.time.Time]:
         """
         Centre time over which the visibilities are computed.
         """
 
     @property
     @abc.abstractmethod   
-    def integration_time(self) -> u.Quantity:
-        """
-        Time duration over which the visibilities are computed.
-        """
-
-    @property
-    @abc.abstractmethod   
-    def u(self) -> np.ndarray:
+    def u(self) -> Iterable[u.Quantity]:
         """
         u-coordinate on the complex plane of the visibilities.
         """
 
     @property
     @abc.abstractmethod   
-    def v(self) -> np.ndarray:
+    def v(self) -> Iterable[u.Quantity]:
         """
         v-coordinate on the complex plane of the visibilities.
         """
 
     @property
     @abc.abstractmethod   
-    def vis(self) -> np.ndarray:
+    def visibilities(self) -> Iterable[u.Quantity]:
         """
         Complex numbers representing the visibilities.
         """
 
     @property
     @abc.abstractmethod   
-    def keys(self) -> Iterable[str]:
+    def names(self) -> Iterable[str]:
         """
         Names for each visibility. 
 
