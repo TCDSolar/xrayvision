@@ -302,8 +302,9 @@ class Visibilities(VisibilitiesABC, VisibilitiesBase):
     
     super().__init__(visibilities, u, v, names, uncertainty=None, meta=None)
 
+
 class VisMeta(VisMetaABC, SimpleNamespace):
-     @apu.quantity_input(energy_range=u.keV)
+    @apu.quantity_input(energy_range=u.keV)
     def __init__(self, energy_range, time_range, center, observer_coordinate, **kwargs):
         if len(energy_range) != 2: 
             raise ValueError('energy_range must be length 2.')          
