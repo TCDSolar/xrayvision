@@ -115,7 +115,7 @@ class VisMetaABC:
         """
         Centre time over which the visibilities are computed.
         """ 
-         
+
     @property
     @abc.abstractmethod   
     def center(self) -> SkyCoord:
@@ -130,8 +130,7 @@ class VisMetaABC:
         Location of the observer.
         """
 
-
-class Visibilities:
+class VisibilitiesBase(VisibilitiesBaseABC):
     r"""
     Hold a set of related visibilities and information.
 
@@ -147,8 +146,8 @@ class Visibilities:
         The x, y offset of phase center
 
     """
-    @apu.quantity_input(u=1/u.arcsec, v=1/u.arcsec, energy_range=u.keV, center=apu.arcsec)
-    def __init__(self, visibilities, *, u, v, names, energy_range, date_range=None, center=None, observer_coordinate=None, uncertainty=None):
+    @apu.quantity_input(u=1/u.arcsec, v=1/u.arcsec)
+    def __init__(self, visibilities, *, u, v, names, uncertainty=None, meta=None):
         r"""
         Initialise a new Visibility object.
 
@@ -163,6 +162,8 @@ class Visibilities:
         center :
             Phase centre
         """
+        if not isinstance(visibilities, u.Quantity) or not visibilities.isscalar:
+            raise TypeError('visibilities must all be a non scalar Astropy quantity.')
         self._visibilities = visibilities
         nvis = len(self._visibilities)
         if len(u) != nvis: 
@@ -176,21 +177,8 @@ class Visibilities:
         if not (isinstance(name, str) for name in names).all(): 
             raise TypeError('names must all be strings.')
         self._names = names
-        if len(energy_range) != 2: 
-            raise ValueError('energy range must be length 2.')
-        self._energy_range = energy_range
-        if center is not None and (not isinstance(center, SkyCoord) or not name.isscalar): 
-            raise ValueError('center must be a scalar SkyCoord.')           
-        self._center = center
-        if date_range is not None and (not isinstance(date_range, astropy.time.Time) or len(date_range) != 2): 
-            raise ValueError('date_range must be a length 2 astropy time object.')   
-        self._date_range = date_range
-        if observer_coordinate is not None and (not isinstance(observer_coordinate, SkyCoord) or not observer_coordinate.isscalar): 
-            raise ValueError('observer_coordinate must be a scalar SkyCoord.')  
-        self._observer_coordinate = observer_coordinate
-        if uncertainty is not None and (len(uncertainty) != nvis): 
-            raise ValueError('uncertainty must be the same length as visibilities.')
         self._uncertainty = uncertainty
+        self._meta = meta
 
     @property
     def visibilities(self): 
@@ -209,26 +197,30 @@ class Visibilities:
         return self._names
      
     @property
-    def energy_range(self): 
-        return self._energy_range 
-       
-    @property
-    def center(self): 
-        return self._center 
-             
-    @property
-    def date_range(self): 
-        return self._date_range 
-             
-    @property
-    def observer_coordinate(self): 
-        return self._observer_coordinate  
-             
-    @property
     def uncertainty(self): 
-        return self._uncertainty      
+        return self._uncertainty
 
+    @property
+    def meta(self): 
+        return self._meta
 
+    ################# Everything above is required by ABC, adding extra functionality below #################
+
+    @property
+    def amplitude(self):
+        pass
+   
+    @property
+    def amplitude_uncertainty(self):
+        pass
+
+    @property
+    def phase(self):
+        pass
+
+    @property
+    def phase_uncertainty(self):
+        pass
 
     def __repr__(self):
         r"""
@@ -263,3 +255,48 @@ class Visibilities:
             return True
         else:
             return False
+
+
+class Visibilities(VisibilitiesABC, VisibilitiesBase):
+    r"""
+    Hold a set of related visibilities and information.
+
+    Attributes
+    ----------
+    vis : `numpy.ndarray`
+        Array of N complex visibilities at coordinates in `uv`
+    u : `numpy.ndarray`
+        Array of `u` coordinates where visibilities will be evaluated
+    v : `numpy.ndarray`
+        Array of `v` coordinates where visibilities will be evaluated
+    center : `float` (x, y), optional
+        The x, y offset of phase center
+
+    """
+    @apu.quantity_input(u=1/u.arcsec, v=1/u.arcsec)
+    def __init__(self, visibilities, *, u, v, names, uncertainty=None, meta=None):
+        r"""
+        Initialise a new Visibility object.
+
+        Parameters
+        ----------
+        vis : `numpy.ndarray`
+            Array of N complex visibilities at coordinates in `uv`.
+        u : `numpy.ndarray`
+            Array of `u` coordinates where visibilities will be evaluated.
+        v : `numpy.ndarray`
+            Array of `v` coordinates where visibilities will be evaluated.
+        center :
+            Phase centre
+        """
+
+    nvis = len(visibilities)
+    if not uncertainty.isscalar or len(uncertainty) != nvis:
+        raise TypeError('uncertainty must be the same length as visibilities.')
+
+    if not isinstance(meta, VisMetaABC):
+        raise TypeError('Meta must be an instance of VisMetaABC.')
+    
+    super().__init__(visibilities, u, v, names, uncertainty=None, meta=None)
+
+
