@@ -155,7 +155,6 @@ class VisibilitiesBase(VisibilitiesBaseABC):
     @apu.quantity_input()
     def __init__(self,
                  visibilities: apu.Quantity,
-                 *,
                  u: apu.Quantity[1/apu.arcsec],
                  v: apu.Quantity[1/apu.arcsec],
                  names: Iterable[str],
@@ -175,7 +174,7 @@ class VisibilitiesBase(VisibilitiesBaseABC):
         center :
             Phase centre
         """
-        if not isinstance(visibilities, apu.Quantity) or not visibilities.isscalar:
+        if not isinstance(visibilities, apu.Quantity) or visibilities.isscalar:
             raise TypeError('visibilities must all be a non scalar Astropy quantity.')
         self._visibilities = visibilities
         nvis = len(self._visibilities)
@@ -187,9 +186,11 @@ class VisibilitiesBase(VisibilitiesBaseABC):
         self._v = v
         if len(names) != nvis: 
             raise ValueError('names must be the same length as visibilities.')
-        if not (isinstance(name, str) for name in names).all(): 
+        if not np.array(isinstance(name, str) for name in names).all(): 
             raise TypeError('names must all be strings.')
         self._names = names
+        if uncertainty is not None and not isinstance(uncertainty, apu.Quantity):
+            raise TypeError('uncertainty must be None or same type as visibilities.')
         self._uncertainty = uncertainty
         self._meta = meta
 
@@ -221,21 +222,23 @@ class VisibilitiesBase(VisibilitiesBaseABC):
 
     @property
     def amplitude(self):
-        return np.sqrt(np.real(visibilities) ** 2 + np.imag(visibilities) ** 2)
+        return np.sqrt(np.real(self.visibilities) ** 2 + np.imag(self.visibilities) ** 2)
    
     @property
-    def amplitude_uncertainty(self):
-        return np.sqrt((np.real(visibilities) / amplitude * np.real(uncertainty)) ** 2 
-                       + (np.imag(visibilities) / amplitude * np.imag(uncertainty)) ** 2 )
+    def amplitude_uncertainty(self): 
+        amplitude = self.amplitude
+        return np.sqrt((np.real(self.visibilities) / amplitude * np.real(self.uncertainty)) ** 2 
+                       + (np.imag(self.visibilities) / amplitude * np.imag(self.uncertainty)) ** 2 )
 
     @property
     def phase(self):
-        return (np.arctan2(np.imag(visibilities), np.real(visibilities)) * apu.rad).to(apu.deg)
+        return np.arctan2(np.imag(self.visibilities), np.real(self.visibilities)).to(apu.deg)
 
     @property
     def phase_uncertainty(self):
-        return (np.sqrt(np.imag(visibilities) ** 2 / amplitude ** 4 * np.real(uncertainty) ** 2 
-                        + np.real(visibilities) ** 2 / amplitude ** 4 * np.imag(uncertainty) ** 2 ) * apu.rad).to(apu.deg)
+        amplitude = self.amplitude
+        return (np.sqrt(np.imag(self.visibilities) ** 2 / amplitude ** 4 * np.real(self.uncertainty) ** 2 
+                        + np.real(self.visibilities) ** 2 / amplitude ** 4 * np.imag(self.uncertainty) ** 2 ) * apu.rad).to(apu.deg)
 
     def __repr__(self):
         r"""
@@ -246,7 +249,7 @@ class VisibilitiesBase(VisibilitiesBaseABC):
         `str`
 
         """
-        return f"{self.__class__.__name__}< {self.u.size}, {self.vis}>"
+        return f"{self.__class__.__name__}< {self.u.size}, {self.visibilities}>"
 
     def __eq__(self, other):
         r"""
@@ -322,7 +325,7 @@ class VisMeta(VisMetaABC, SimpleNamespace):
             raise ValueError('energy_range must be length 2.')          
         if not isinstance(time_range, Time) or len(time_range) != 2: 
             raise ValueError('time_range must be a length 2 astropy time object.')   
-        if not isinstance(center, SkyCoord) or not name.isscalar: 
+        if not isinstance(center, SkyCoord) or not center.isscalar: 
             raise ValueError('center must be a scalar SkyCoord.') 
         if not isinstance(observer_coordinate, SkyCoord) or not observer_coordinate.isscalar: 
             raise ValueError('observer_coordinate must be a scalar SkyCoord.')  
