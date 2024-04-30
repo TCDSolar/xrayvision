@@ -9,51 +9,17 @@ import abc
 import numpy as np
 from astropy.coordinates import SkyCoord
 import astropy.units as u
+from typing import Any
 
 
 __all__ = ['Visibilities']
 
-class VisibilitiesABC:
-    @property
-    @abc.abstractmethod
-    def amplitude(self) -> np.ndarray:
-        """
-        Amplitudes of the visibilities.
-        """
-    
+class VisibilitiesBaseABC:
     @property
     @abc.abstractmethod   
-    def phase(self) -> np.ndarray:
+    def visibilities(self) -> Iterable[u.Quantity]:
         """
-        Phases of the visibilities.
-        """
-    
-    @property
-    @abc.abstractmethod   
-    def center(self) -> SkyCoord:
-        """
-        Center of the image described by the visibilities.
-        """
-
-    @property
-    @abc.abstractmethod   
-    def observer_coordinate(self) -> SkyCoord:
-        """
-        Location of the observer.
-        """
-
-    @property
-    @abc.abstractmethod   
-    def energy_range(self) -> Iterable[u.Quantity]:
-        """
-        Energy range over which the visibilities are computed.
-        """
-
-    @property
-    @abc.abstractmethod   
-    def date_range(self) -> Iterable[astropy.time.Time]:
-        """
-        Centre time over which the visibilities are computed.
+        Complex numbers representing the visibilities.
         """
 
     @property
@@ -72,13 +38,6 @@ class VisibilitiesABC:
 
     @property
     @abc.abstractmethod   
-    def visibilities(self) -> Iterable[u.Quantity]:
-        """
-        Complex numbers representing the visibilities.
-        """
-
-    @property
-    @abc.abstractmethod   
     def names(self) -> Iterable[str]:
         """
         Names for each visibility. 
@@ -88,23 +47,87 @@ class VisibilitiesABC:
 
     @property
     @abc.abstractmethod   
-    def uncertainty(self) -> np.ndarray:
+    def uncertainty(self) -> Any:
         """
-        uncertainties on visibilities values. 
+        Uncertainties on visibilities values.
         """
 
     @property
     @abc.abstractmethod   
-    def phase_uncertainty(self) -> np.ndarray:
+    def meta(self) -> Any:
         """
-        uncertainties on phases of the visibilities. 
+        Meta data.
         """
-        
+
+class VisibilitiesABC(VisibilitiesBaseABC):
     @property
     @abc.abstractmethod   
+    def uncertainty(self) -> Iterable[u.Quantity]:
+        """
+        Uncertainties on visibilities values.
+        """
+
+    @property
+    @abc.abstractmethod
+    def amplitude(self) -> np.ndarray:
+        """
+        Amplitudes of the visibilities.
+        """
+    
+    @property
+    @abc.abstractmethod   
+    def phase(self) -> np.ndarray:
+        """
+        Phases of the visibilities.
+        """
+    @property
+    @abc.abstractmethod
     def amplitude_uncertainty(self) -> np.ndarray:
         """
-        uncertainties on amplitudes of the visibilities. 
+        Amplitude uncertainty of the visibilities.
+        """
+    
+    @property
+    @abc.abstractmethod   
+    def phase_uncertainty(self) -> np.ndarray:
+        """
+        Phase uncertainty of the visibilities.
+        """
+
+    @property
+    @abc.abstractmethod   
+    def meta(self) -> VisMetaABC:
+        """
+        Meta data.
+        """
+
+class VisMetaABC: 
+    @property
+    @abc.abstractmethod   
+    def energy_range(self) -> Iterable[u.Quantity]:
+        """
+        Energy range over which the visibilities are computed.
+        """
+
+    @property
+    @abc.abstractmethod   
+    def date_range(self) -> Iterable[astropy.time.Time]:
+        """
+        Centre time over which the visibilities are computed.
+        """ 
+         
+    @property
+    @abc.abstractmethod   
+    def center(self) -> SkyCoord:
+        """
+        Center of the image described by the visibilities.
+        """
+
+    @property
+    @abc.abstractmethod   
+    def observer_coordinate(self) -> SkyCoord:
+        """
+        Location of the observer.
         """
 
 
