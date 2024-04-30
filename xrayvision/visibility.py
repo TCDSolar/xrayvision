@@ -208,19 +208,21 @@ class VisibilitiesBase(VisibilitiesBaseABC):
 
     @property
     def amplitude(self):
-        pass
+        return np.sqrt(np.real(visibilities) ** 2 + np.imag(visibilities) ** 2)
    
     @property
     def amplitude_uncertainty(self):
-        pass
+        return np.sqrt((np.real(visibilities) / amplitude * np.real(uncertainty)) ** 2 
+                       + (np.imag(visibilities) / amplitude * np.imag(uncertainty)) ** 2 )
 
     @property
     def phase(self):
-        pass
+        return (np.arctan2(np.imag(visibilities), np.real(visibilities)) * u.rad).to(u.deg)
 
     @property
     def phase_uncertainty(self):
-        pass
+        return (np.sqrt(np.imag(visibilities) ** 2 / amplitude ** 4 * np.real(uncertainty) ** 2 
+                        + np.real(visibilities) ** 2 / amplitude ** 4 * np.imag(uncertainty) ** 2 ) * u.rad).to(u.deg)
 
     def __repr__(self):
         r"""
