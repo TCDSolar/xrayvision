@@ -152,8 +152,15 @@ class VisibilitiesBase(VisibilitiesBaseABC):
         The x, y offset of phase center
 
     """
-    @apu.quantity_input(u=1/apu.arcsec, v=1/apu.arcsec)
-    def __init__(self, visibilities, *, u, v, names, uncertainty=None, meta=None):
+    @apu.quantity_input()
+    def __init__(self,
+                 visibilities: apu.Quantity,
+                 *,
+                 u: apu.Quantity[1/apu.arcsec],
+                 v: apu.Quantity[1/apu.arcsec],
+                 names: Iterable[str],
+                 uncertainty: Any = None,
+                 meta: Any = None):
         r"""
         Initialise a new Visibility object.
 
