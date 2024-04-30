@@ -10,6 +10,7 @@ import numpy as np
 from astropy.coordinates import SkyCoord
 import astropy.units as u
 from typing import Any
+from types import SimpleNamespace
 
 
 __all__ = ['Visibilities']
@@ -111,7 +112,7 @@ class VisMetaABC:
 
     @property
     @abc.abstractmethod   
-    def date_range(self) -> Iterable[astropy.time.Time]:
+    def time_range(self) -> Iterable[astropy.time.Time]:
         """
         Centre time over which the visibilities are computed.
         """ 
@@ -300,5 +301,29 @@ class Visibilities(VisibilitiesABC, VisibilitiesBase):
         raise TypeError('Meta must be an instance of VisMetaABC.')
     
     super().__init__(visibilities, u, v, names, uncertainty=None, meta=None)
+
+class VisMeta(VisMetaABC, SimpleNamespace):
+     @apu.quantity_input(energy_range=u.keV)
+    def __init__(self, energy_range, time_range, center, observer_coordinate, **kwargs):
+        if len(energy_range) != 2: 
+            raise ValueError('energy_range must be length 2.')          
+        if not isinstance(time_range, astropy.time.Time) or len(time_range) != 2: 
+            raise ValueError('time_range must be a length 2 astropy time object.')   
+        if not isinstance(center, SkyCoord) or not name.isscalar: 
+            raise ValueError('center must be a scalar SkyCoord.') 
+        if not isinstance(observer_coordinate, SkyCoord) or not observer_coordinate.isscalar: 
+            raise ValueError('observer_coordinate must be a scalar SkyCoord.')  
+        
+        kwargs['energy_range'] = energy_range
+        kwargs['time_range'] = time_range
+        kwargs['center'] = center
+        kwargs['observer_coordinate'] = observer_coordinate
+        super().__init__(**kwargs)
+    
+
+
+
+
+
 
 
