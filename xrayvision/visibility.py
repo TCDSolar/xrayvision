@@ -219,7 +219,7 @@ class VisibilitiesBase(VisibilitiesBaseABC):
     @property
     def amplitude_uncertainty(self):
         return np.sqrt((np.real(visibilities) / amplitude * np.real(uncertainty)) ** 2 
-                       + (np.imag(visibilities) / amplitude * np.imag(uncertainty)) ** 2 )
+                       + (np.imag(visibilities) / amplitude * np.imag(uncertainty)) ** 2)
 
     @property
     def phase(self):
@@ -228,7 +228,24 @@ class VisibilitiesBase(VisibilitiesBaseABC):
     @property
     def phase_uncertainty(self):
         return (np.sqrt(np.imag(visibilities) ** 2 / amplitude ** 4 * np.real(uncertainty) ** 2 
-                        + np.real(visibilities) ** 2 / amplitude ** 4 * np.imag(uncertainty) ** 2 ) * apu.rad).to(apu.deg)
+                        + np.real(visibilities) ** 2 / amplitude ** 4 * np.imag(uncertainty) ** 2) * apu.rad).to(apu.deg)
+
+    def __getitem__(self, item):
+        """Allow slicing/indexing by name, rather than integer."""
+        if isinstance(item, str):
+            new_item = np.where(self.names == item)[0][0]
+        elif isinstance(item, slice):
+            start = np.where(self.names == str(item.start))[0][0]
+            stop = np.where(self.names == str(item.stop))[0][0]
+            new_item = slice(start, stop, item.step)
+        else:
+            new_item = np.array([np.where(self.names == str(name))[0][0] for name in item])
+        new_vis = self.visibilities[new_item]
+        new_u = self.u[new_item]
+        new_v = self.v[new_item]
+        new_names = self.names[new_item]
+        new_uncertainty = self.uncertainty[new_item] if isinstance(self.uncertainty, type(self.visibilities) else self.uncertainty
+        return type(self)(new_visibilites, new_u, new_v, new_names, uncertainty=new_uncertainty, meta=new_meta)
 
     def __repr__(self):
         r"""
@@ -297,7 +314,6 @@ class Visibilities(VisibilitiesABC, VisibilitiesBase):
         center :
             Phase centre
         """
-
         nvis = len(visibilities)
         if not uncertainty.isscalar or len(uncertainty) != nvis:
             raise TypeError('uncertainty must be the same length as visibilities.')
@@ -325,11 +341,3 @@ class VisMeta(VisMetaABC, SimpleNamespace):
         kwargs['center'] = center
         kwargs['observer_coordinate'] = observer_coordinate
         super().__init__(**kwargs)
-    
-
-
-
-
-
-
-
