@@ -331,7 +331,7 @@ class VisibilitiesBase(VisibilitiesBaseABC):
             return False
 
 
-class Visibilities(VisibilitiesABC, VisibilitiesBase):
+class Visibilities(VisibilitiesBase,VisibilitiesABC):
     r"""
     Hold a set of related visibilities and information.
 
@@ -347,8 +347,8 @@ class Visibilities(VisibilitiesABC, VisibilitiesBase):
         The x, y offset of phase center
 
     """
-    @apu.quantity_input(u=1/apu.arcsec, v=1/apu.arcsec)
-    def __init__(self, visibilities, *, u, v, names, uncertainty=None, meta=None):
+    #@apu.quantity_input(u=1/apu.arcsec, v=1/apu.arcsec)
+    def __init__(self, visibilities, u, v, names, uncertainty=None, meta=None):
         r"""
         Initialise a new Visibility object.
 
@@ -364,13 +364,13 @@ class Visibilities(VisibilitiesABC, VisibilitiesBase):
             Phase centre
         """
         nvis = len(visibilities)
-        if not uncertainty.isscalar or len(uncertainty) != nvis:
+        if uncertainty.isscalar or len(uncertainty) != nvis: 
             raise TypeError('uncertainty must be the same length as visibilities.')
 
         if not isinstance(meta, VisMetaABC):
             raise TypeError('Meta must be an instance of VisMetaABC.')
     
-        super().__init__(visibilities, u, v, names, uncertainty=None, meta=None)
+        super().__init__(visibilities, u, v, names, uncertainty=uncertainty, meta=meta)
 
 
 class VisMeta(VisMetaABC, SimpleNamespace):
