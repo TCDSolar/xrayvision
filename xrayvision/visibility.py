@@ -6,16 +6,18 @@ certain spacecraft or instruments
 """
 
 import abc
-import numpy as np
-from astropy.coordinates import SkyCoord
-import astropy.units as apu
-from typing import Any
-from types import SimpleNamespace
 from collections.abc import Iterable
+from types import SimpleNamespace
+from typing import Any, Union
+
+import astropy.units as apu
+import numpy as np
+import xarray
+from astropy.coordinates import SkyCoord
 from astropy.time import Time
 
 
-__all__ = ['Visibilities', 'VisMeta']
+__all__ = ['Visibilities', 'VisibilitiesBase', 'VisMeta']
 
 
 class VisMetaABC(abc.ABC): 
@@ -158,8 +160,11 @@ class VisibilitiesBase(VisibilitiesBaseABC):
                  u: apu.Quantity[1/apu.arcsec],
                  v: apu.Quantity[1/apu.arcsec],
                  names: Iterable[str],
-                 uncertainty: Any = None,
-                 meta: Any = None):
+                 uncertainty: Union[apu.Quantity, None],
+                 meta: Any = None,
+                 dims: Iterable[str] = ("uv",),
+                 coords: dict = {}):
+
         r"""
         Initialise a new Visibility object.
 
@@ -176,69 +181,103 @@ class VisibilitiesBase(VisibilitiesBaseABC):
         """
         if not isinstance(visibilities, apu.Quantity) or visibilities.isscalar:
             raise TypeError('visibilities must all be a non scalar Astropy quantity.')
-        self._visibilities = visibilities
-        nvis = len(self._visibilities)
+        nvis = len(visibilities)
         if len(u) != nvis: 
             raise ValueError('u must be the same length as visibilities.')
-        self._u = u
         if len(v) != nvis: 
             raise ValueError('v must be the same length as visibilities.')
-        self._v = v
         if len(names) != nvis: 
             raise ValueError('names must be the same length as visibilities.')
         if not np.array(isinstance(name, str) for name in names).all(): 
             raise TypeError('names must all be strings.')
-        self._names = names
         if uncertainty is not None and not isinstance(uncertainty, apu.Quantity):
             raise TypeError('uncertainty must be None or same type as visibilities.')
-        self._uncertainty = uncertainty
-        self._meta = meta
+        uv_name = "uv"
+        if uv_name not in dims:
+            raise ValueError(f"dims must contain '{uv_name}'.")
+        data = {"data": (dims, visibilities.value)}
+        if uncertainty is not None:
+            data["uncertainty"] = (dims, uncertainty.to_value(visibilities.unit))
+        units = dict([(key, value[1].unit) for key, value in coords.items()])
+        units["data"] = visibilities.unit
+        units["u"] = u.unit
+        units["v"] = v.unit
+        coords["u"] = ([uv_name], u)
+        coords["v"] = ([uv_name], v)
+        coords["names"] = ([uv_name], names)
+        attrs = {"units": units, "meta": meta}
+        self._data = xarray.Dataset(data, coords=coords, attrs=attrs)
 
     @property
     def visibilities(self): 
-        return self._visibilities
+        return apu.Quantity(self._data["data"], unit=self._data.attrs["units"]["data"])
     
     @property
     def u(self): 
-        return self._u
-    
+        return apu.Quantity(self._data.coords["u"].values, unit=self._data.attrs["units"]["u"])
+
     @property
     def v(self): 
-        return self._v
+        return apu.Quantity(self._data.coords["v"].values, unit=self._data.attrs["units"]["v"])
     
     @property
     def names(self): 
-        return self._names
+        return self._data.coords["names"].values
      
     @property
-    def uncertainty(self): 
-        return self._uncertainty
+    def uncertainty(self):
+        unc_name = "uncertainty"
+        return apu.Quantity(self._data[unc_name], unit=self._data.attrs["units"]["data"]) if unc_name in self._data.keys() else None
 
     @property
     def meta(self): 
-        return self._meta
+        return self._data.attrs["meta"]
 
     ################# Everything above is required by ABC, adding extra functionality below #################
 
+    def _build_quantity(self, label, unit_label=None):
+        if unit_label is None:
+            unit_label = label
+        return apu.Quantity(self._data[label], unit=self._data.attrs["units"][unit_label])
+
     @property
     def amplitude(self):
-        return np.sqrt(np.real(self.visibilities) ** 2 + np.imag(self.visibilities) ** 2)
+        label = "amplitude"
+        unit_label = label if label in self._data.attrs["units"].keys() else "data"
+        if label in self._data.keys():
+            return self._build_quantity(label, unit_label=unit_label)
+        else:
+            return np.sqrt(np.real(self.visibilities) ** 2 + np.imag(self.visibilities) ** 2)
    
     @property
     def amplitude_uncertainty(self): 
-        amplitude = self.amplitude
-        return np.sqrt((np.real(self.visibilities) / amplitude * np.real(self.uncertainty)) ** 2 
-                       + (np.imag(self.visibilities) / amplitude * np.imag(self.uncertainty)) ** 2 )
+        label = "amplitude_uncertainty"
+        unit_label = label if label in self._data.attrs["units"].keys() else "data"
+        if label in self._data.keys():
+            return self._build_quantity(label, unit_label=unit_label)
+        else:
+            amplitude = self.amplitude
+            return np.sqrt((np.real(self.visibilities) / amplitude * np.real(self.uncertainty)) ** 2 
+                           + (np.imag(self.visibilities) / amplitude * np.imag(self.uncertainty)) ** 2 )
 
     @property
     def phase(self):
-        return np.arctan2(np.imag(self.visibilities), np.real(self.visibilities)).to(apu.deg)
+        label = "phase"
+        if label in self._data.keys():
+            return self._build_quantity(label)
+        else:
+            return np.arctan2(np.imag(self.visibilities), np.real(self.visibilities)).to(apu.deg)
 
     @property
     def phase_uncertainty(self):
-        amplitude = self.amplitude
-        return (np.sqrt(np.imag(self.visibilities) ** 2 / amplitude ** 4 * np.real(self.uncertainty) ** 2 
-                        + np.real(self.visibilities) ** 2 / amplitude ** 4 * np.imag(self.uncertainty) ** 2 ) * apu.rad).to(apu.deg)
+        label = "phase_uncertainty"
+        unit_label = label if label in self._data.attrs["units"].keys() else "phase"
+        if label in self._data.keys():
+            return self._build_quantity(label, unit_label=unit_label)
+        else:
+            amplitude = self.amplitude
+            return (np.sqrt(np.imag(self.visibilities) ** 2 / amplitude ** 4 * np.real(self.uncertainty) ** 2 
+                            + np.real(self.visibilities) ** 2 / amplitude ** 4 * np.imag(self.uncertainty) ** 2 ) * apu.rad).to(apu.deg)
 
     def __getitem__(self, item):
         """Allow slicing/indexing by name, rather than integer."""
@@ -254,7 +293,7 @@ class VisibilitiesBase(VisibilitiesBaseABC):
         new_u = self.u[new_item]
         new_v = self.v[new_item]
         new_names = self.names[new_item]
-        new_uncertainty = self.uncertainty[new_item] if isinstance(self.uncertainty, type(self.visibilities) else self.uncertainty
+        new_uncertainty = self.uncertainty[new_item] if isinstance(self.uncertainty, type(self.visibilities)) else self.uncertainty
         return type(self)(new_visibilites, new_u, new_v, new_names, uncertainty=new_uncertainty, meta=new_meta)
 
     def __repr__(self):
@@ -335,9 +374,12 @@ class Visibilities(VisibilitiesABC, VisibilitiesBase):
 
 
 class VisMeta(VisMetaABC, SimpleNamespace):
-    @apu.quantity_input(energy_range=apu.keV)
-    def __init__(self, energy_range, time_range, center, observer_coordinate, **kwargs):
-        if len(energy_range) != 2: 
+    def __init__(self, **kwargs):
+        energy_range = kwargs.get("energy_range", None)
+        time_range = kwargs.get("time_range", None)
+        center_range = kwargs.get("center", None)
+        observer_coordinate = kwargs.get("observer_coordinate", None)
+        if not isinstance(energy_range, apu.Quantity) or len(energy_range) != 2: 
             raise ValueError('energy_range must be length 2.')          
         if not isinstance(time_range, Time) or len(time_range) != 2: 
             raise ValueError('time_range must be a length 2 astropy time object.')   
@@ -345,9 +387,4 @@ class VisMeta(VisMetaABC, SimpleNamespace):
             raise ValueError('center must be a scalar SkyCoord.') 
         if not isinstance(observer_coordinate, SkyCoord) or not observer_coordinate.isscalar: 
             raise ValueError('observer_coordinate must be a scalar SkyCoord.')  
-        
-        kwargs['energy_range'] = energy_range
-        kwargs['time_range'] = time_range
-        kwargs['center'] = center
-        kwargs['observer_coordinate'] = observer_coordinate
         super().__init__(**kwargs)
