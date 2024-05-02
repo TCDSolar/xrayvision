@@ -279,23 +279,6 @@ class VisibilitiesBase(VisibilitiesBaseABC):
             return (np.sqrt(np.imag(self.visibilities) ** 2 / amplitude ** 4 * np.real(self.uncertainty) ** 2 
                             + np.real(self.visibilities) ** 2 / amplitude ** 4 * np.imag(self.uncertainty) ** 2 ) * apu.rad).to(apu.deg)
 
-    def __getitem__(self, item):
-        """Allow slicing/indexing by name, rather than integer."""
-        if isinstance(item, str):
-            new_item = np.where(self.names == item)[0][0]
-        elif isinstance(item, slice):
-            start = np.where(self.names == str(item.start))[0][0]
-            stop = np.where(self.names == str(item.stop))[0][0]
-            new_item = slice(start, stop, item.step)
-        else:
-            new_item = np.array([np.where(self.names == str(name))[0][0] for name in item])
-        new_vis = self.visibilities[new_item]
-        new_u = self.u[new_item]
-        new_v = self.v[new_item]
-        new_names = self.names[new_item]
-        new_uncertainty = self.uncertainty[new_item] if isinstance(self.uncertainty, type(self.visibilities)) else self.uncertainty
-        return type(self)(new_visibilites, new_u, new_v, new_names, uncertainty=new_uncertainty, meta=new_meta)
-
     def __repr__(self):
         r"""
         Return a printable representation of the visibility.
