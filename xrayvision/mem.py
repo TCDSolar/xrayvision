@@ -76,10 +76,10 @@ def get_fourier_matrix(vis, shape=[64, 64] * apu.pix, pixel_size=[4.0312500, 4.0
     -------
     The complex Fourier matrix
     """
-    m, n = shape.to_value("pix")
+    m, n = shape.to('pix')
     y = generate_xy(m, 0 * apu.arcsec, pixel_size[1])
     x = generate_xy(n, 0 * apu.arcsec, pixel_size[0])
-    x, y = np.meshgrid(x, y)
+    x, y = np.meshgrid(x, y, indexing='ij')
     uv = np.vstack([vis.u, vis.v])
     # Check apu are correct for exp need to be dimensionless and then remove apu for speed
     if (vis.u * x[0, 0]).unit == apu.dimensionless_unscaled and (vis.v * y[0, 0]).unit == apu.dimensionless_unscaled:

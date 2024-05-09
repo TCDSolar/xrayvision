@@ -12,7 +12,7 @@ import logging
 import numpy as np
 from astropy.convolution import Gaussian2DKernel
 from scipy import signal
-from scipy.ndimage.interpolation import shift
+from scipy.ndimage import shift
 from sunpy.map.map_factory import Map
 
 from xrayvision.imaging import vis_psf_image, vis_to_map
@@ -59,7 +59,8 @@ __common_clean_doc__ = r"""
     """
 
 
-def clean(dirty_map, dirty_beam, pixel=None, clean_beam_width=4.0, gain=0.1, thres=0.01, niter=5000):
+def clean(dirty_map, dirty_beam, pixel_size=None, clean_beam_width=4.0,
+          gain=0.1, thres=0.01, niter=5000):
     r"""
     Clean the image using Hogbom's original method.
 
@@ -74,7 +75,7 @@ def clean(dirty_map, dirty_beam, pixel=None, clean_beam_width=4.0, gain=0.1, thr
         The dirty map to be cleaned 2D
     dirty_beam : `numpy.ndarray`
         The dirty beam or point spread function (PSF) 2D must
-    pixel :
+    pixel_size :
         Size of a pixel
     """
     # Ensure both beam and map are even/odd on same axes
@@ -82,9 +83,9 @@ def clean(dirty_map, dirty_beam, pixel=None, clean_beam_width=4.0, gain=0.1, thr
     #     raise ValueError('')
     pad = [0 if x % 2 == 0 else 1 for x in dirty_map.shape]
 
-    # Assume beam, map center is in middle
-    beam_center = (dirty_beam.shape[0] - 1) / 2.0, (dirty_beam.shape[1] - 1) / 2.0
-    map_center = (dirty_map.shape[0] - 1) / 2.0, (dirty_map.shape[1] - 1) / 2.0
+    # Assume beam, map phase_centre is in middle
+    beam_center = (dirty_beam.shape[0] - 1)/2.0, (dirty_beam.shape[1] - 1)/2.0
+    map_center = (dirty_map.shape[0] - 1)/2.0, (dirty_map.shape[1] - 1)/2.0
 
     # Work out size of map for slicing over-sized dirty beam
     shape = dirty_map.shape
@@ -132,26 +133,28 @@ def clean(dirty_map, dirty_beam, pixel=None, clean_beam_width=4.0, gain=0.1, thr
 
     if clean_beam_width != 0.0:
         # Convert from FWHM to StDev   FWHM = sigma*(8ln2)**0.5 = 2.3548200450309493
-        x_stdev = (clean_beam_width / pixel[0] / 2.3548200450309493).value
-        y_stdev = (clean_beam_width / pixel[1] / 2.3548200450309493).value
-        clean_beam = Gaussian2DKernel(x_stdev, y_stdev, x_size=dirty_beam.shape[1], y_size=dirty_beam.shape[0]).array
+        x_stdev = (clean_beam_width / pixel_size[0] / 2.3548200450309493).value
+        y_stdev = (clean_beam_width / pixel_size[1] / 2.3548200450309493).value
+        clean_beam = Gaussian2DKernel(x_stdev, y_stdev, x_size=dirty_beam.shape[1],
+                                      y_size=dirty_beam.shape[0]).array
         # Normalise beam
         clean_beam = clean_beam / clean_beam.max()
 
         # Convolve clean beam with model and scale
-        clean_map = signal.convolve2d(model, clean_beam / clean_beam.sum(), mode="same") / (pixel[0] * pixel[1])
+        clean_map = (signal.convolve2d(model, clean_beam/clean_beam.sum(), mode='same')
+                     / (pixel_size[0] * pixel_size[1]))
 
         # Scale residual map with model and scale
-        dirty_map = dirty_map / clean_beam.sum() / (pixel[0] * pixel[1])
-        return clean_map + dirty_map, model, dirty_map
+        dirty_map = dirty_map / clean_beam.sum() / (pixel_size[0] * pixel_size[1])
+        return clean_map+dirty_map, model, dirty_map
 
     return model + dirty_map, model, dirty_map
 
 
-clean.__doc__ += __common_clean_doc__
+clean.__doc__ += __common_clean_doc__  # type: ignore
 
 
-def vis_clean(vis, shape, pixel, clean_beam_width=4.0, niter=5000, map=True, gain=0.1, **kwargs):
+def vis_clean(vis, shape, pixel_size, clean_beam_width=4.0, niter=5000, map=True, gain=0.1, **kwargs):
     r"""
     Clean the visibilities using Hogbom's original method.
 
@@ -163,25 +166,24 @@ def vis_clean(vis, shape, pixel, clean_beam_width=4.0, niter=5000, map=True, gai
         The visibilities to clean
     shape :
         Size of map
-    pixel :
+    pixel_size :
         Size of pixel
     map : `boolean` optional
         Return an `sunpy.map.Map` by default or data only if `False`
     """
 
-    dirty_map = vis_to_map(vis, shape=shape, pixel_size=pixel, **kwargs)
-    dirty_beam_shape = [x.value * 3 + 1 if x.value * 3 % 2 == 0 else x.value * 3 for x in shape] * shape.unit
-    dirty_beam = vis_psf_image(vis, shape=dirty_beam_shape, pixel_size=pixel, **kwargs)
-    clean_map, model, residual = clean(
-        dirty_map.data, dirty_beam.value, pixel=pixel, gain=gain, clean_beam_width=clean_beam_width, niter=niter
-    )
+    dirty_map = vis_to_map(vis, shape=shape, pixel_size=pixel_size, **kwargs)
+    dirty_beam_shape = [x.value*3 + 1 if x.value*3 % 2 == 0 else x.value*3 for x in shape]*shape.unit
+    dirty_beam = vis_psf_image(vis, shape=dirty_beam_shape, pixel_size=pixel_size, **kwargs)
+    clean_map, model, residual = clean(dirty_map.data, dirty_beam.value, pixel_size=pixel_size,
+                                       clean_beam_width=clean_beam_width, gain=gain, niter=niter)
     if not map:
         return clean_map, model, residual
 
     return [Map((data, dirty_map.meta)) for data in (clean_map, model, residual)]
 
 
-vis_clean.__doc__ += __common_clean_doc__
+vis_clean.__doc__ += __common_clean_doc__  # type: ignore
 
 
 __common_ms_clean_doc__ = r"""
@@ -331,7 +333,7 @@ def ms_clean(dirty_map, dirty_beam, pixel, scales=None, clean_beam_width=4.0, ga
     else:
         logger.info("Max iterations reached")
 
-    # Convolve model with clean beam  B_G * I^M
+    # Convolve model with clean beam B_G * I^M
     if clean_beam_width != 0.0:
         x_stdev = (clean_beam_width / pixel[0] / (2.0 * np.sqrt(2.0 * np.log(2.0)))).value
         y_stdev = (clean_beam_width / pixel[1] / (2.0 * np.sqrt(2.0 * np.log(2.0)))).value
@@ -350,7 +352,7 @@ def ms_clean(dirty_map, dirty_beam, pixel, scales=None, clean_beam_width=4.0, ga
     return model, scaled_residuals.sum(axis=2)
 
 
-ms_clean.__doc__ += __common_ms_clean_doc__
+ms_clean.__doc__ += __common_ms_clean_doc__  # type: ignore
 
 
 def vis_ms_clean(vis, shape, pixel, scales=None, clean_beam_width=4.0, gain=0.1, thres=0.01, niter=5000, map=True):

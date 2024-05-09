@@ -41,10 +41,10 @@ measured visibilities in f can the original map a be recovered?
 
     data = make_data()
 
-    full_uv = transform.generate_uv(65)
+    full_uv = transform.generate_uv(65*u.pix)
 
-    uu = transform.generate_uv(33)
-    vv = transform.generate_uv(33)
+    uu = transform.generate_uv(33*u.pix)
+    vv = transform.generate_uv(33*u.pix)
 
     uu, vv = np.meshgrid(uu, vv)
 
@@ -53,7 +53,7 @@ measured visibilities in f can the original map a be recovered?
 
     full_vis = transform.dft_map(data, u=uv[0,:], v=uv[1,:])
 
-    res = transform.idft_map(full_vis, u=uv[0,:], v=uv[1,:], shape=(33, 33))
+    res = transform.idft_map(full_vis, u=uv[0,:], v=uv[1,:], weights=1/33**2, shape=(33, 33)*u.pix)
     # assert np.allclose(data, res)
 
     # Generate log spaced radial u, v sampeling
@@ -77,9 +77,10 @@ measured visibilities in f can the original map a be recovered?
     sub_vis = transform.dft_map(data, u=sub_uv[0,:], v=sub_uv[1,:])
 
     psf1 = transform.idft_map(np.full(sub_vis.size, 1), u=sub_uv[0,:], v=sub_uv[1,:],
-                              shape=(65, 65))
+                              weights=1/sub_vis.size, shape=(65, 65)*u.pix)
 
-    sub_res = transform.idft_map(sub_vis, u=sub_uv[0,:], v=sub_uv[1,:], shape=(65, 65))
+    sub_res = transform.idft_map(sub_vis, u=sub_uv[0,:], v=sub_uv[1,:],
+                                 weights=1/sub_vis.size, shape=(65, 65)*u.pix)
 
     xp = np.round(x * 33 + 33/2 - 0.5 + 16).astype(int)
     yp = np.round(y * 33 + 33/2 - 0.5 + 16).astype(int)

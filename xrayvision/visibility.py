@@ -1,5 +1,5 @@
 """
-Modules contains visibility related classes.
+Module contains visibility related classes.
 
 This contains classes to hold general visibilities and specialised classes hold visibilities from
 certain spacecraft or instruments
@@ -407,59 +407,43 @@ class VisMeta(VisMetaABC, dict):
         return instr
 
 
-class BaseVisibility:
-    r"""
-    Base visibility containing bare essential fields, u, v, and complex vis
-    """
-
-    @apu.quantity_input(u=1 / apu.arcsec, v=1 / apu.arcsec, center=apu.arcsec)
-    def __int__(self, u, v, vis, center=(0, 0) * apu.arcsec):
-        self.u = u
-        self.v = v
-        self.vis = vis
-        self.center = center
 
 
 class Visibility:
     r"""
     Hold a set of related visibilities and information.
 
-    Attributes
-    ----------
-    vis : `numpy.ndarray`
-        Array of N complex visibilities at coordinates in `uv`
-    u : `numpy.ndarray`
-        Array of `u` coordinates where visibilities will be evaluated
-    v : `numpy.ndarray`
-        Array of `v` coordinates where visibilities will be evaluated
-    center : `float` (x, y), optional
-        The x, y offset of phase center
 
     """
-
-    @apu.quantity_input(uv=1 / apu.arcsec, offset=apu.arcsec, center=apu.arcsec, pixel_size=apu.arcsec)
-    def __init__(self, vis, *, u, v, offset=(0.0, 0.0) * apu.arcsec, center=(0.0, 0.0) * apu.arcsec):
+    @apu.quantity_input
+    def __init__(self, vis, *, u: Quantity[1/apu.arcsec], v: Quantity[1/apu.arcsec],
+                 offset: Optional[Quantity[apu.arcsec]] = (0., 0.) * apu.arcsec,
+                 phase_centre: Optional[Quantity[apu.arcsec]] = (0., 0.) * apu.arcsec) -> None:
         r"""
-        Initialise a new Visibility object.
+        Generic Visibility object.
 
         Parameters
         ----------
-        vis : `numpy.ndarray`
-            Array of N complex visibilities at coordinates in `uv`.
-        u : `numpy.ndarray`
-            Array of `u` coordinates where visibilities will be evaluated.
-        v : `numpy.ndarray`
-            Array of `v` coordinates where visibilities will be evaluated.
-        center :
-            Phase centre
-        """
-        self.u = u
-        self.v = v
-        self.vis = vis
-        self.center = center
-        self.offset = offset
+        vis:
+            Array of N complex visibilities sampled at the `u`, `v` coordinates.
+        u:
+            Array of `u` coordinates where visibilities are sampled.
+        v:
+            Array of `v` coordinates where visibilities are sampled.
+        phase_centre:
+            Phase centre of the visibility, defaults to (0,0).
+        offset:
+            Offset of the phase_centre visibility, defaults to (0,0).
 
-    def __repr__(self):
+
+        """
+        self.u: Quantity[1/apu.arcsec] = u
+        self.v: Quantity[1/apu.arcsec] = v
+        self.vis: Quantity = vis
+        self.phase_centre: Quantity[apu.arcsec] = phase_centre
+        self.offset: Quantity[apu.arcsec] = offset
+
+    def __repr__(self) -> str:
         r"""
         Return a printable representation of the visibility.
 
@@ -470,7 +454,7 @@ class Visibility:
         """
         return f"{self.__class__.__name__}< {self.u.size}, {self.vis}>"
 
-    def __eq__(self, other):
+    def __eq__(self, other) -> bool:
         r"""
         Equality for Visibility class
 
@@ -490,5 +474,5 @@ class Visibility:
 
         if all(props_equal):
             return True
-        else:
-            return False
+
+        return False

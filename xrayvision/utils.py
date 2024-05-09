@@ -1,7 +1,8 @@
 import logging
+from typing import Union, Optional
 
 
-def get_logger(name, level=logging.WARNING):
+def get_logger(name: str, level: Optional[Union[int, str]] = logging.WARNING) -> logging.Logger:
     """
     Return a configured logger instance.
 
@@ -18,12 +19,11 @@ def get_logger(name, level=logging.WARNING):
         Configured logger
     """
     logger = logging.getLogger(name)
-    logger.setLevel(level)
+    logger.setLevel(level)  # type: ignore
     handler = logging.StreamHandler()
-    handler.setLevel(level)
-    formatter = logging.Formatter(
-        "%(asctime)s %(levelname)s %(name)s %(lineno)s: %(message)s", datefmt="%Y-%m-%dT%H:%M:%SZ"
-    )
+    handler.setLevel(level)  # type: ignore
+    formatter = logging.Formatter('%(asctime)s %(levelname)s %(name)s %(lineno)s: %(message)s',
+                                  datefmt='%Y-%m-%dT%H:%M:%SZ')
     handler.setFormatter(formatter)
     logger.addHandler(handler)
     return logger

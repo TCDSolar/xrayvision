@@ -1,47 +1,43 @@
+from typing import Optional
+
 import astropy.units as apu
 import numpy as np
-from sunpy.map import Map
+from astropy.units import Quantity
+from sunpy.map import GenericMap, Map
 
 from xrayvision.transform import dft_map, idft_map
 from xrayvision.visibility import Visibility
 
-__all__ = [
-    "get_weights",
-    "validate_and_expand_kwarg",
-    "vis_psf_image",
-    "vis_psf_map",
-    "vis_to_image",
-    "vis_to_map",
-    "generate_header",
-    "image_to_vis",
-    "map_to_vis",
-]
+__all__ = ['get_weights', 'validate_and_expand_kwarg', 'vis_psf_image', 'vis_psf_map',
+           'vis_to_image', 'vis_to_map', 'generate_header', 'image_to_vis', 'map_to_vis']
 
 ANGLE = apu.get_physical_type(apu.deg)
+WEIGHT_SCHEMES = ('natural', 'uniform')
 
 
-def get_weights(vis, natural=True, norm=True):
+def get_weights(vis: Visibility, scheme: Optional[str] = 'natural', norm: Optional[bool] = True) -> np.ndarray:
     r"""
-    Return natural spatial frequency weight factor for each visibility.
+    Return spatial frequency weight factors for each visibility.
 
     Defaults to use natural weighting scheme given by `(vis.u**2 + vis.v**2)^{1/2}`.
 
     Parameters
     ----------
-    vis : `xrayvision.visibility.Visibility`
+    vis :
         Input visibilities
-    natural : `boolean` optional
-        Use natural or uniform weighting scheme
-    norm : `boolean`
-        Normalise the weighs before returning
+    scheme :
+        Weighting scheme to use, defaults to natural
+    norm :
+        Normalise the weighs before returning, defaults to True.
 
     Returns
     -------
-    `weights`
 
     """
+    if scheme not in WEIGHT_SCHEMES:
+        raise ValueError(f'Invalid weighting scheme {scheme}, must be one of: {WEIGHT_SCHEMES}')
     weights = np.sqrt(vis.u**2 + vis.v**2).value
-    if natural:
+    if scheme == 'natural':
         weights = np.ones_like(vis.vis, dtype=float)
 
     if norm:
@@ -49,8 +45,8 @@ def get_weights(vis, natural=True, norm=True):
 
     return weights
 
-
-def validate_and_expand_kwarg(q, name=""):
+@apu.quantity_input()
+def validate_and_expand_kwarg(q: Quantity, name: Optional[str] = '') -> Quantity:
     r"""
     Expand a scalar or array of size one to size two by repeating.
 
@@ -80,88 +76,96 @@ def validate_and_expand_kwarg(q, name=""):
         q = np.repeat(q, 2)
 
     if q.shape != (2,):
-        raise ValueError(f"{name} argument must be scalar or an 1D array of size 1 or 2.")
+        raise ValueError(f'{name} argument must be scalar or an 1D array of size 1 or 2.')
 
     return q
 
 
-@apu.quantity_input(shape=apu.pixel, pixel_size="angle")
-def vis_psf_image(vis, *, shape=(65, 65) * apu.pixel, pixel_size=2 * apu.arcsec, natural=True):
+@apu.quantity_input()
+def vis_psf_image(vis: Visibility, *, shape: Quantity[apu.pix] = (65, 65)*apu.pixel,
+                  pixel_size: Optional[Quantity[apu.arcsec/apu.pix]] = 1*apu.arcsec/apu.pix,
+                  scheme: Optional[str] = 'natural') -> Quantity:
     """
     Create the point spread function for given u, v point of the visibilities.
 
     Parameters
     ----------
-    vis : `xrayvision.visibility.Visibility`
+    vis :
         Input visibilities
-    shape : `astropy.units.quantity.Quantity`, optional
-        Shape of the image, if only one value is given assume square (repeating the value).
-    pixel_size : `astropy.units.quantity.Quantity`, optional
-        Size of pixels, if only one value is given assume square pixels (repeating the value).
-    natural : `boolean` optional
-        Weight scheme use natural by default, uniform if `False`
+    shape :
+        Shape of the image, if only one value passed, assume square (repeating the value).
+    pixel_size :
+        Size of pixels, if only one value is passed, assume square pixels (repeating the value).
+    scheme :
+        Weight scheme, natural by default.
 
     Returns
     -------
-    `astropy.units.quantity.Quantity`
+    :
         Point spread function
 
     """
-    shape = validate_and_expand_kwarg(shape, "shape")
-    pixel_size = validate_and_expand_kwarg(pixel_size, "pixel_size")
-    shape = shape.to_value(apu.pixel)
-    weights = get_weights(vis, natural=natural)
+    shape = validate_and_expand_kwarg(shape, 'shape')
+    pixel_size = validate_and_expand_kwarg(pixel_size, 'pixel_size')
+    shape = shape.to(apu.pixel)
+    weights = get_weights(vis, scheme=scheme)
 
     # Make sure psf is always odd so power is in exactly one pixel
-    m, n = (s // 2 * 2 + 1 for s in shape)
-    psf_arr = idft_map(
-        np.ones(vis.vis.shape) * vis.vis.unit, u=vis.u, v=vis.v, shape=(m, n), weights=weights, pixel_size=pixel_size
-    )
+    shape = [s // 2 * 2 + 1 for s in shape.to_value(apu.pix)] * shape.unit
+    psf_arr = idft_map(np.ones(vis.vis.shape)*vis.vis.unit, u=vis.u, v=vis.v,
+                       shape=shape, weights=weights, pixel_size=pixel_size)
     return psf_arr
 
 
-@apu.quantity_input(shape=apu.pixel, pixel_size="angle")
-def vis_psf_map(vis, *, shape=(65, 65) * apu.pixel, pixel_size=2 * apu.arcsec, natural=True):
+@apu.quantity_input()
+def vis_psf_map(vis: Visibility, *,
+                shape: Quantity[apu.pix] = (65, 65)*apu.pixel,
+                pixel_size: Optional[Quantity[apu.arcsec/apu.pix]] = 1*apu.arcsec/apu.pix,
+                scheme: Optional[str] = 'natural') -> GenericMap:
     r"""
     Create a map of the point spread function for given the visibilities.
 
     Parameters
     ----------
-    vis : `xrayvision.visibility.Visibility`
+    vis :
         Input visibilities
-    shape : `astropy.units.quantity.Quantity`, optional
-        Shape of the image, if only one value is given assume square (repeating the value).
-    pixel_size : `Tuple[~astropy.units.Quantity]`, optional
-        Size of pixels, if only one value is given assume square pixels (repeating the value).
-    natural : `boolean` optional
-        Weight scheme use natural by default, uniform if `False`
+    shape :
+        Shape of the image, if only one value is passed, assume square (repeating the value).
+    pixel_size :
+        Size of pixels, if only one value is passed, assume square pixels (repeating the value).
+    scheme :
+        Weight scheme to use natural by default.
 
     Returns
     -------
-
+    :
+        Map of the point spread function
     """
-    shape = validate_and_expand_kwarg(shape, "shape")
-    pixel_size = validate_and_expand_kwarg(pixel_size, "pixel_size")
+    shape = validate_and_expand_kwarg(shape, 'shape')
+    pixel_size = validate_and_expand_kwarg(pixel_size, 'pixel_size')
     header = generate_header(vis, shape=shape, pixel_size=pixel_size)
-    psf = vis_psf_image(vis, shape=shape, pixel_size=pixel_size, natural=natural)
+    psf = vis_psf_image(vis, shape=shape, pixel_size=pixel_size, scheme=scheme)
     return Map((psf, header))
 
 
-@apu.quantity_input(shape=apu.pixel, pixel_size="angle")
-def vis_to_image(vis, shape=(65, 65) * apu.pixel, pixel_size=2 * apu.arcsec, natural=True):
+@apu.quantity_input()
+def vis_to_image(vis: Visibility,
+                 shape: Quantity[apu.pix] = (65, 65)*apu.pixel,
+                 pixel_size: Optional[Quantity[apu.arcsec/apu.pix]] = 1*apu.arcsec/apu.pix,
+                 scheme: Optional[str] = 'natural') -> Quantity:
     """
     Create an image by 'back projecting' the given visibilities onto the sky.
 
     Parameters
     ----------
-    vis : `xrayvision.visibility.Visibility`
+    vis :
         Input visibilities
-    shape : `~astropy.units.Quantity`
-        Shape of the image, if only one value is given assume square (repeating the value).
-    pixel_size : `~astropy.units.Quantity`
-        Size of pixels, if only one value is given assume square pixels (repeating the value).
-    natural : `boolean` optional
-        Weight scheme use natural by default, uniform if `False`
+    shape :
+        Shape of the image, if only one value is passed assume square (repeating the value).
+    pixel_size :
+        Size of pixels, if only one value is passed assume square pixels (repeating the value).
+    scheme :
+        Weight scheme natural by default.
 
     Returns
     -------
@@ -169,139 +173,135 @@ def vis_to_image(vis, shape=(65, 65) * apu.pixel, pixel_size=2 * apu.arcsec, nat
         Back projection image
 
     """
-    shape = validate_and_expand_kwarg(shape, "shape")
-    pixel_size = validate_and_expand_kwarg(pixel_size, "pixel_size")
-    shape = shape.to_value(apu.pixel)
-    weights = get_weights(vis, natural=natural)
-    bp_arr = idft_map(vis.vis, u=vis.u, v=vis.v, shape=shape, weights=weights, pixel_size=pixel_size, center=vis.center)
+    shape = validate_and_expand_kwarg(shape, 'shape')
+    pixel_size = validate_and_expand_kwarg(pixel_size, 'pixel_size')
+    shape = shape.to(apu.pixel)
+    weights = get_weights(vis, scheme=scheme)
+    bp_arr = idft_map(vis.vis, u=vis.u, v=vis.v, shape=shape,
+                      weights=weights, pixel_size=pixel_size, phase_centre=vis.phase_centre)
 
     return bp_arr
 
 
-@apu.quantity_input(shape=apu.pixel, pixel_size="angle")
-def vis_to_map(vis, shape=(65, 65) * apu.pixel, pixel_size=2 * apu.arcsec, natural=True):
+@apu.quantity_input()
+def vis_to_map(vis: Visibility,
+               shape: Quantity[apu.pix] = (65, 65)*apu.pixel,
+               pixel_size: Optional[Quantity[apu.arcsec/apu.pix]] = 1*apu.arcsec/apu.pixel,
+               scheme: Optional[str] = 'natural') -> GenericMap:
     r"""
     Create a map by performing a back projection of inverse transform on the visibilities.
 
     Parameters
     ----------
-    vis : `xrayvision.visibility.Visibility`
+    vis :
         Input visibilities
-    shape : `int` (m, n)
-        Shape of the image, if only one value is given assume square (repeating the value).
-    pixel_size : `float` (dx, dy), optional
-        Size of pixels, if only one value is given assume square pixels (repeating the value).
-    natural : `boolean` optional
-        Weight scheme use natural by default, uniform if `False`.
+    shape :
+        Shape of the image, if only one value is passed, assume square (repeating the value).
+    pixel_size :
+        Size of pixels, if only one value is passed, assume square pixels (repeating the value).
+    scheme :
+        Weight scheme natural by default.
 
     Returns
     -------
-    `sunpy.map.Map`
-        Map object with the map created from the visibilities and the metadata will contain the
-        offset and the pixel size
+    :
+        Map object with the map created from the visibilities and the metadata will contain the offset and the pixel size
 
     """
     shape = validate_and_expand_kwarg(shape, "shape")
     pixel_size = validate_and_expand_kwarg(pixel_size, "pixel_size")
     header = generate_header(vis, shape=shape, pixel_size=pixel_size)
 
-    image = vis_to_image(vis, shape=shape, pixel_size=pixel_size, natural=natural)
+    image = vis_to_image(vis, shape=shape, pixel_size=pixel_size, scheme=scheme)
     return Map((image, header))
 
 
-def generate_header(vis, *, shape, pixel_size):
+@apu.quantity_input()
+def generate_header(vis: Visibility, *,
+                    shape: Quantity[apu.pix],
+                    pixel_size: Quantity[apu.arcsec/apu.pix]) -> dict:
     r"""
     Generate a map head given the visibilities, pixel size and shape
 
     Parameters
     ----------
     vis :
-    shape : `~astropy.units.Quantity`
-        Shape of the image, if only one value is given assume square (repeating the value).
-    pixel_size : `~astropy.units.Quantity`
-        Size of pixels, if only one value is given assume square pixels (repeating the value)
-    offset
+        Input visibilities.
+    shape :
+        Shape of the image, if only one value is passed assume square (repeating the value).
+    pixel_size :
+        Size of pixels, if only one value is passed assume square pixels (repeating the value)
 
     Returns
     -------
-
+    :
     """
-    header = {
-        "crval1": (vis.offset[0]).to_value(apu.arcsec),
-        "crval2": (vis.offset[1]).to_value(apu.arcsec),
-        "cdelt1": pixel_size[0].to_value(apu.arcsec),
-        "cdelt2": pixel_size[1].to_value(apu.arcsec),
-        "ctype1": "HPLN-TAN",
-        "ctype2": "HPLT-TAN",
-        "naxis": 2,
-        "naxis1": shape[0].value,
-        "naxis2": shape[1].value,
-        "cunit1": "arcsec",
-        "cunit2": "arcsec",
-    }
-    # if vis.center is not None:
-    #     header['crval1'] = vis.center[0].value
-    #     header['crval2'] = vis.center[1].value
-    if pixel_size is not None:
-        if pixel_size.ndim == 0:
-            header["cdelt1"] = pixel_size.value
-            header["cdelt2"] = pixel_size.value
-        elif pixel_size.ndim == 1 and pixel_size.size == 2:
-            header["cdelt1"] = pixel_size[0].value
-            header["cdelt2"] = pixel_size[1].value
-        else:
-            raise ValueError(f"pixel_size can have a length of 1 or 2 not {pixel_size.shape}")
+    header = {'crval1': (vis.offset[0]).to_value(apu.arcsec),
+              'crval2': (vis.offset[1]).to_value(apu.arcsec),
+              'cdelt1': (pixel_size[0]*apu.pix).to_value(apu.arcsec),
+              'cdelt2': (pixel_size[1]*apu.pix).to_value(apu.arcsec),
+              'ctype1': 'HPLN-TAN',
+              'ctype2': 'HPLT-TAN',
+              'naxis': 2,
+              'naxis1': shape[0].value,
+              'naxis2': shape[1].value,
+              'cunit1': 'arcsec',
+              'cunit2': 'arcsec'}
     return header
 
 
-@apu.quantity_input(center="angle", pixel_size="angle")
-def image_to_vis(image, *, u, v, center=(0.0, 0.0) * apu.arcsec, pixel_size=2.0 * apu.arcsec):
+@apu.quantity_input
+def image_to_vis(image: Quantity, *,
+                 u: Quantity[apu.arcsec**-1], v: Quantity[apu.arcsec**-1],
+                 phase_centre: Optional[Quantity[apu.arcsec]] = (0.0, 0.0) * apu.arcsec,
+                 pixel_size: Optional[Quantity[apu.arcsec/apu.pix]] = 1.0*apu.arcsec/apu.pix) -> Visibility:
     r"""
     Return a Visibility created from the image and u, v sampling.
 
     Parameters
     ----------
-    image : `numpy.ndarray`
+    image :
         The 2D input image
-    u : `astropy.units.Quantity`
+    u :
         Array of u coordinates where the visibilities will be evaluated
-    v : `astropy.units.Quantity`
+    v :
         Array of v coordinates where the visibilities will be evaluated
-    center : `~astropy.units.Quantity` (x, y)
-        The coordinates of the center of the image.
-    pixel_size : `~astropy.units.Quantity`
-        Size of pixels, if only one value is given assume square pixels (repeating the value).
+    phase_centre :
+        The coordinates the phase_centre.
+    pixel_size :
+        Size of pixels, if only one value is passed, assume square pixels (repeating the value).
 
     Returns
     -------
-    `Visibility`
-
+    :
         The new visibility object
 
     """
-    pixel_size = validate_and_expand_kwarg(pixel_size, "pixel_size")
-    if not (apu.get_physical_type((1 / u).unit) == ANGLE and apu.get_physical_type((1 / v).unit) == ANGLE):
-        raise ValueError("u and v must be inverse angle (e.g. 1/deg or 1/arcsec")
-    vis = dft_map(image, u=u, v=v, center=center, pixel_size=pixel_size)
-    return Visibility(vis, u=u, v=v, center=center)
+    pixel_size = validate_and_expand_kwarg(pixel_size, 'pixel_size')
+    if not (apu.get_physical_type((1/u).unit) == ANGLE
+            and apu.get_physical_type((1/v).unit) == ANGLE):
+        raise ValueError('u and v must be inverse angle (e.g. 1/deg or 1/arcsec')
+    vis = dft_map(image, u=u, v=v, phase_centre=phase_centre, pixel_size=pixel_size)
+    return Visibility(vis, u=u, v=v, offset=phase_centre)
 
 
-def map_to_vis(amap, *, u, v):
+@apu.quantity_input()
+def map_to_vis(amap: GenericMap, *, u: Quantity[1/apu.arcsec], v: Quantity[1/apu.arcsec]) -> Visibility:
     r"""
-    Return a Visibility object created from the map and u, v sampling.
+    Return a Visibility object created from the map, sampling it at give `u`, `v` coordinates.
 
     Parameters
     ----------
-    amap : `sunpy.map.Map`
-        The input map
-    u : `numpy.ndarray`
+    amap :
+        Input map.
+    u :
         Array of u coordinates where the visibilities will be evaluated
-    v : `numpy.ndarray`
+    v :
         Array of v coordinates where the visibilities will be evaluated
 
     Returns
     -------
-    `Visibility`
+    :
         The new visibility object
 
     """
@@ -320,6 +320,6 @@ def map_to_vis(amap, *, u, v):
     if "cdelt2" in meta:
         new_psize[1] = float(meta["cdelt2"])
 
-    vis = image_to_vis(amap.data, u=u, v=v, pixel_size=new_psize * apu.arcsec)
-    vis.offset = new_pos * apu.arcsec
+    vis = image_to_vis(amap.data, u=u, v=v, pixel_size=new_psize * apu.arcsec/apu.pix)
+    vis.offset = new_pos*apu.arcsec
     return vis

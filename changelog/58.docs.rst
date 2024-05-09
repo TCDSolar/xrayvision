@@ -1,0 +1,1 @@
+Add per module reference pages, switch to documenting types using type annotations.

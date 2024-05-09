@@ -64,13 +64,16 @@ setattr(vis, "isc", vis_data["isc"])
 ###############################################################################
 # Lets have a look at the point spread function (PSF) or dirty beam
 
-psf_map = vis_psf_map(vis, shape=(101, 101) * apu.pixel, pixel_size=1.5 * apu.arcsec, natural=False)
+psf_map = vis_psf_map(vis, shape=(101, 101)*apu.pixel,
+                      pixel_size=1.5*apu.arcsec/apu.pixel,
+                      scheme='uniform')
 
 ###############################################################################
 # We can now make an image using the back projection algorithm essentially and
 # inverse Fourier transform of the visibilities.
 
-backproj_map = vis_to_map(vis, shape=[101, 101] * apu.pixel, pixel_size=1.5 * apu.arcsec)
+backproj_map = vis_to_map(vis, shape=[101, 101]*apu.pixel,
+                          pixel_size=1.5*apu.arcsec/apu.pix)
 
 ###############################################################################
 # Back projection contain many artifact due to the incomplete sampling of the u-v
@@ -82,14 +85,14 @@ backproj_map = vis_to_map(vis, shape=[101, 101] * apu.pixel, pixel_size=1.5 * ap
 # vis_59 = Visibility(vis=vis_data_59['obsvis']*apu.Unit('ph/cm*s'), u=vis_data_59['u']/apu.arcsec,
 #                     v=vis_data_59['v']/apu.arcsec, offset=vis_data_59['xyoffset'][0]*apu.arcsec)
 
-clean_map, model_map, residual_map = vis_clean(
-    vis, shape=[101, 101] * apu.pixel, pixel=[1.5, 1.5] * apu.arcsec, clean_beam_width=10 * apu.arcsec, niter=100
-)
+clean_map, model_map, residual_map = vis_clean(vis, shape=[101, 101] * apu.pixel,
+                                               pixel_size=[1.5, 1.5] * apu.arcsec / apu.pix,
+                                               clean_beam_width=10 * apu.arcsec, niter=100)
 
 ###############################################################################
 # MEM
 
-mem_map = mem(vis, shape=[129, 129] * apu.pixel, pixel=[2, 2] * apu.arcsec)
+mem_map = mem(vis, shape=[129, 129] * apu.pixel, pixel=[2, 2] * apu.arcsec/apu.pix)
 mem_map.plot()
 
 

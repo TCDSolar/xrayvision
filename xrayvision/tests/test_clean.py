@@ -129,15 +129,14 @@ def test_clean_sim():
     sub_uv = np.hstack([sub_uv, np.zeros((2, 1))]) / u.arcsec
 
     # Factor of 9 is compensate for the factor of  3 * 3 increase in size
-    dirty_beam = idft_map(np.ones(321) / 321, u=sub_uv[0, :], v=sub_uv[1, :], shape=(n * 3 + 1, m * 3 + 1))
+    dirty_beam = idft_map(np.ones(321)/321, u=sub_uv[0, :], v=sub_uv[1, :], shape=(n * 3+1, m * 3+1)*u.pix)
 
     vis = dft_map(data, u=sub_uv[0, :], v=sub_uv[1, :])
 
-    dirty_map = idft_map(vis, u=sub_uv[0, :], v=sub_uv[1, :], shape=(n, m))
+    dirty_map = idft_map(vis, u=sub_uv[0, :], v=sub_uv[1, :], shape=(n, m)*u.pix)
 
-    clean_map, model, res = clean(
-        dirty_map, dirty_beam, clean_beam_width=0.1 * u.arcsec, pixel=[2, 2] * u.arcsec, niter=500
-    )
+    clean_map, model, res = clean(dirty_map, dirty_beam, pixel_size=[2, 2] * u.arcsec, clean_beam_width=0.1 * u.arcsec,
+                                  niter=500)
     np.allclose(data, clean_map.data, rtol=dirty_beam.max() * 0.1)
 
 
@@ -147,7 +146,7 @@ def test_vis_clean_sim():
 
     half_log_space = np.logspace(np.log10(0.03030303), np.log10(0.48484848), 10)
 
-    theta = np.linspace(0, 2 * np.pi, 32)
+    theta = np.linspace(0, 2*np.pi, 32)
     theta = theta[np.newaxis, :]
     theta = np.repeat(theta, 10, axis=0)
 
@@ -163,7 +162,6 @@ def test_vis_clean_sim():
 
     vis = image_to_vis(data * u.dimensionless_unscaled, u=sub_uv[0, :], v=sub_uv[1, :])
 
-    clean_map, model, res = vis_clean(
-        vis, shape=(m, n) * u.pix, clean_beam_width=0, pixel=[2, 2] * u.arcsec, natural=False, niter=100
-    )
+    clean_map, model, res = vis_clean(vis, shape=(m, n) * u.pix, pixel_size=[2, 2] * u.arcsec / u.pix,
+                                      clean_beam_width=0, niter=100, scheme='uniform')
     np.allclose(data, clean_map.data, atol=0.1)
