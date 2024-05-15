@@ -21,16 +21,19 @@ def test_clean_ideal():
     pos2 = [40, 32]
 
     clean_map = np.zeros((n, m))
-    clean_map[pos1[0], pos1[1]] = 10.
-    clean_map[pos2[0], pos2[1]] = 7.
+    clean_map[pos1[0], pos1[1]] = 10.0
+    clean_map[pos2[0], pos2[1]] = 7.0
 
     dirty_beam = np.zeros((n, m))
-    dirty_beam[(n-1)//4:(n-1)//4 + (n-1)//2, (m-1)//2] = 0.75
-    dirty_beam[(n-1)//2, (m-1)//4:(m-1)//4 + (m-1)//2, ] = 0.75
-    dirty_beam[(n-1)//2, (m-1)//2] = 0.8
-    dirty_beam = np.pad(dirty_beam, (65, 65), 'constant')
+    dirty_beam[(n - 1) // 4 : (n - 1) // 4 + (n - 1) // 2, (m - 1) // 2] = 0.75
+    dirty_beam[
+        (n - 1) // 2,
+        (m - 1) // 4 : (m - 1) // 4 + (m - 1) // 2,
+    ] = 0.75
+    dirty_beam[(n - 1) // 2, (m - 1) // 2] = 0.8
+    dirty_beam = np.pad(dirty_beam, (65, 65), "constant")
 
-    dirty_map = signal.convolve(clean_map, dirty_beam, mode='same')
+    dirty_map = signal.convolve(clean_map, dirty_beam, mode="same")
 
     # Disable convolution of model with gaussian for testing
     out_map, model, resid = clean(dirty_map, dirty_beam, clean_beam_width=0.0)
@@ -82,19 +85,22 @@ def test_ms_clean_ideal():
     pos2 = [40, 32]
 
     clean_map = np.zeros((n, m))
-    clean_map[pos1[0], pos1[1]] = 10.
-    clean_map[pos2[0], pos2[1]] = 7.
+    clean_map[pos1[0], pos1[1]] = 10.0
+    clean_map[pos2[0], pos2[1]] = 7.0
 
     dirty_beam = np.zeros((n, m))
-    dirty_beam[(n-1)//4:(n-1)//4 + (n-1)//2, (m-1)//2] = 0.75
-    dirty_beam[(n-1)//2, (m-1)//4:(m-1)//4 + (m-1)//2, ] = 0.75
-    dirty_beam[(n-1)//2, (m-1)//2] = 1.0
-    dirty_beam = np.pad(dirty_beam, (65, 65), 'constant')
+    dirty_beam[(n - 1) // 4 : (n - 1) // 4 + (n - 1) // 2, (m - 1) // 2] = 0.75
+    dirty_beam[
+        (n - 1) // 2,
+        (m - 1) // 4 : (m - 1) // 4 + (m - 1) // 2,
+    ] = 0.75
+    dirty_beam[(n - 1) // 2, (m - 1) // 2] = 1.0
+    dirty_beam = np.pad(dirty_beam, (65, 65), "constant")
 
-    dirty_map = signal.convolve2d(clean_map, dirty_beam, mode='same')
+    dirty_map = signal.convolve2d(clean_map, dirty_beam, mode="same")
 
     # Disable convolution of model with gaussian for testing
-    model, res = ms_clean(dirty_map, dirty_beam, [1, 1]*u.arcsec, scales=[1], clean_beam_width=0.0)
+    model, res = ms_clean(dirty_map, dirty_beam, [1, 1] * u.arcsec, scales=[1], clean_beam_width=0.0)
     recovered = model + res
 
     # Within threshold default threshold
@@ -108,7 +114,7 @@ def test_clean_sim():
 
     half_log_space = np.logspace(np.log10(0.03030303), np.log10(0.48484848), 10)
 
-    theta = np.linspace(0, 2*np.pi, 32)
+    theta = np.linspace(0, 2 * np.pi, 32)
     theta = theta[np.newaxis, :]
     theta = np.repeat(theta, 10, axis=0)
 
@@ -123,14 +129,15 @@ def test_clean_sim():
     sub_uv = np.hstack([sub_uv, np.zeros((2, 1))]) / u.arcsec
 
     # Factor of 9 is compensate for the factor of  3 * 3 increase in size
-    dirty_beam = idft_map(np.ones(321)/321, u=sub_uv[0, :], v=sub_uv[1, :], shape=(n * 3+1, m * 3+1))
+    dirty_beam = idft_map(np.ones(321) / 321, u=sub_uv[0, :], v=sub_uv[1, :], shape=(n * 3 + 1, m * 3 + 1))
 
     vis = dft_map(data, u=sub_uv[0, :], v=sub_uv[1, :])
 
     dirty_map = idft_map(vis, u=sub_uv[0, :], v=sub_uv[1, :], shape=(n, m))
 
-    clean_map, model, res = clean(dirty_map, dirty_beam, clean_beam_width=0.1*u.arcsec, pixel=[2, 2]*u.arcsec,
-                                  niter=500)
+    clean_map, model, res = clean(
+        dirty_map, dirty_beam, clean_beam_width=0.1 * u.arcsec, pixel=[2, 2] * u.arcsec, niter=500
+    )
     np.allclose(data, clean_map.data, rtol=dirty_beam.max() * 0.1)
 
 
@@ -140,7 +147,7 @@ def test_vis_clean_sim():
 
     half_log_space = np.logspace(np.log10(0.03030303), np.log10(0.48484848), 10)
 
-    theta = np.linspace(0, 2*np.pi, 32)
+    theta = np.linspace(0, 2 * np.pi, 32)
     theta = theta[np.newaxis, :]
     theta = np.repeat(theta, 10, axis=0)
 
@@ -154,8 +161,9 @@ def test_vis_clean_sim():
     sub_uv = np.vstack([x.flatten(), y.flatten()])
     sub_uv = np.hstack([sub_uv, np.zeros((2, 1))]) / u.arcsec
 
-    vis = image_to_vis(data*u.dimensionless_unscaled, u=sub_uv[0, :], v=sub_uv[1, :])
+    vis = image_to_vis(data * u.dimensionless_unscaled, u=sub_uv[0, :], v=sub_uv[1, :])
 
-    clean_map, model, res = vis_clean(vis, shape=(m, n)*u.pix, clean_beam_width=0,
-                                      pixel=[2, 2]*u.arcsec, natural=False, niter=100)
+    clean_map, model, res = vis_clean(
+        vis, shape=(m, n) * u.pix, clean_beam_width=0, pixel=[2, 2] * u.arcsec, natural=False, niter=100
+    )
     np.allclose(data, clean_map.data, atol=0.1)

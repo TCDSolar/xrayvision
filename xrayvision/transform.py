@@ -6,12 +6,13 @@ the input has no positional information other than an arbitrary 0 origin and a l
 takes inputs which have positional information `dft_map` and the inverse `idft_map`
 
 """
+
 import astropy.units as apu
 import numpy as np
 from astropy.units.core import UnitsError
 
 
-@apu.quantity_input(center='angle', pixel_size='angle')
+@apu.quantity_input(center="angle", pixel_size="angle")
 def generate_xy(number_pixels, center=0.0 * apu.arcsec, pixel_size=1.0 * apu.arcsec):
     """
     Generate the x or y coordinates given the number of pixels, center and pixel size.
@@ -50,7 +51,7 @@ def generate_xy(number_pixels, center=0.0 * apu.arcsec, pixel_size=1.0 * apu.arc
     return x
 
 
-@apu.quantity_input(center='angle', pixel_size='angle')
+@apu.quantity_input(center="angle", pixel_size="angle")
 def generate_uv(number_pixels, center=0.0 * apu.arcsec, pixel_size=1.0 * apu.arcsec):
     """
     Generate the u or v  coordinates given the number of pixels, center and pixel size.
@@ -94,7 +95,7 @@ def generate_uv(number_pixels, center=0.0 * apu.arcsec, pixel_size=1.0 * apu.arc
     return x
 
 
-@apu.quantity_input(center='angle', pixel_size='angle')
+@apu.quantity_input(center="angle", pixel_size="angle")
 def dft_map(input_array, *, u, v, center=(0.0, 0.0) * apu.arcsec, pixel_size=(1.0, 1.0) * apu.arcsec):
     r"""
     Discrete Fourier transform in terms of coordinates returning 1-D array complex visibilities.
@@ -124,26 +125,32 @@ def dft_map(input_array, *, u, v, center=(0.0, 0.0) * apu.arcsec, pixel_size=(1.
     x, y = np.meshgrid(x, y)
     uv = np.vstack([u, v])
     # Check units are correct for exp need to be dimensionless and then remove units for speed
-    if (uv[0, :] * x[0, 0]).unit == apu.dimensionless_unscaled and \
-            (uv[1, :] * y[0, 0]).unit == apu.dimensionless_unscaled:
-
+    if (uv[0, :] * x[0, 0]).unit == apu.dimensionless_unscaled and (
+        uv[1, :] * y[0, 0]
+    ).unit == apu.dimensionless_unscaled:
         uv = uv.value
         x = x.value
         y = y.value
 
-        vis = np.sum(input_array[..., np.newaxis] * np.exp(2j * np.pi * (
-            x[..., np.newaxis] * uv[np.newaxis, 0, :] + y[..., np.newaxis] * uv[np.newaxis, 1, :])),
-            axis=(0, 1))
+        vis = np.sum(
+            input_array[..., np.newaxis]
+            * np.exp(
+                2j * np.pi * (x[..., np.newaxis] * uv[np.newaxis, 0, :] + y[..., np.newaxis] * uv[np.newaxis, 1, :])
+            ),
+            axis=(0, 1),
+        )
 
         return vis
     else:
-        raise UnitsError("Incompatible units on uv {uv.unit} should cancel with xy "
-                         "to leave a dimensionless quantity")
+        raise UnitsError(
+            "Incompatible units on uv {uv.unit} should cancel with xy " "to leave a dimensionless quantity"
+        )
 
 
-@apu.quantity_input(center='angle', pixel_size='angle')
-def idft_map(input_vis, *, u, v, shape, weights=None, center=(0.0, 0.0) * apu.arcsec,
-             pixel_size=(1.0, 1.0) * apu.arcsec):
+@apu.quantity_input(center="angle", pixel_size="angle")
+def idft_map(
+    input_vis, *, u, v, shape, weights=None, center=(0.0, 0.0) * apu.arcsec, pixel_size=(1.0, 1.0) * apu.arcsec
+):
     r"""
     Inverse discrete Fourier transform in terms of coordinates returning a 2D real array or image.
 
@@ -177,21 +184,28 @@ def idft_map(input_vis, *, u, v, shape, weights=None, center=(0.0, 0.0) * apu.ar
         weights = np.ones(input_vis.shape)
     uv = np.vstack([u, v])
     # Check units are correct for exp need to be dimensionless and then remove units for speed
-    if (uv[0, :] * x[0, 0]).unit == apu.dimensionless_unscaled and \
-            (uv[1, :] * y[0, 0]).unit == apu.dimensionless_unscaled:
-
+    if (uv[0, :] * x[0, 0]).unit == apu.dimensionless_unscaled and (
+        uv[1, :] * y[0, 0]
+    ).unit == apu.dimensionless_unscaled:
         uv = uv.value
         x = x.value
         y = y.value
 
-        image = np.sum(input_vis * weights * np.exp(-2j * np.pi * (
-            x[..., np.newaxis] * uv[np.newaxis, 0, :] + y[..., np.newaxis] * uv[np.newaxis, 1, :])),
-            axis=2)
+        image = np.sum(
+            input_vis
+            * weights
+            * np.exp(
+                -2j * np.pi * (x[..., np.newaxis] * uv[np.newaxis, 0, :] + y[..., np.newaxis] * uv[np.newaxis, 1, :])
+            ),
+            axis=2,
+        )
 
         return np.real(image)
     else:
-        raise UnitsError("Incompatible units on uv {uv.unit} should cancel with xy "
-                         "to leave a dimensionless quantity")
+        raise UnitsError(
+            "Incompatible units on uv {uv.unit} should cancel with xy " "to leave a dimensionless quantity"
+        )
+
 
 # def dft(im, uv):
 #     """

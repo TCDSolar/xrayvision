@@ -6,6 +6,7 @@ which is a collection of point sources or in the case of multiscale clean a coll
 appropriate component shapes at different scales.
 
 """
+
 import logging
 
 import numpy as np
@@ -16,10 +17,10 @@ from sunpy.map.map_factory import Map
 
 from xrayvision.imaging import vis_psf_image, vis_to_map
 
-__all__ = ['clean', 'vis_clean', 'ms_clean', 'vis_ms_clean']
+__all__ = ["clean", "vis_clean", "ms_clean", "vis_ms_clean"]
 
 logger = logging.getLogger(__name__)
-logger.setLevel('DEBUG')
+logger.setLevel("DEBUG")
 
 __common_clean_doc__ = r"""
     clean_beam_width : `float`
@@ -58,8 +59,7 @@ __common_clean_doc__ = r"""
     """
 
 
-def clean(dirty_map, dirty_beam, pixel=None, clean_beam_width=4.0,
-          gain=0.1, thres=0.01, niter=5000):
+def clean(dirty_map, dirty_beam, pixel=None, clean_beam_width=4.0, gain=0.1, thres=0.01, niter=5000):
     r"""
     Clean the image using Hogbom's original method.
 
@@ -83,8 +83,8 @@ def clean(dirty_map, dirty_beam, pixel=None, clean_beam_width=4.0,
     pad = [0 if x % 2 == 0 else 1 for x in dirty_map.shape]
 
     # Assume beam, map center is in middle
-    beam_center = (dirty_beam.shape[0] - 1)/2.0, (dirty_beam.shape[1] - 1)/2.0
-    map_center = (dirty_map.shape[0] - 1)/2.0, (dirty_map.shape[1] - 1)/2.0
+    beam_center = (dirty_beam.shape[0] - 1) / 2.0, (dirty_beam.shape[1] - 1) / 2.0
+    map_center = (dirty_map.shape[0] - 1) / 2.0, (dirty_map.shape[1] - 1) / 2.0
 
     # Work out size of map for slicing over-sized dirty beam
     shape = dirty_map.shape
@@ -132,22 +132,20 @@ def clean(dirty_map, dirty_beam, pixel=None, clean_beam_width=4.0,
 
     if clean_beam_width != 0.0:
         # Convert from FWHM to StDev   FWHM = sigma*(8ln2)**0.5 = 2.3548200450309493
-        x_stdev = (clean_beam_width/pixel[0] / 2.3548200450309493).value
-        y_stdev = (clean_beam_width/pixel[1] / 2.3548200450309493).value
-        clean_beam = Gaussian2DKernel(x_stdev, y_stdev, x_size=dirty_beam.shape[1],
-                                      y_size=dirty_beam.shape[0]).array
+        x_stdev = (clean_beam_width / pixel[0] / 2.3548200450309493).value
+        y_stdev = (clean_beam_width / pixel[1] / 2.3548200450309493).value
+        clean_beam = Gaussian2DKernel(x_stdev, y_stdev, x_size=dirty_beam.shape[1], y_size=dirty_beam.shape[0]).array
         # Normalise beam
         clean_beam = clean_beam / clean_beam.max()
 
         # Convolve clean beam with model and scale
-        clean_map = (signal.convolve2d(model, clean_beam/clean_beam.sum(), mode='same')
-                     / (pixel[0]*pixel[1]))
+        clean_map = signal.convolve2d(model, clean_beam / clean_beam.sum(), mode="same") / (pixel[0] * pixel[1])
 
         # Scale residual map with model and scale
         dirty_map = dirty_map / clean_beam.sum() / (pixel[0] * pixel[1])
-        return clean_map+dirty_map, model, dirty_map
+        return clean_map + dirty_map, model, dirty_map
 
-    return model+dirty_map, model, dirty_map
+    return model + dirty_map, model, dirty_map
 
 
 clean.__doc__ += __common_clean_doc__
@@ -172,10 +170,11 @@ def vis_clean(vis, shape, pixel, clean_beam_width=4.0, niter=5000, map=True, gai
     """
 
     dirty_map = vis_to_map(vis, shape=shape, pixel_size=pixel, **kwargs)
-    dirty_beam_shape = [x.value*3 + 1 if x.value*3 % 2 == 0 else x.value*3 for x in shape]*shape.unit
+    dirty_beam_shape = [x.value * 3 + 1 if x.value * 3 % 2 == 0 else x.value * 3 for x in shape] * shape.unit
     dirty_beam = vis_psf_image(vis, shape=dirty_beam_shape, pixel_size=pixel, **kwargs)
-    clean_map, model, residual = clean(dirty_map.data, dirty_beam.value, pixel=pixel, gain=gain,
-                                       clean_beam_width=clean_beam_width, niter=niter)
+    clean_map, model, residual = clean(
+        dirty_map.data, dirty_beam.value, pixel=pixel, gain=gain, clean_beam_width=clean_beam_width, niter=niter
+    )
     if not map:
         return clean_map, model, residual
 
@@ -220,8 +219,7 @@ __common_ms_clean_doc__ = r"""
     """
 
 
-def ms_clean(dirty_map, dirty_beam, pixel, scales=None,
-             clean_beam_width=4.0, gain=0.1, thres=0.01, niter=5000):
+def ms_clean(dirty_map, dirty_beam, pixel, scales=None, clean_beam_width=4.0, gain=0.1, thres=0.01, niter=5000):
     r"""
     Clean the map using a multiscale clean algorithm.
 
@@ -234,7 +232,7 @@ def ms_clean(dirty_map, dirty_beam, pixel, scales=None,
     """
     # Compute the number of dyadic scales, their sizes and scale biases
     number_of_scales = np.floor(np.log2(min(dirty_map.shape))).astype(int)
-    scale_sizes = 2**np.arange(number_of_scales)
+    scale_sizes = 2 ** np.arange(number_of_scales)
 
     if scales:
         scales = np.array(scales)
@@ -247,7 +245,7 @@ def ms_clean(dirty_map, dirty_beam, pixel, scales=None,
 
     model = np.zeros(dirty_map.shape)
 
-    map_center = (dirty_map.shape[0] - 1)/2.0, (dirty_map.shape[1] - 1)/2.0
+    map_center = (dirty_map.shape[0] - 1) / 2.0, (dirty_map.shape[1] - 1) / 2.0
     height = dirty_map.shape[0] // 2
     width = dirty_map.shape[1] // 2
     pad = [0 if x % 2 == 0 else 1 for x in dirty_map.shape]
@@ -261,13 +259,13 @@ def ms_clean(dirty_map, dirty_beam, pixel, scales=None,
 
     for i, scale in enumerate(scale_sizes):
         scales[:, :, i] = component(scale=scale, shape=dirty_map.shape)
-        scaled_residuals[:, :, i] = signal.convolve(dirty_map, scales[:, :, i], mode='same')
-        scaled_dirty_beams[:, :, i] = signal.convolve(dirty_beam, scales[:, :, i], mode='same')
+        scaled_residuals[:, :, i] = signal.convolve(dirty_map, scales[:, :, i], mode="same")
+        scaled_dirty_beams[:, :, i] = signal.convolve(dirty_beam, scales[:, :, i], mode="same")
         max_scaled_dirty_beams[i] = scaled_dirty_beams[:, :, i].max()
         for j in range(i, number_of_scales):
             cross_terms[(i, j)] = signal.convolve(
-                signal.convolve(dirty_beam, scales[:, :, i], mode='same'),
-                scales[:, :, j], mode='same')
+                signal.convolve(dirty_beam, scales[:, :, i], mode="same"), scales[:, :, j], mode="same"
+            )
 
     # Clean loop
     for i in range(niter):
@@ -287,8 +285,10 @@ def ms_clean(dirty_map, dirty_beam, pixel, scales=None,
         # Loop gain and scale dependent bias
         strength = strength * scale_biases[max_scale] * gain
 
-        beam_center = [(scaled_dirty_beams[:, :, max_scale].shape[0] - 1) / 2.0,
-                       (scaled_dirty_beams[:, :, max_scale].shape[1] - 1) / 2.0]
+        beam_center = [
+            (scaled_dirty_beams[:, :, max_scale].shape[0] - 1) / 2.0,
+            (scaled_dirty_beams[:, :, max_scale].shape[1] - 1) / 2.0,
+        ]
 
         offset = map_center[0] - max_x, map_center[1] - max_y
         shifted_beam_center = int(beam_center[0] + offset[0]), int(beam_center[1] + offset[1])
@@ -297,8 +297,7 @@ def ms_clean(dirty_map, dirty_beam, pixel, scales=None,
 
         # shifted = dirty_beam[xr, yr]
 
-        comp = strength * shift(scales[:, :, max_scale],
-                                (max_x - map_center[0], max_y - map_center[1]), order=0)
+        comp = strength * shift(scales[:, :, max_scale], (max_x - map_center[0], max_y - map_center[1]), order=0)
 
         # comp = strength * scales[xr, yr]
 
@@ -334,20 +333,19 @@ def ms_clean(dirty_map, dirty_beam, pixel, scales=None,
 
     # Convolve model with clean beam  B_G * I^M
     if clean_beam_width != 0.0:
-        x_stdev = (clean_beam_width/pixel[0] / (2.0 * np.sqrt(2.0 * np.log(2.0)))).value
-        y_stdev = (clean_beam_width/pixel[1] / (2.0 * np.sqrt(2.0 * np.log(2.0)))).value
-        clean_beam = Gaussian2DKernel(x_stdev, y_stdev, x_size=dirty_beam.shape[1],
-                                      y_size=dirty_beam.shape[0]).array
+        x_stdev = (clean_beam_width / pixel[0] / (2.0 * np.sqrt(2.0 * np.log(2.0)))).value
+        y_stdev = (clean_beam_width / pixel[1] / (2.0 * np.sqrt(2.0 * np.log(2.0)))).value
+        clean_beam = Gaussian2DKernel(x_stdev, y_stdev, x_size=dirty_beam.shape[1], y_size=dirty_beam.shape[0]).array
 
         # Normalise beam
         clean_beam = clean_beam / clean_beam.max()
 
-        clean_map = signal.convolve2d(model, clean_beam, mode='same') / (pixel[0]*pixel[1])
+        clean_map = signal.convolve2d(model, clean_beam, mode="same") / (pixel[0] * pixel[1])
 
         # Scale residual map with model and scale
         dirty_map = (scaled_residuals / clean_beam.sum() / (pixel[0] * pixel[1])).sum(axis=2)
 
-        return clean_map+dirty_map, model, dirty_map
+        return clean_map + dirty_map, model, dirty_map
     # Add residuals B_G * I^M + I^R
     return model, scaled_residuals.sum(axis=2)
 
@@ -355,8 +353,7 @@ def ms_clean(dirty_map, dirty_beam, pixel, scales=None,
 ms_clean.__doc__ += __common_ms_clean_doc__
 
 
-def vis_ms_clean(vis, shape, pixel, scales=None, clean_beam_width=4.0,
-                 gain=0.1, thres=0.01, niter=5000, map=True):
+def vis_ms_clean(vis, shape, pixel, scales=None, clean_beam_width=4.0, gain=0.1, thres=0.01, niter=5000, map=True):
     r"""
     Clean the visibilities using a multiscale clean method.
 
@@ -374,9 +371,16 @@ def vis_ms_clean(vis, shape, pixel, scales=None, clean_beam_width=4.0,
     """
     dirty_map = vis_to_map(vis, shape=shape, pixel_size=pixel)
     dirty_beam = vis_psf_image(vis, shape=shape * 3, pixel_size=pixel)
-    clean_map, model, residual = ms_clean(dirty_map.data, dirty_beam, pixel, scales=scales,
-                                          clean_beam_width=clean_beam_width, gain=gain,
-                                          thres=thres, niter=niter)
+    clean_map, model, residual = ms_clean(
+        dirty_map.data,
+        dirty_beam,
+        pixel,
+        scales=scales,
+        clean_beam_width=clean_beam_width,
+        gain=gain,
+        thres=thres,
+        niter=niter,
+    )
     if not map:
         return clean_map, model, residual
 
@@ -458,7 +462,7 @@ def radial_prolate_sphereoidal(nu):
             bot += q[k, part] * np.power(delnusq, k)
 
         if bot != 0.0:
-            return top/bot
+            return top / bot
         else:
             return 0
 
@@ -535,7 +539,7 @@ def vec_radial_prolate_sphereoidal(nu):
     bot[upper] += np.sum(q[j, 1, np.newaxis] * np.power(delnusq[upper], j[..., np.newaxis]), axis=0)
 
     out = np.zeros(nu.shape)
-    out[bot != 0] = top[bot != 0]/bot[bot != 0]
+    out[bot != 0] = top[bot != 0] / bot[bot != 0]
     out = np.where(nu <= 0, 1.0, out)
     out = np.where(nu >= 1, 0.0, out)
 
@@ -569,8 +573,8 @@ def component(scale, shape):
         wave_amp[int(refx), int(refy)] = 1
         return wave_amp
 
-    xy = np.mgrid[0:shape[0]:1, 0:shape[1]:1]
-    radii_squared = ((xy[0, :, :] - refx) / scale)**2 + ((xy[1, :, :] - refy) / scale)**2
+    xy = np.mgrid[0 : shape[0] : 1, 0 : shape[1] : 1]
+    radii_squared = ((xy[0, :, :] - refx) / scale) ** 2 + ((xy[1, :, :] - refy) / scale) ** 2
 
     rad_zeros_indices = radii_squared <= 0.0
     amp_zero_indices = radii_squared >= 1.0
