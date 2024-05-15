@@ -407,18 +407,23 @@ class VisMeta(VisMetaABC, dict):
         return instr
 
 
-
-
 class Visibility:
     r"""
     Hold a set of related visibilities and information.
 
 
     """
+
     @apu.quantity_input
-    def __init__(self, vis, *, u: Quantity[1/apu.arcsec], v: Quantity[1/apu.arcsec],
-                 offset: Optional[Quantity[apu.arcsec]] = (0., 0.) * apu.arcsec,
-                 phase_centre: Optional[Quantity[apu.arcsec]] = (0., 0.) * apu.arcsec) -> None:
+    def __init__(
+        self,
+        vis,
+        *,
+        u: Quantity[1 / apu.arcsec],
+        v: Quantity[1 / apu.arcsec],
+        offset: Optional[Quantity[apu.arcsec]] = (0.0, 0.0) * apu.arcsec,
+        phase_centre: Optional[Quantity[apu.arcsec]] = (0.0, 0.0) * apu.arcsec,
+    ) -> None:
         r"""
         Generic Visibility object.
 
@@ -437,8 +442,8 @@ class Visibility:
 
 
         """
-        self.u: Quantity[1/apu.arcsec] = u
-        self.v: Quantity[1/apu.arcsec] = v
+        self.u: Quantity[1 / apu.arcsec] = u
+        self.v: Quantity[1 / apu.arcsec] = v
         self.vis: Quantity = vis
         self.phase_centre: Quantity[apu.arcsec] = phase_centre
         self.offset: Quantity[apu.arcsec] = offset

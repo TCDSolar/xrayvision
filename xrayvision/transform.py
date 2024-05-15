@@ -6,6 +6,7 @@ the input has no positional information other than an arbitrary 0 origin and a l
 takes inputs which have positional information `dft_map` and the inverse `idft_map`
 
 """
+
 from typing import Union, Optional
 
 import astropy.units as apu
@@ -14,13 +15,15 @@ import numpy.typing as npt
 from astropy.units import Quantity
 from astropy.units.core import UnitsError
 
-__all__ = ['generate_xy', 'generate_uv', 'dft_map', 'idft_map']
+__all__ = ["generate_xy", "generate_uv", "dft_map", "idft_map"]
 
 
 @apu.quantity_input()
-def generate_xy(number_pixels: Quantity[apu.pix],
-                phase_centre: Optional[Quantity[apu.arcsec]] = 0.0 * apu.arcsec,
-                pixel_size: Optional[Quantity[apu.arcsec/apu.pix]] = 1.0 * apu.arcsec/apu.pix) -> Quantity[apu.arcsec]:
+def generate_xy(
+    number_pixels: Quantity[apu.pix],
+    phase_centre: Optional[Quantity[apu.arcsec]] = 0.0 * apu.arcsec,
+    pixel_size: Optional[Quantity[apu.arcsec / apu.pix]] = 1.0 * apu.arcsec / apu.pix,
+) -> Quantity[apu.arcsec]:
     """
     Generate the x or y coordinates given the number of pixels, phase_centre and pixel size.
 
@@ -56,15 +59,18 @@ def generate_xy(number_pixels: Quantity[apu.pix],
     <Quantity [ 0. ,  2.5,  5. ,  7.5, 10. , 12.5, 15. , 17.5, 20. ] arcsec>
 
     """
-    x = (np.arange(number_pixels.to_value(apu.pixel))
-         - (number_pixels.to_value(apu.pix) / 2) + 0.5)*apu.pix*pixel_size + phase_centre
+    x = (
+        np.arange(number_pixels.to_value(apu.pixel)) - (number_pixels.to_value(apu.pix) / 2) + 0.5
+    ) * apu.pix * pixel_size + phase_centre
     return x
 
 
 @apu.quantity_input()
-def generate_uv(number_pixels: Quantity[apu.pix],
-                phase_centre: Optional[Quantity[apu.arcsec]] = 0.0 * apu.arcsec,
-                pixel_size: Optional[Quantity[apu.arcsec/apu.pix]] = 1.0 * apu.arcsec/apu.pix) -> Quantity[1/apu.arcsec]:
+def generate_uv(
+    number_pixels: Quantity[apu.pix],
+    phase_centre: Optional[Quantity[apu.arcsec]] = 0.0 * apu.arcsec,
+    pixel_size: Optional[Quantity[apu.arcsec / apu.pix]] = 1.0 * apu.arcsec / apu.pix,
+) -> Quantity[1 / apu.arcsec]:
     """
     Generate the u or v coordinates given the number of pixels, phase_centre and pixel size.
 
@@ -105,8 +111,9 @@ def generate_uv(number_pixels: Quantity[apu.pix],
     """
     # x = (np.arange(number_pixels) - number_pixels / 2 + 0.5) / (pixel_size * number_pixels)
 
-    x = (np.arange(number_pixels.to_value(apu.pixel))
-         - (number_pixels.to_value(apu.pix) / 2) + 0.5) / (pixel_size * number_pixels)
+    x = (np.arange(number_pixels.to_value(apu.pixel)) - (number_pixels.to_value(apu.pix) / 2) + 0.5) / (
+        pixel_size * number_pixels
+    )
 
     if phase_centre.value != 0.0:  # type: ignore
         x += 1 / phase_centre  # type: ignore
@@ -114,12 +121,14 @@ def generate_uv(number_pixels: Quantity[apu.pix],
 
 
 @apu.quantity_input()
-def dft_map(input_array: Union[Quantity, npt.NDArray], *,
-            u: Quantity[1/apu.arcsec],
-            v: Quantity[1/apu.arcsec],
-            phase_centre: Optional[Quantity[apu.arcsec]] = (0.0, 0.0) * apu.arcsec,
-            pixel_size: Optional[Quantity[apu.arcsec/apu.pix]] = (1.0, 1.0) * apu.arcsec/apu.pix) \
-           -> Union[Quantity, npt.NDArray]:
+def dft_map(
+    input_array: Union[Quantity, npt.NDArray],
+    *,
+    u: Quantity[1 / apu.arcsec],
+    v: Quantity[1 / apu.arcsec],
+    phase_centre: Optional[Quantity[apu.arcsec]] = (0.0, 0.0) * apu.arcsec,
+    pixel_size: Optional[Quantity[apu.arcsec / apu.pix]] = (1.0, 1.0) * apu.arcsec / apu.pix,
+) -> Union[Quantity, npt.NDArray]:
     r"""
     Discrete Fourier transform in terms of coordinates returning 1-D array complex visibilities.
 
@@ -146,12 +155,12 @@ def dft_map(input_array: Union[Quantity, npt.NDArray], *,
     x = generate_xy(m, phase_centre[0], pixel_size[0])  # type: ignore
     y = generate_xy(n, phase_centre[1], pixel_size[1])  # type: ignore
 
-    x, y = np.meshgrid(x, y, indexing='ij')
+    x, y = np.meshgrid(x, y, indexing="ij")
     uv = np.vstack([u, v])
     # Check units are correct for exp need to be dimensionless and then remove units for speed
-    if (uv[0, :] * x[0, 0]).unit == apu.dimensionless_unscaled and \
-            (uv[1, :] * y[0, 0]).unit == apu.dimensionless_unscaled:
-
+    if (uv[0, :] * x[0, 0]).unit == apu.dimensionless_unscaled and (
+        uv[1, :] * y[0, 0]
+    ).unit == apu.dimensionless_unscaled:
         uv = uv.value  # type: ignore
         x = x.value
         y = y.value
@@ -172,14 +181,16 @@ def dft_map(input_array: Union[Quantity, npt.NDArray], *,
 
 
 @apu.quantity_input()
-def idft_map(input_vis: Union[Quantity, npt.NDArray], *,
-             u: Quantity[1 / apu.arcsec],
-             v: Quantity[1 / apu.arcsec],
-             shape: Quantity[apu.pix],
-             weights: Optional[npt.NDArray] = None,
-             phase_centre: Optional[Quantity[apu.arcsec]] = (0.0, 0.0) * apu.arcsec,
-             pixel_size: Optional[Quantity[apu.arcsec / apu.pix]] = (1.0, 1.0) * apu.arcsec / apu.pix) \
-            -> Union[Quantity, npt.NDArray]:
+def idft_map(
+    input_vis: Union[Quantity, npt.NDArray],
+    *,
+    u: Quantity[1 / apu.arcsec],
+    v: Quantity[1 / apu.arcsec],
+    shape: Quantity[apu.pix],
+    weights: Optional[npt.NDArray] = None,
+    phase_centre: Optional[Quantity[apu.arcsec]] = (0.0, 0.0) * apu.arcsec,
+    pixel_size: Optional[Quantity[apu.arcsec / apu.pix]] = (1.0, 1.0) * apu.arcsec / apu.pix,
+) -> Union[Quantity, npt.NDArray]:
     r"""
     Inverse discrete Fourier transform in terms of coordinates returning a 2D real array or image.
 
@@ -210,15 +221,15 @@ def idft_map(input_vis: Union[Quantity, npt.NDArray], *,
     x = generate_xy(m, phase_centre[0], pixel_size[0])  # type: ignore
     y = generate_xy(n, phase_centre[1], pixel_size[1])  # type: ignore
 
-    x, y = np.meshgrid(x, y, indexing='ij')
+    x, y = np.meshgrid(x, y, indexing="ij")
 
     if weights is None:
         weights = np.ones(input_vis.shape)
     uv = np.vstack([u, v])
     # Check units are correct for exp need to be dimensionless and then remove units for speed
-    if (uv[0, :] * x[0, 0]).unit == apu.dimensionless_unscaled and \
-            (uv[1, :] * y[0, 0]).unit == apu.dimensionless_unscaled:
-
+    if (uv[0, :] * x[0, 0]).unit == apu.dimensionless_unscaled and (
+        uv[1, :] * y[0, 0]
+    ).unit == apu.dimensionless_unscaled:
         uv = uv.value  # type: ignore
         x = x.value
         y = y.value

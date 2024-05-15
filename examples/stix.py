@@ -32,30 +32,31 @@ stix_vis.offset = offset
 ###############################################################################
 # Lets have a look at the point spread function (PSF) or dirty beam
 
-psf_map = vis_psf_map(stix_vis, shape=(129, 129)*apu.pixel,
-                      pixel_size=2*apu.arcsec/apu.pix,
-                      scheme='uniform')
+psf_map = vis_psf_map(stix_vis, shape=(129, 129) * apu.pixel, pixel_size=2 * apu.arcsec / apu.pix, scheme="uniform")
 psf_map.plot()
 
 ###############################################################################
 # Back projection
 
-backproj_map = vis_to_map(stix_vis, shape=(129, 129)*apu.pixel,
-                          pixel_size=2*apu.arcsec/apu.pix, scheme='uniform')
+backproj_map = vis_to_map(stix_vis, shape=(129, 129) * apu.pixel, pixel_size=2 * apu.arcsec / apu.pix, scheme="uniform")
 backproj_map.plot()
 
 ###############################################################################
 # Clean
 
-clean_map, model_map, resid_map = vis_clean(stix_vis, shape=[129, 129] * apu.pixel,
-                                            pixel_size=[2, 2] * apu.arcsec / apu.pix, clean_beam_width=20 * apu.arcsec,
-                                            niter=100)
+clean_map, model_map, resid_map = vis_clean(
+    stix_vis,
+    shape=[129, 129] * apu.pixel,
+    pixel_size=[2, 2] * apu.arcsec / apu.pix,
+    clean_beam_width=20 * apu.arcsec,
+    niter=100,
+)
 clean_map.plot()
 
 ###############################################################################
 # MEM
 
-mem_map = mem(stix_vis, shape=[129, 129] * apu.pixel, pixel=[2, 2] * apu.arcsec/apu.pix)
+mem_map = mem(stix_vis, shape=[129, 129] * apu.pixel, pixel=[2, 2] * apu.arcsec / apu.pix)
 mem_map.plot()
 
 ###############################################################################

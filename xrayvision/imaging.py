@@ -8,14 +8,23 @@ from sunpy.map import GenericMap, Map
 from xrayvision.transform import dft_map, idft_map
 from xrayvision.visibility import Visibility
 
-__all__ = ['get_weights', 'validate_and_expand_kwarg', 'vis_psf_image', 'vis_psf_map',
-           'vis_to_image', 'vis_to_map', 'generate_header', 'image_to_vis', 'map_to_vis']
+__all__ = [
+    "get_weights",
+    "validate_and_expand_kwarg",
+    "vis_psf_image",
+    "vis_psf_map",
+    "vis_to_image",
+    "vis_to_map",
+    "generate_header",
+    "image_to_vis",
+    "map_to_vis",
+]
 
 ANGLE = apu.get_physical_type(apu.deg)
-WEIGHT_SCHEMES = ('natural', 'uniform')
+WEIGHT_SCHEMES = ("natural", "uniform")
 
 
-def get_weights(vis: Visibility, scheme: Optional[str] = 'natural', norm: Optional[bool] = True) -> np.ndarray:
+def get_weights(vis: Visibility, scheme: Optional[str] = "natural", norm: Optional[bool] = True) -> np.ndarray:
     r"""
     Return spatial frequency weight factors for each visibility.
 
@@ -35,9 +44,9 @@ def get_weights(vis: Visibility, scheme: Optional[str] = 'natural', norm: Option
 
     """
     if scheme not in WEIGHT_SCHEMES:
-        raise ValueError(f'Invalid weighting scheme {scheme}, must be one of: {WEIGHT_SCHEMES}')
+        raise ValueError(f"Invalid weighting scheme {scheme}, must be one of: {WEIGHT_SCHEMES}")
     weights = np.sqrt(vis.u**2 + vis.v**2).value
-    if scheme == 'natural':
+    if scheme == "natural":
         weights = np.ones_like(vis.vis, dtype=float)
 
     if norm:
@@ -45,8 +54,9 @@ def get_weights(vis: Visibility, scheme: Optional[str] = 'natural', norm: Option
 
     return weights
 
+
 @apu.quantity_input()
-def validate_and_expand_kwarg(q: Quantity, name: Optional[str] = '') -> Quantity:
+def validate_and_expand_kwarg(q: Quantity, name: Optional[str] = "") -> Quantity:
     r"""
     Expand a scalar or array of size one to size two by repeating.
 
@@ -76,15 +86,19 @@ def validate_and_expand_kwarg(q: Quantity, name: Optional[str] = '') -> Quantity
         q = np.repeat(q, 2)
 
     if q.shape != (2,):
-        raise ValueError(f'{name} argument must be scalar or an 1D array of size 1 or 2.')
+        raise ValueError(f"{name} argument must be scalar or an 1D array of size 1 or 2.")
 
     return q
 
 
 @apu.quantity_input()
-def vis_psf_image(vis: Visibility, *, shape: Quantity[apu.pix] = (65, 65)*apu.pixel,
-                  pixel_size: Optional[Quantity[apu.arcsec/apu.pix]] = 1*apu.arcsec/apu.pix,
-                  scheme: Optional[str] = 'natural') -> Quantity:
+def vis_psf_image(
+    vis: Visibility,
+    *,
+    shape: Quantity[apu.pix] = (65, 65) * apu.pixel,
+    pixel_size: Optional[Quantity[apu.arcsec / apu.pix]] = 1 * apu.arcsec / apu.pix,
+    scheme: Optional[str] = "natural",
+) -> Quantity:
     """
     Create the point spread function for given u, v point of the visibilities.
 
@@ -105,23 +119,27 @@ def vis_psf_image(vis: Visibility, *, shape: Quantity[apu.pix] = (65, 65)*apu.pi
         Point spread function
 
     """
-    shape = validate_and_expand_kwarg(shape, 'shape')
-    pixel_size = validate_and_expand_kwarg(pixel_size, 'pixel_size')
+    shape = validate_and_expand_kwarg(shape, "shape")
+    pixel_size = validate_and_expand_kwarg(pixel_size, "pixel_size")
     shape = shape.to(apu.pixel)
     weights = get_weights(vis, scheme=scheme)
 
     # Make sure psf is always odd so power is in exactly one pixel
     shape = [s // 2 * 2 + 1 for s in shape.to_value(apu.pix)] * shape.unit
-    psf_arr = idft_map(np.ones(vis.vis.shape)*vis.vis.unit, u=vis.u, v=vis.v,
-                       shape=shape, weights=weights, pixel_size=pixel_size)
+    psf_arr = idft_map(
+        np.ones(vis.vis.shape) * vis.vis.unit, u=vis.u, v=vis.v, shape=shape, weights=weights, pixel_size=pixel_size
+    )
     return psf_arr
 
 
 @apu.quantity_input()
-def vis_psf_map(vis: Visibility, *,
-                shape: Quantity[apu.pix] = (65, 65)*apu.pixel,
-                pixel_size: Optional[Quantity[apu.arcsec/apu.pix]] = 1*apu.arcsec/apu.pix,
-                scheme: Optional[str] = 'natural') -> GenericMap:
+def vis_psf_map(
+    vis: Visibility,
+    *,
+    shape: Quantity[apu.pix] = (65, 65) * apu.pixel,
+    pixel_size: Optional[Quantity[apu.arcsec / apu.pix]] = 1 * apu.arcsec / apu.pix,
+    scheme: Optional[str] = "natural",
+) -> GenericMap:
     r"""
     Create a map of the point spread function for given the visibilities.
 
@@ -141,18 +159,20 @@ def vis_psf_map(vis: Visibility, *,
     :
         Map of the point spread function
     """
-    shape = validate_and_expand_kwarg(shape, 'shape')
-    pixel_size = validate_and_expand_kwarg(pixel_size, 'pixel_size')
+    shape = validate_and_expand_kwarg(shape, "shape")
+    pixel_size = validate_and_expand_kwarg(pixel_size, "pixel_size")
     header = generate_header(vis, shape=shape, pixel_size=pixel_size)
     psf = vis_psf_image(vis, shape=shape, pixel_size=pixel_size, scheme=scheme)
     return Map((psf, header))
 
 
 @apu.quantity_input()
-def vis_to_image(vis: Visibility,
-                 shape: Quantity[apu.pix] = (65, 65)*apu.pixel,
-                 pixel_size: Optional[Quantity[apu.arcsec/apu.pix]] = 1*apu.arcsec/apu.pix,
-                 scheme: Optional[str] = 'natural') -> Quantity:
+def vis_to_image(
+    vis: Visibility,
+    shape: Quantity[apu.pix] = (65, 65) * apu.pixel,
+    pixel_size: Optional[Quantity[apu.arcsec / apu.pix]] = 1 * apu.arcsec / apu.pix,
+    scheme: Optional[str] = "natural",
+) -> Quantity:
     """
     Create an image by 'back projecting' the given visibilities onto the sky.
 
@@ -173,21 +193,24 @@ def vis_to_image(vis: Visibility,
         Back projection image
 
     """
-    shape = validate_and_expand_kwarg(shape, 'shape')
-    pixel_size = validate_and_expand_kwarg(pixel_size, 'pixel_size')
+    shape = validate_and_expand_kwarg(shape, "shape")
+    pixel_size = validate_and_expand_kwarg(pixel_size, "pixel_size")
     shape = shape.to(apu.pixel)
     weights = get_weights(vis, scheme=scheme)
-    bp_arr = idft_map(vis.vis, u=vis.u, v=vis.v, shape=shape,
-                      weights=weights, pixel_size=pixel_size, phase_centre=vis.phase_centre)
+    bp_arr = idft_map(
+        vis.vis, u=vis.u, v=vis.v, shape=shape, weights=weights, pixel_size=pixel_size, phase_centre=vis.phase_centre
+    )
 
     return bp_arr
 
 
 @apu.quantity_input()
-def vis_to_map(vis: Visibility,
-               shape: Quantity[apu.pix] = (65, 65)*apu.pixel,
-               pixel_size: Optional[Quantity[apu.arcsec/apu.pix]] = 1*apu.arcsec/apu.pixel,
-               scheme: Optional[str] = 'natural') -> GenericMap:
+def vis_to_map(
+    vis: Visibility,
+    shape: Quantity[apu.pix] = (65, 65) * apu.pixel,
+    pixel_size: Optional[Quantity[apu.arcsec / apu.pix]] = 1 * apu.arcsec / apu.pixel,
+    scheme: Optional[str] = "natural",
+) -> GenericMap:
     r"""
     Create a map by performing a back projection of inverse transform on the visibilities.
 
@@ -217,9 +240,7 @@ def vis_to_map(vis: Visibility,
 
 
 @apu.quantity_input()
-def generate_header(vis: Visibility, *,
-                    shape: Quantity[apu.pix],
-                    pixel_size: Quantity[apu.arcsec/apu.pix]) -> dict:
+def generate_header(vis: Visibility, *, shape: Quantity[apu.pix], pixel_size: Quantity[apu.arcsec / apu.pix]) -> dict:
     r"""
     Generate a map head given the visibilities, pixel size and shape
 
@@ -236,25 +257,31 @@ def generate_header(vis: Visibility, *,
     -------
     :
     """
-    header = {'crval1': (vis.offset[0]).to_value(apu.arcsec),
-              'crval2': (vis.offset[1]).to_value(apu.arcsec),
-              'cdelt1': (pixel_size[0]*apu.pix).to_value(apu.arcsec),
-              'cdelt2': (pixel_size[1]*apu.pix).to_value(apu.arcsec),
-              'ctype1': 'HPLN-TAN',
-              'ctype2': 'HPLT-TAN',
-              'naxis': 2,
-              'naxis1': shape[0].value,
-              'naxis2': shape[1].value,
-              'cunit1': 'arcsec',
-              'cunit2': 'arcsec'}
+    header = {
+        "crval1": (vis.offset[1]).to_value(apu.arcsec),
+        "crval2": (vis.offset[0]).to_value(apu.arcsec),
+        "cdelt1": (pixel_size[1] * apu.pix).to_value(apu.arcsec),
+        "cdelt2": (pixel_size[0] * apu.pix).to_value(apu.arcsec),
+        "ctype1": "HPLN-TAN",
+        "ctype2": "HPLT-TAN",
+        "naxis": 2,
+        "naxis1": shape[1].value,
+        "naxis2": shape[0].value,
+        "cunit1": "arcsec",
+        "cunit2": "arcsec",
+    }
     return header
 
 
 @apu.quantity_input
-def image_to_vis(image: Quantity, *,
-                 u: Quantity[apu.arcsec**-1], v: Quantity[apu.arcsec**-1],
-                 phase_centre: Optional[Quantity[apu.arcsec]] = (0.0, 0.0) * apu.arcsec,
-                 pixel_size: Optional[Quantity[apu.arcsec/apu.pix]] = 1.0*apu.arcsec/apu.pix) -> Visibility:
+def image_to_vis(
+    image: Quantity,
+    *,
+    u: Quantity[apu.arcsec**-1],
+    v: Quantity[apu.arcsec**-1],
+    phase_centre: Optional[Quantity[apu.arcsec]] = (0.0, 0.0) * apu.arcsec,
+    pixel_size: Optional[Quantity[apu.arcsec / apu.pix]] = 1.0 * apu.arcsec / apu.pix,
+) -> Visibility:
     r"""
     Return a Visibility created from the image and u, v sampling.
 
@@ -277,16 +304,15 @@ def image_to_vis(image: Quantity, *,
         The new visibility object
 
     """
-    pixel_size = validate_and_expand_kwarg(pixel_size, 'pixel_size')
-    if not (apu.get_physical_type((1/u).unit) == ANGLE
-            and apu.get_physical_type((1/v).unit) == ANGLE):
-        raise ValueError('u and v must be inverse angle (e.g. 1/deg or 1/arcsec')
+    pixel_size = validate_and_expand_kwarg(pixel_size, "pixel_size")
+    if not (apu.get_physical_type((1 / u).unit) == ANGLE and apu.get_physical_type((1 / v).unit) == ANGLE):
+        raise ValueError("u and v must be inverse angle (e.g. 1/deg or 1/arcsec")
     vis = dft_map(image, u=u, v=v, phase_centre=phase_centre, pixel_size=pixel_size)
     return Visibility(vis, u=u, v=v, offset=phase_centre)
 
 
 @apu.quantity_input()
-def map_to_vis(amap: GenericMap, *, u: Quantity[1/apu.arcsec], v: Quantity[1/apu.arcsec]) -> Visibility:
+def map_to_vis(amap: GenericMap, *, u: Quantity[1 / apu.arcsec], v: Quantity[1 / apu.arcsec]) -> Visibility:
     r"""
     Return a Visibility object created from the map, sampling it at give `u`, `v` coordinates.
 
@@ -310,16 +336,16 @@ def map_to_vis(amap: GenericMap, *, u: Quantity[1/apu.arcsec], v: Quantity[1/apu
     meta = amap.meta
     new_pos = np.array([0.0, 0.0])
     if "crval1" in meta:
-        new_pos[0] = float(meta["crval1"])
+        new_pos[1] = float(meta["crval1"])
     if "crval2" in meta:
-        new_pos[1] = float(meta["crval2"])
+        new_pos[0] = float(meta["crval2"])
 
     new_psize = np.array([1.0, 1.0])
     if "cdelt1" in meta:
-        new_psize[0] = float(meta["cdelt1"])
+        new_psize[1] = float(meta["cdelt1"])
     if "cdelt2" in meta:
-        new_psize[1] = float(meta["cdelt2"])
+        new_psize[0] = float(meta["cdelt2"])
 
-    vis = image_to_vis(amap.data, u=u, v=v, pixel_size=new_psize * apu.arcsec/apu.pix)
-    vis.offset = new_pos*apu.arcsec
+    vis = image_to_vis(amap.data, u=u, v=v, pixel_size=new_psize * apu.arcsec / apu.pix)
+    vis.offset = new_pos * apu.arcsec
     return vis

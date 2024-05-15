@@ -2,7 +2,7 @@ import astropy.units as apu
 import numpy as np
 import pytest
 from astropy.convolution.kernels import Gaussian2DKernel
-from numpy.testing import assert_allclose, assert_array_equal
+from numpy.testing import assert_allclose
 from sunpy.map import Map
 
 from xrayvision.imaging import image_to_vis, map_to_vis, vis_psf_image, vis_to_image, vis_to_map
@@ -31,15 +31,16 @@ def uv():
 @pytest.mark.parametrize("pixel_size", [(0.5), (1), (2)])
 def test_psf_to_image(pixel_size, uv):
     u, v = uv
-    img = np.zeros((65, 65))*(apu.ph/apu.cm**2)
-    img[32, 32] = 1.0*(apu.ph/apu.cm**2)
-    obs_vis = dft_map(img, u=u, v=v, pixel_size=[2., 2.]*apu.arcsec/apu.pix)
+    img = np.zeros((65, 65)) * (apu.ph / apu.cm**2)
+    img[32, 32] = 1.0 * (apu.ph / apu.cm**2)
+    obs_vis = dft_map(img, u=u, v=v, pixel_size=[2.0, 2.0] * apu.arcsec / apu.pix)
     weights = np.sqrt(u**2 + v**2).value
     weights /= weights.sum()
-    psf_calc = idft_map(obs_vis, u=u, v=v, shape=[65, 65]*apu.pix, pixel_size=[2, 2]*apu.arcsec/apu.pix,
-                        weights=weights)
+    psf_calc = idft_map(
+        obs_vis, u=u, v=v, shape=[65, 65] * apu.pix, pixel_size=[2, 2] * apu.arcsec / apu.pix, weights=weights
+    )
     vis = Visibility(obs_vis, u=u, v=v)
-    res = vis_psf_image(vis, shape=[65, 65]*apu.pixel, pixel_size=2*apu.arcsec/apu.pix, scheme='uniform')
+    res = vis_psf_image(vis, shape=[65, 65] * apu.pixel, pixel_size=2 * apu.arcsec / apu.pix, scheme="uniform")
     assert np.allclose(psf_calc, res)
 
 
@@ -47,13 +48,14 @@ def test_vis_to_image(uv):
     u, v = uv
     img = np.zeros((65, 65)) * (apu.ph / apu.cm**2)
     img[32, 32] = 1.0 * (apu.ph / apu.cm**2)
-    obs_vis = dft_map(img, u=u, v=v, pixel_size=[2., 2.] * apu.arcsec/apu.pix)
+    obs_vis = dft_map(img, u=u, v=v, pixel_size=[2.0, 2.0] * apu.arcsec / apu.pix)
     weights = np.sqrt(u**2 + v**2).value
     weights /= weights.sum()
-    bp_calc = idft_map(obs_vis, u=u, v=v, shape=[65, 65]*apu.pix, pixel_size=[2, 2] * apu.arcsec/apu.pix,
-                       weights=weights)
+    bp_calc = idft_map(
+        obs_vis, u=u, v=v, shape=[65, 65] * apu.pix, pixel_size=[2, 2] * apu.arcsec / apu.pix, weights=weights
+    )
     vis = Visibility(obs_vis, u=u, v=v)
-    res = vis_to_image(vis, shape=[65, 65] * apu.pixel, pixel_size=2 * apu.arcsec/apu.pix, scheme='uniform')
+    res = vis_to_image(vis, shape=[65, 65] * apu.pixel, pixel_size=2 * apu.arcsec / apu.pix, scheme="uniform")
     assert np.allclose(bp_calc, res)
 
 
@@ -64,15 +66,15 @@ def test_image_to_vis():
     image = np.zeros((m, n))
 
     # Calculate full u, v coverage so will be equivalent to a discrete Fourier transform (DFT)
-    u = generate_uv(m*apu.pix)
-    v = generate_uv(n*apu.pix)
-    u, v = np.meshgrid(u, v, indexing='ij')
+    u = generate_uv(m * apu.pix)
+    v = generate_uv(n * apu.pix)
+    u, v = np.meshgrid(u, v, indexing="ij")
     u, v = np.array([u, v]).reshape(2, size) / apu.arcsec
 
     # For an empty map visibilities should all be zero (0+0j)
     empty_vis = image_to_vis(image, u=v, v=v)
     assert np.array_equal(empty_vis.phase_centre, (0.0, 0.0) * apu.arcsec)
-    assert np.array_equal(empty_vis.vis, np.zeros(n*m, dtype=complex))
+    assert np.array_equal(empty_vis.vis, np.zeros(n * m, dtype=complex))
 
 
 def test_image_to_vis_center():
@@ -82,9 +84,9 @@ def test_image_to_vis_center():
     image = np.zeros((m, n))
 
     # Calculate full u, v coverage so will be equivalent to a discrete Fourier transform (DFT)
-    u = generate_uv(m*apu.pix)
-    v = generate_uv(n*apu.pix)
-    u, v = np.meshgrid(u, v, indexing='ij')
+    u = generate_uv(m * apu.pix)
+    v = generate_uv(n * apu.pix)
+    u, v = np.meshgrid(u, v, indexing="ij")
     u, v = np.array([u, v]).reshape(2, size) / apu.arcsec
 
     # For an empty map visibilities should all be zero (0+0j)
@@ -102,19 +104,19 @@ def test_map_to_vis(pos, pixel):
     size = m * n
 
     pos = pos * apu.arcsec
-    pixel = pixel * apu.arcsec/apu.pix
+    pixel = pixel * apu.arcsec / apu.pix
 
     # Calculate full u, v coverage so will be equivalent to a discrete Fourier transform (DFT)
-    u = generate_uv(m*apu.pix, phase_centre=pos[0], pixel_size=pixel[0])
-    v = generate_uv(n*apu.pix, phase_centre=pos[1], pixel_size=pixel[1])
-    u, v = np.meshgrid(u, v, indexing='ij')
+    u = generate_uv(m * apu.pix, phase_centre=pos[0], pixel_size=pixel[0])
+    v = generate_uv(n * apu.pix, phase_centre=pos[1], pixel_size=pixel[1])
+    u, v = np.meshgrid(u, v, indexing="ij")
     u, v = np.array([u, v]).reshape(2, size) / apu.arcsec
 
     header = {
-        "crval1": pos[0].value,
-        "crval2": pos[1].value,
-        "cdelt1": pixel[0].value,
-        "cdelt2": pixel[1].value,
+        "crval1": pos[1].value,
+        "crval2": pos[0].value,
+        "cdelt1": pixel[1].value,
+        "cdelt2": pixel[0].value,
         "cunit1": "arcsec",
         "cunit2": "arcsec",
     }
@@ -135,8 +137,8 @@ def test_vis_to_image1():
     size = m * n
 
     # Calculate full u, v coverage so will be equivalent to a discrete Fourier transform (DFT)
-    u = generate_uv(m*apu.pix)
-    v = generate_uv(n*apu.pix)
+    u = generate_uv(m * apu.pix)
+    v = generate_uv(n * apu.pix)
     u, v = np.meshgrid(u, v)
     uv = np.array([u, v]).reshape(2, size) / apu.arcsec
     u, v = uv
@@ -155,16 +157,16 @@ def test_vis_to_image_single_pixel_size():
     size = m * n
 
     # Calculate full u, v coverage so will be equivalent to a discrete Fourier transform (DFT)
-    u = generate_uv(m*apu.pix, pixel_size=2. * apu.arcsec/apu.pix)
-    v = generate_uv(n*apu.pix, pixel_size=2. * apu.arcsec/apu.pix)
-    u, v = np.meshgrid(u, v, indexing='ij')
+    u = generate_uv(m * apu.pix, pixel_size=2.0 * apu.arcsec / apu.pix)
+    v = generate_uv(n * apu.pix, pixel_size=2.0 * apu.arcsec / apu.pix)
+    u, v = np.meshgrid(u, v, indexing="ij")
     uv = np.array([u, v]).reshape(2, size) / apu.arcsec
     u, v = uv
     # Astropy index order is opposite to that of numpy, is 1st dim is across second down
     data = Gaussian2DKernel(6, x_size=n, y_size=m).array
 
-    vis = image_to_vis(data, u=u, v=v, pixel_size=(2., 2.) * apu.arcsec/apu.pix)
-    res = vis_to_image(vis, shape=(m, n)*apu.pixel, pixel_size=2. * apu.arcsec/apu.pix)
+    vis = image_to_vis(data, u=u, v=v, pixel_size=(2.0, 2.0) * apu.arcsec / apu.pix)
+    res = vis_to_image(vis, shape=(m, n) * apu.pixel, pixel_size=2.0 * apu.arcsec / apu.pix)
     assert res.shape == (m, n)
     assert np.allclose(data, res)
 
@@ -174,9 +176,9 @@ def test_vis_to_image_invalid_pixel_size():
     size = m * n
 
     # Calculate full u, v coverage so will be equivalent to a discrete Fourier transform (DFT)
-    u = generate_uv(m*apu.pix)
-    v = generate_uv(n*apu.pix)
-    u, v = np.meshgrid(u, v, indexing='ij')
+    u = generate_uv(m * apu.pix)
+    v = generate_uv(n * apu.pix)
+    u, v = np.meshgrid(u, v, indexing="ij")
     uv = np.array([u, v]).reshape(2, size) / apu.arcsec
     u, v = uv
 
@@ -185,26 +187,30 @@ def test_vis_to_image_invalid_pixel_size():
 
     vis = image_to_vis(data, u=u, v=v)
     with pytest.raises(ValueError):
-        vis_to_image(vis, shape=(m, n)*apu.pixel, pixel_size=[1, 2, 2] * apu.arcsec/apu.pix)
+        vis_to_image(vis, shape=(m, n) * apu.pixel, pixel_size=[1, 2, 2] * apu.arcsec / apu.pix)
 
 
-@pytest.mark.parametrize("m,n,pos,pixel", [#(33, 33, (0, 0), (1.5, 1.5)),
-                                           (33, 33, (10., -5.), (2., 3.)),
-                                           (32, 32, (-12, -19), (1., 5.))])
+@pytest.mark.parametrize(
+    "m,n,pos,pixel",
+    [  # (33, 33, (0, 0), (1.5, 1.5)),
+        (33, 33, (10.0, -5.0), (2.0, 3.0)),
+        (32, 32, (-12, -19), (1.0, 5.0)),
+    ],
+)
 def test_vis_to_map(m, n, pos, pixel):
     pos = pos * apu.arcsec
-    pixel = pixel * apu.arcsec/apu.pix
-    u = generate_uv(m*apu.pix, phase_centre=pos[0], pixel_size=pixel[0])
-    v = generate_uv(n*apu.pix, phase_centre=pos[1], pixel_size=pixel[1])
-    u, v = np.meshgrid(u, v, indexing='ij')
+    pixel = pixel * apu.arcsec / apu.pix
+    u = generate_uv(m * apu.pix, phase_centre=pos[0], pixel_size=pixel[0])
+    v = generate_uv(n * apu.pix, phase_centre=pos[1], pixel_size=pixel[1])
+    u, v = np.meshgrid(u, v, indexing="ij")
     uv = np.array([u, v]).reshape(2, m * n) / apu.arcsec
     u, v = uv
 
     header = {
-        "crval1": pos[0].value,
-        "crval2": pos[1].value,
-        "cdelt1": pixel[0].value,
-        "cdelt2": pixel[1].value,
+        "crval1": pos[1].value,
+        "crval2": pos[0].value,
+        "cdelt1": pixel[1].value,
+        "cdelt2": pixel[0].value,
         "cunit1": "arcsec",
         "cunit2": "arcsec",
     }
@@ -213,23 +219,23 @@ def test_vis_to_map(m, n, pos, pixel):
 
     vis = map_to_vis(mp, u=u, v=v)
 
-    res = vis_to_map(vis_map, shape=(m, n)*apu.pixel, pixel_size=pixel, scheme='natural')
+    res = vis_to_map(vis, shape=(m, n) * apu.pixel, pixel_size=pixel, scheme="natural")
     # TODO: figure out why atol is needed here
     assert_allclose(data, res.data, atol=1e-15)
 
-    assert res.reference_coordinate.Tx == pos[0]
-    assert res.reference_coordinate.Ty == pos[1]
-    assert res.scale.axis1 == pixel[0]
-    assert res.scale.axis2 == pixel[1]
+    assert res.reference_coordinate.Tx == pos[1]
+    assert res.reference_coordinate.Ty == pos[0]
+    assert res.scale.axis1 == pixel[1]
+    assert res.scale.axis2 == pixel[0]
     assert res.dimensions.x == m * apu.pix
     assert res.dimensions.y == n * apu.pix
 
 
 def test_to_sunpy_single_pixel_size():
     m = n = 32
-    u = generate_uv(m*apu.pix, pixel_size=2. * apu.arcsec/apu.pix)
-    v = generate_uv(m*apu.pix, pixel_size=2. * apu.arcsec/apu.pix)
-    u, v = np.meshgrid(u, v, indexing='ij')
+    u = generate_uv(m * apu.pix, pixel_size=2.0 * apu.arcsec / apu.pix)
+    v = generate_uv(m * apu.pix, pixel_size=2.0 * apu.arcsec / apu.pix)
+    u, v = np.meshgrid(u, v, indexing="ij")
     uv = np.array([u, v]).reshape(2, m * n) / apu.arcsec
     u, v = uv
 
@@ -238,17 +244,17 @@ def test_to_sunpy_single_pixel_size():
     mp = Map((data, header))
 
     vis = map_to_vis(mp, u=u, v=v)
-    res = vis_to_map(vis, shape=(m, n)*apu.pixel, pixel_size=2 * apu.arcsec/apu.pix)
-    assert res.meta['cdelt1'] == 2.
-    assert res.meta['cdelt1'] == 2.
+    res = vis_to_map(vis, shape=(m, n) * apu.pixel, pixel_size=2 * apu.arcsec / apu.pix)
+    assert res.meta["cdelt1"] == 2.0
+    assert res.meta["cdelt1"] == 2.0
     assert np.allclose(data, res.data)
 
 
 def test_to_sunpy_map_invalid_pixel_size():
     m = n = 32
-    u = generate_uv(m*apu.pix)
-    v = generate_uv(n*apu.pix)
-    u, v = np.meshgrid(u, v, indexing='ij')
+    u = generate_uv(m * apu.pix)
+    v = generate_uv(n * apu.pix)
+    u, v = np.meshgrid(u, v, indexing="ij")
     uv = np.array([u, v]).reshape(2, m * n) / apu.arcsec
     u, v = uv
 
@@ -259,4 +265,4 @@ def test_to_sunpy_map_invalid_pixel_size():
     vis = map_to_vis(mp, u=u, v=v)
 
     with pytest.raises(ValueError):
-        vis_to_map(vis, shape=(m, n)*apu.pixel, pixel_size=[1, 2, 3] * apu.arcsec/apu.pix)
+        vis_to_map(vis, shape=(m, n) * apu.pixel, pixel_size=[1, 2, 3] * apu.arcsec / apu.pix)

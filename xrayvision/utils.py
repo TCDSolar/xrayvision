@@ -22,8 +22,9 @@ def get_logger(name: str, level: Optional[Union[int, str]] = logging.WARNING) ->
     logger.setLevel(level)  # type: ignore
     handler = logging.StreamHandler()
     handler.setLevel(level)  # type: ignore
-    formatter = logging.Formatter('%(asctime)s %(levelname)s %(name)s %(lineno)s: %(message)s',
-                                  datefmt='%Y-%m-%dT%H:%M:%SZ')
+    formatter = logging.Formatter(
+        "%(asctime)s %(levelname)s %(name)s %(lineno)s: %(message)s", datefmt="%Y-%m-%dT%H:%M:%SZ"
+    )
     handler.setFormatter(formatter)
     logger.addHandler(handler)
     return logger

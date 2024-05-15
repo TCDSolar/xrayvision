@@ -10,10 +10,10 @@ from xrayvision.visibility import Visibility
 
 
 def test_visibility():
-    vis = Visibility(vis=1*apu.ct, u=1/apu.deg, v=1/apu.deg)
-    assert vis.vis == 1*apu.ct
-    assert vis.u == 1/apu.deg
-    assert vis.v == 1/apu.deg
+    vis = Visibility(vis=1 * apu.ct, u=1 / apu.deg, v=1 / apu.deg)
+    assert vis.vis == 1 * apu.ct
+    assert vis.u == 1 / apu.deg
+    assert vis.v == 1 / apu.deg
     assert_array_equal([0, 0] * apu.arcsec, vis.phase_centre)
     assert_array_equal([0, 0] * apu.arcsec, vis.offset)
 

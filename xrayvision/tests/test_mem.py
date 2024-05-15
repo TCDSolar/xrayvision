@@ -143,10 +143,9 @@ def test_mem():
     sub_uv = np.vstack([x.flatten(), y.flatten()]) / u.arcsec
     # sub_uv = np.hstack([sub_uv, np.zeros((2, 1))]) / u.arcsec
 
-    vis = image_to_vis(data, u=sub_uv[0, :], v=sub_uv[1, :], pixel_size=2*u.arcsec/u.pix)
-    setattr(vis, 'amplitude_error', np.sqrt(np.abs(vis.vis)))
-    setattr(vis, 'label', [str(x) for x in np.sqrt(x**2 + y**2).flatten()])
+    vis = image_to_vis(data, u=sub_uv[0, :], v=sub_uv[1, :], pixel_size=2 * u.arcsec / u.pix)
+    setattr(vis, "amplitude_error", np.sqrt(np.abs(vis.vis)))
+    setattr(vis, "label", [str(x) for x in np.sqrt(x**2 + y**2).flatten()])
 
-    res = mem(vis, percent_lambda=None, shape=(m, n)*u.pix, pixel=[2, 2]*u.arcsec/u.pix,
-              maxiter=1000, tol=1e-3)
-    np.testing.assert_allclose(res.data - data/4, 0.0, atol=1e-3)
+    res = mem(vis, percent_lambda=None, shape=(m, n) * u.pix, pixel=[2, 2] * u.arcsec / u.pix, maxiter=1000, tol=1e-3)
+    np.testing.assert_allclose(res.data - data / 4, 0.0, atol=1e-3)
