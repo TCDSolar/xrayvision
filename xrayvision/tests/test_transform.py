@@ -32,9 +32,7 @@ def test_generate_xy_offset(center):
     assert np.array_equal(even, generate_xy(32, center=center))
 
 
-@pytest.mark.parametrize("center, pixel_size", [(0, (0.5, 1, 2, 3)),
-                                                (+5.5, (0.5, 1, 2, 3)),
-                                                (-5.5, (0.5, 1, 2, 3))])
+@pytest.mark.parametrize("center, pixel_size", [(0, (0.5, 1, 2, 3)), (+5.5, (0.5, 1, 2, 3)), (-5.5, (0.5, 1, 2, 3))])
 def test_generate_xy_offset_size(center, pixel_size):
     center = center * apu.arcsec
     pixel_size = pixel_size * apu.arcsec
@@ -56,7 +54,7 @@ def test_generate_uv_pixel_size(pixel_size):
     n = 32
 
     # Odd
-    odd = np.linspace(-((m-1)/2) * (1/(m * pixel_size)), ((m-1)/2) * (1/(m * pixel_size)), m)
+    odd = np.linspace(-((m - 1) / 2) * (1 / (m * pixel_size)), ((m - 1) / 2) * (1 / (m * pixel_size)), m)
 
     # Know issue with quantities and isclose/allclose need to add unit to atol default value
     assert np.allclose(odd, generate_uv(m, pixel_size=pixel_size), atol=1e-8 / apu.arcsec)
@@ -73,21 +71,19 @@ def test_generate_uv_pixel_offset(center):
     n = 32
 
     # Odd
-    odd = np.linspace(-((m-1)/2) * (1/m), ((m-1)/2) * (1/m), m) / apu.arcsec
+    odd = np.linspace(-((m - 1) / 2) * (1 / m), ((m - 1) / 2) * (1 / m), m) / apu.arcsec
     if center.value != 0:
-        odd += 1/center
+        odd += 1 / center
     assert np.allclose(odd, generate_uv(m, center=center), atol=1e-8 / apu.arcsec)
 
     # Even
     even = (np.arange(n) - n / 2 + 0.5) * (1 / n) / apu.arcsec
     if center.value != 0:
-        even += 1/center
+        even += 1 / center
     assert np.allclose(even, generate_uv(32, center=center), atol=1e-8 / apu.arcsec)
 
 
-@pytest.mark.parametrize("center, pixel_size", [(0, (0.5, 1, 2, 3)),
-                                                (+5.5, (0.5, 1, 2, 3)),
-                                                (-5.5, (0.5, 1, 2, 3))])
+@pytest.mark.parametrize("center, pixel_size", [(0, (0.5, 1, 2, 3)), (+5.5, (0.5, 1, 2, 3)), (-5.5, (0.5, 1, 2, 3))])
 def test_generate_uv_offset_size(center, pixel_size):
     center = center * apu.arcsec
     pixel_size = pixel_size * apu.arcsec
@@ -99,15 +95,13 @@ def test_generate_uv_offset_size(center, pixel_size):
         odd = np.linspace(-((m - 1) / 2) * (1 / (size * m)), ((m - 1) / 2) * (1 / (size * m)), m)
         if center != 0:
             odd += 1 / center
-        assert np.allclose(odd, generate_uv(m, center=center, pixel_size=size),
-                           atol=1e-8 / apu.arcsec)
+        assert np.allclose(odd, generate_uv(m, center=center, pixel_size=size), atol=1e-8 / apu.arcsec)
 
         # Even
         even = (np.arange(n) - n / 2 + 0.5) * (1 / (size * n))
         if center != 0:
             even += 1 / center
-        assert np.allclose(even, generate_uv(32, center=center, pixel_size=size),
-                           atol=1e-8 / apu.arcsec)
+        assert np.allclose(even, generate_uv(32, center=center, pixel_size=size), atol=1e-8 / apu.arcsec)
 
 
 @pytest.mark.parametrize("shape", [(33, 33), (32, 32), (33, 32), (32, 33)])
@@ -127,7 +121,7 @@ def test_dft_idft_map(shape):
     # assert_array_equal(np.zeros(np.prod((m, n)), dtype=complex), vis)
     out_map = idft_map(vis, u=u, v=v, shape=shape)
     # Should get back original map after dft(idft())
-    assert_allclose(zeros, out_map/np.prod((m, n)))
+    assert_allclose(zeros, out_map / np.prod((m, n)))
 
     # All ones
     ones = np.ones((m, n))
@@ -135,20 +129,20 @@ def test_dft_idft_map(shape):
     # All visibilities should be 1
     # assert_allclose(np.ones(np.prod((m, n)), dtype=complex), vis)
     out_map = idft_map(vis, u=u, v=v, shape=(m, n))
-    assert_allclose(ones, out_map/np.prod((m, n)))
+    assert_allclose(ones, out_map / np.prod((m, n)))
 
     # Delta
     delta = zeros[:, :]
-    delta[m//2, n//2] = 1.0
+    delta[m // 2, n // 2] = 1.0
     vis = dft_map(delta, u=u, v=v)
     out_map = idft_map(vis, u=u, v=v, shape=shape)
-    assert_allclose(out_map/np.prod(shape), delta, atol=1e-14)
+    assert_allclose(out_map / np.prod(shape), delta, atol=1e-14)
 
     # Gaussian - astropy has axis in reverse order compared to numpy
     gaussian = Gaussian2DKernel(5, x_size=n, y_size=m).array
     vis = dft_map(gaussian, u=u, v=v)
     out_map = idft_map(vis, u=u, v=v, shape=shape)
-    assert_allclose(out_map/np.prod(shape), gaussian)
+    assert_allclose(out_map / np.prod(shape), gaussian)
 
 
 # @pytest.mark.skip('UV coordinate generation off somewhere')
@@ -171,26 +165,26 @@ def test_dft_idft_map_pixel_size(pixel_size):
     assert_array_equal(np.zeros(size, dtype=complex), vis)
     out_map = idft_map(vis, u=u, v=v, shape=shape, pixel_size=pixel_size)
     # Should get back original map after dft(idft())
-    assert_array_equal(out_map/np.prod(shape), zeros)
+    assert_array_equal(out_map / np.prod(shape), zeros)
 
     # All ones
     ones = np.ones(shape)
     vis = dft_map(ones, u=u, v=v, pixel_size=pixel_size)
     out_map = idft_map(vis, u=u, v=v, shape=shape, pixel_size=pixel_size)
-    assert_allclose(out_map/np.prod(shape), ones)
+    assert_allclose(out_map / np.prod(shape), ones)
 
     # Delta
     delta = zeros[:, :]
-    delta[m//2, n//2] = 1.0
+    delta[m // 2, n // 2] = 1.0
     vis = dft_map(delta, u=u, v=v, pixel_size=pixel_size)
     out_map = idft_map(vis, u=u, v=v, shape=shape, pixel_size=pixel_size)
-    assert_allclose(out_map/np.prod(shape), delta, atol=1e-14)
+    assert_allclose(out_map / np.prod(shape), delta, atol=1e-14)
 
     # Gaussian - astropy has axis in reverse order compared to numpy
     gaussian = Gaussian2DKernel(5, x_size=n, y_size=m).array
     vis = dft_map(gaussian, u=u, v=v, pixel_size=pixel_size)
     out_map = idft_map(vis, u=u, v=v, shape=shape, pixel_size=pixel_size)
-    assert_allclose(out_map/np.prod(shape), gaussian)
+    assert_allclose(out_map / np.prod(shape), gaussian)
 
 
 # @pytest.mark.skip('UV coordinate generation off somewhere')
@@ -213,33 +207,33 @@ def test_dft_idft_map_center(center):
     assert_array_equal(vis, np.zeros(size, dtype=complex))
     out_map = idft_map(vis, u=u, v=v, shape=shape, center=center)
     # Should get back original map after dft(idft())
-    assert_array_equal(out_map/np.prod(shape), zeros)
+    assert_array_equal(out_map / np.prod(shape), zeros)
 
     # All ones
     ones = np.ones(shape)
     vis = dft_map(ones, u=u, v=v, center=center)
     out_map = idft_map(vis, u=u, v=v, shape=shape, center=center)
-    assert_allclose(out_map/np.prod(shape), ones)
+    assert_allclose(out_map / np.prod(shape), ones)
 
     # Delta
     delta = zeros[:, :]
-    delta[m//2, n//2] = 1.0
+    delta[m // 2, n // 2] = 1.0
     vis = dft_map(delta, u=u, v=v, center=center)
     out_map = idft_map(vis, u=u, v=v, shape=shape, center=center)
-    assert_allclose(out_map/np.prod(shape), delta, atol=1e-14)
+    assert_allclose(out_map / np.prod(shape), delta, atol=1e-14)
 
     # Gaussian - astropy has axis in reverse order compared to numpy
     gaussian = Gaussian2DKernel(5, x_size=n, y_size=m).array
     vis = dft_map(gaussian, u=u, v=v, center=center)
     out_map = idft_map(vis, u=u, v=v, shape=shape, center=center)
-    assert_allclose(out_map/np.prod(shape), gaussian)
+    assert_allclose(out_map / np.prod(shape), gaussian)
 
 
 # @pytest.mark.skip('UV coordinate generation off somewhere')
-@pytest.mark.parametrize("shape, pixel_size", [((11, 10), (0.5, 0.5)),
-                                               ((11, 10), (1.0, 1.0)),
-                                               ((11, 10), (2.0, 2.0)),
-                                               ((11, 10), (3.0, 3.0))])
+@pytest.mark.parametrize(
+    "shape, pixel_size",
+    [((11, 10), (0.5, 0.5)), ((11, 10), (1.0, 1.0)), ((11, 10), (2.0, 2.0)), ((11, 10), (3.0, 3.0))],
+)
 def test_dft_idft_map_shape_pixel_size(shape, pixel_size):
     pixel_size = pixel_size * apu.arcsec
     m, n = shape
@@ -258,26 +252,26 @@ def test_dft_idft_map_shape_pixel_size(shape, pixel_size):
     assert_array_equal(np.zeros(size, dtype=complex), vis)
     out_map = idft_map(vis, u=u, v=v, shape=shape, pixel_size=pixel_size)
     # Should get back original map after dft(idft())
-    assert_array_equal(out_map/np.prod(shape), zeros)
+    assert_array_equal(out_map / np.prod(shape), zeros)
 
     # All ones
     ones = np.ones(shape)
     vis = dft_map(ones, u=u, v=v, pixel_size=pixel_size)
     out_map = idft_map(vis, u=u, v=v, shape=shape, pixel_size=pixel_size)
-    assert_allclose(out_map/np.prod(shape), ones)
+    assert_allclose(out_map / np.prod(shape), ones)
 
     # Delta
     delta = zeros[:, :]
     delta[m // 2, n // 2] = 1.0
     vis = dft_map(delta, u=u, v=v, pixel_size=pixel_size)
     out_map = idft_map(vis, u=u, v=v, shape=shape, pixel_size=pixel_size)
-    assert_allclose(out_map/np.prod(shape), delta, atol=1e-14)
+    assert_allclose(out_map / np.prod(shape), delta, atol=1e-14)
 
     # Gaussian - astropy has axis in reverse order compared to numpy
     gaussian = Gaussian2DKernel(5, x_size=n, y_size=m).array
     vis = dft_map(gaussian, u=u, v=v, pixel_size=pixel_size)
     out_map = idft_map(vis, u=u, v=v, shape=shape, pixel_size=pixel_size)
-    assert_allclose(out_map/np.prod(shape), gaussian)
+    assert_allclose(out_map / np.prod(shape), gaussian)
 
 
 def test_equivalence_of_convolve():
@@ -296,7 +290,7 @@ def test_equivalence_of_convolve():
 
     full_vis = dft_map(data, u=u, v=v)
 
-    sampling = np.random.choice(2, size=(33**2))*1
+    sampling = np.random.choice(2, size=(33**2)) * 1
     sampling.reshape(33, 33)[16, 16] = 1
     sub_vis = sampling * full_vis
 
@@ -309,7 +303,7 @@ def test_equivalence_of_convolve():
     # Need to make the psf large enough to slide over entire data window
     psf1 = idft_map(sampling[non_zero], u=u[non_zero], v=v[non_zero], shape=(33 * 3, 33 * 3))
 
-    conv = signal.convolve(data, psf1, mode='same', method='fft')
+    conv = signal.convolve(data, psf1, mode="same", method="fft")
 
     psf2 = idft_map(sampling[non_zero], u=u[non_zero], v=v[non_zero], shape=(33, 33))
 

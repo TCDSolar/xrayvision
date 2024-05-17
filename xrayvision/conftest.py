@@ -6,4 +6,4 @@ try:
 except ImportError:
     pass
 else:
-    matplotlib.use('Agg')
+    matplotlib.use("Agg")

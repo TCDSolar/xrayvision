@@ -8,15 +8,16 @@ certain spacecraft or instruments
 import astropy.units as apu
 import numpy as np
 
-__all__ = ['Visibility']
+__all__ = ["Visibility"]
 
 
 class BaseVisibility:
     r"""
     Base visibility containing bare essential fields, u, v, and complex vis
     """
-    @apu.quantity_input(u=1/apu.arcsec, v=1/apu.arcsec, center=apu.arcsec)
-    def __int__(self, u, v, vis, center=(0, 0)*apu.arcsec):
+
+    @apu.quantity_input(u=1 / apu.arcsec, v=1 / apu.arcsec, center=apu.arcsec)
+    def __int__(self, u, v, vis, center=(0, 0) * apu.arcsec):
         self.u = u
         self.v = v
         self.vis = vis
@@ -39,8 +40,9 @@ class Visibility:
         The x, y offset of phase center
 
     """
-    @apu.quantity_input(uv=1/apu.arcsec, offset=apu.arcsec, center=apu.arcsec, pixel_size=apu.arcsec)
-    def __init__(self, vis, *, u, v, offset=(0., 0.) * apu.arcsec, center=(0., 0.) * apu.arcsec):
+
+    @apu.quantity_input(uv=1 / apu.arcsec, offset=apu.arcsec, center=apu.arcsec, pixel_size=apu.arcsec)
+    def __init__(self, vis, *, u, v, offset=(0.0, 0.0) * apu.arcsec, center=(0.0, 0.0) * apu.arcsec):
         r"""
         Initialise a new Visibility object.
 
