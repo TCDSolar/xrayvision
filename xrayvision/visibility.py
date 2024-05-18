@@ -16,7 +16,7 @@ import xarray
 from astropy.coordinates import SkyCoord
 from astropy.time import Time
 
-__all__ = ['Visibilitiy', 'Visibilities', 'VisibilitiesBase', 'VisMeta']
+__all__ = ['Visibility', 'Visibilities', 'VisibilitiesBase', 'VisMeta']
 
 
 class VisMetaABC(abc.ABC):

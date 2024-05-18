@@ -7,7 +7,7 @@ XRAYVISION - X-RAY VIsibility Synthesis ImagiNg
     :target: https://www.sunpy.org
     :alt: Powered by SunPy Badge
 
-.. |Build Status| image:: https://github.com/TCDSolar/xrayvision/actions/workflows/ci.yaml/badge.svg
+.. |Build Status| image:: https://github.com/TCDSolar/xrayvision/actions/workflows/ci.yml/badge.svg
     :target: https://github.com/TCDSolar/xrayvision/actions/workflows/ci.yaml
     :alt: Build Status
 

@@ -13,11 +13,19 @@ from xrayvision.imaging import generate_header
 from xrayvision.transform import generate_xy
 from xrayvision.utils import get_logger
 
-__all__ = ['get_entropy', 'get_fourier_matrix', 'estimate_flux', 'get_mean_visibilities',
-           'proximal_entropy', 'proximal_operator', 'optimise_fb', 'mem']
+__all__ = [
+    "get_entropy",
+    "get_fourier_matrix",
+    "estimate_flux",
+    "get_mean_visibilities",
+    "proximal_entropy",
+    "proximal_operator",
+    "optimise_fb",
+    "mem",
+]
 
 
-logger = get_logger(__name__, 'DEBUG')
+logger = get_logger(__name__, "DEBUG")
 
 
 def get_entropy(image, flux):
@@ -44,10 +52,10 @@ def get_entropy(image, flux):
     -------
 
     """
-    return np.sum(image*np.log(image/(flux*np.e)))
+    return np.sum(image * np.log(image / (flux * np.e)))
 
 
-def get_fourier_matrix(vis, shape=[64, 64]*apu.pix, pixel_size=[4.0312500, 4.0312500]*apu.arcsec):
+def get_fourier_matrix(vis, shape=[64, 64] * apu.pix, pixel_size=[4.0312500, 4.0312500] * apu.arcsec):
     r"""
     Return the complex Fourier matrix used to compute the value of the visibilities.
 
@@ -68,20 +76,20 @@ def get_fourier_matrix(vis, shape=[64, 64]*apu.pix, pixel_size=[4.0312500, 4.031
     -------
     The complex Fourier matrix
     """
-    m, n = shape.to_value('pix')
+    m, n = shape.to_value("pix")
     y = generate_xy(m, 0 * apu.arcsec, pixel_size[1])
     x = generate_xy(n, 0 * apu.arcsec, pixel_size[0])
     x, y = np.meshgrid(x, y)
     uv = np.vstack([vis.u, vis.v])
     # Check apu are correct for exp need to be dimensionless and then remove apu for speed
-    if (vis.u * x[0, 0]).unit == apu.dimensionless_unscaled and \
-            (vis.v * y[0, 0]).unit == apu.dimensionless_unscaled:
+    if (vis.u * x[0, 0]).unit == apu.dimensionless_unscaled and (vis.v * y[0, 0]).unit == apu.dimensionless_unscaled:
         uv = uv.value
         x = x.value
         y = y.value
 
-        Hv = np.exp(1j * 2 * np.pi * (x[..., np.newaxis] * uv[np.newaxis, 0, :]
-                                      + y[..., np.newaxis] * uv[np.newaxis, 1, :]))
+        Hv = np.exp(
+            1j * 2 * np.pi * (x[..., np.newaxis] * uv[np.newaxis, 0, :] + y[..., np.newaxis] * uv[np.newaxis, 1, :])
+        )
 
         return Hv * pixel_size[0] * pixel_size[1]
 
@@ -126,14 +134,14 @@ def estimate_flux(vis, shape, pixel, maxiter=1000, tol=1e-3):
 
     # PROJECTED LANDWEBER
     # should have same apu as image ct/ keV cm s arcsec**2
-    x = np.zeros(shape.to_value('pix').astype(int)).flatten()
+    x = np.zeros(shape.to_value("pix").astype(int)).flatten()
 
     for i in range(maxiter):
         x_old = x[:]
 
         # GRADIENT STEP
-        grad = 2. * np.matmul((np.matmul(Hv,  x).value - Visib).T, Hv)
-        y = x - 1. / Lip * grad
+        grad = 2.0 * np.matmul((np.matmul(Hv, x).value - Visib).T, Hv)
+        y = x - 1.0 / Lip * grad
 
         # PROJECTION ON THE POSITIVE ORTHANT
         x = y.clip(min=0.0)
@@ -141,10 +149,10 @@ def estimate_flux(vis, shape, pixel, maxiter=1000, tol=1e-3):
         Hvx = np.matmul(Hv, tmp)
 
         diff_V = Hvx - Visib
-        chi2 = (diff_V ** 2.).sum()
+        chi2 = (diff_V**2.0).sum()
 
-        logger.info(f'Iter: {i}, Chi2: {chi2}')
-        if np.sqrt(((x - x_old) ** 2.).sum()) < tol * np.sqrt((x_old ** 2.).sum()):
+        logger.info(f"Iter: {i}, Chi2: {chi2}")
+        if np.sqrt(((x - x_old) ** 2.0).sum()) < tol * np.sqrt((x_old**2.0).sum()):
             break
 
     return x.sum() * pixel[0] * pixel[1]
@@ -190,7 +198,7 @@ def _prepare_for_optimise(pixel, shape, vis):
     # RESCALING of 'Hv' AND 'Visib'(NEEDED FOR COMPUTING THE VALUE OF THE \chi ** 2; FUNCTION)
     # The vector 'Visib' and every column of 'Hv' are divided by 'sigma'
     Visib = Visib / sigma
-    ones = np.ones(shape.to_value('pix').astype(int))
+    ones = np.ones(shape.to_value("pix").astype(int))
     sigma1 = sigma * ones[..., np.newaxis]
     Hv = Hv / sigma1
     # COMPUTATION OF THE LIPSCHITZ CONSTANT; 'Lip' OF THE GRADIENT OF  THE \chi ** 2
@@ -221,7 +229,7 @@ def get_mean_visibilities(vis, shape, pixel):
     """
 
     imsize2 = shape[0] / 2
-    pixel_size = 1/(shape[0]*pixel[0])
+    pixel_size = 1 / (shape[0] * pixel[0])
 
     iu = vis.u / pixel_size
     iv = vis.v / pixel_size
@@ -234,7 +242,7 @@ def get_mean_visibilities(vis, shape, pixel):
     rv = rv + imsize2
 
     # matrix that represents the discretization of the (u,v)-plane
-    iuarr = np.zeros(shape.to_value('pixel').astype(int))
+    iuarr = np.zeros(shape.to_value("pixel").astype(int))
 
     count = 0
     n_vis = vis.u.shape[0]
@@ -245,19 +253,19 @@ def get_mean_visibilities(vis, shape, pixel):
     visib = np.zeros_like(vis.vis)
     for ip in range(n_vis):
         # what about 0.5 pix offset
-        i = ru[ip].to_value('pix').astype(int)
-        j = rv[ip].to_value('pix').astype(int)
+        i = ru[ip].to_value("pix").astype(int)
+        j = rv[ip].to_value("pix").astype(int)
         # (i, j) is the position of the spatial frequency in
         # the discretization of the (u,v)-plane 'iuarr'
-        if iuarr[i, j] == 0.:
+        if iuarr[i, j] == 0.0:
             u[count] = vis.u[ip]
             v[count] = vis.v[ip]
             # we save in 'u' and 'v' the u and v coordinates of the first frequency that corresponds
             # to the position (i, j) of the discretization of the (u,v)-plane 'iuarr'
 
             visib[count] = vis.vis[ip]
-            weights[count] = vis.amplitude_error[ip]**2.
-            den[count] = 1.
+            weights[count] = vis.amplitude_error[ip] ** 2.0
+            den[count] = 1.0
             iuarr[i, j] = count
 
             count += 1
@@ -265,10 +273,10 @@ def get_mean_visibilities(vis, shape, pixel):
             # Save the sum of the visibilities that correspond to the same position (i, j)
             visib[iuarr[i, j].astype(int)] += vis.vis[ip]
             # Save the number of the visibilities that correspond to the same position (i, j)
-            den[iuarr[i, j].astype(int)] += 1.
+            den[iuarr[i, j].astype(int)] += 1.0
             # Save the sum of the variances of the amplitudes of the visibilities that
             # correspond to the same position (i, j)
-            weights[iuarr[i, j].astype(int)] += vis.amplitude_error[ip]**2
+            weights[iuarr[i, j].astype(int)] += vis.amplitude_error[ip] ** 2
 
     u = u[:count]
     v = v[:count]
@@ -277,10 +285,10 @@ def get_mean_visibilities(vis, shape, pixel):
 
     # computation of the mean value of the visibilities that correspond to the same
     # position in the discretization of the (u,v)-plane
-    visib = visib/den
+    visib = visib / den
     # computation of the mean value of the standard deviation of the visibilities that
     # correspond to the same position in the discretization of the (u,v)-plane
-    weights = np.sqrt(weights[:count])/den
+    weights = np.sqrt(weights[:count]) / den
 
     return SimpleNamespace(u=u, v=v, vis=visib, amplitude_error=weights)
 
@@ -310,10 +318,10 @@ def proximal_entropy(y, m, lamba, Lip, tol=10**-10):
     """
     # INITIALIZATION OF THE BISECTION METHOD
     # TODO where does this number come from
-    a = np.full_like(y, 1e-24*y.unit)
+    a = np.full_like(y, 1e-24 * y.unit)
     b = np.where(y > m, y, m)
 
-    while np.max(b - a) > tol*y.unit:
+    while np.max(b - a) > tol * y.unit:
         c = (a + b) / 2
         f_c = c - y + lamba / Lip * np.log(c / m)
 
@@ -358,7 +366,6 @@ def proximal_operator(z, f, m, lamb, Lip, niter=250):
     q = np.zeros_like(x)
 
     for i in range(niter):
-
         tmp = x + p
         # Projection on the hyperplane that represents the flux constraint
         y = tmp + (f - tmp.sum()) / tmp.size
@@ -420,12 +427,12 @@ def optimise_fb(Hv, Visib, Lip, flux, lambd, shape, pixel, maxiter, tol):
     # 'f': value of the total flux of the image (taking into account the area of the pixel)
     f = flux / (pixel[0] * pixel[1])
     # 'm': total flux divided by the number of pixels of the image
-    m = f / np.prod(shape.to_value('pix'))
+    m = f / np.prod(shape.to_value("pix"))
 
     # INITIALIZATION
 
     # 'x': constant image with total flux equal to 'f'
-    x = np.ones(shape.to_value('pix').astype(int)) + 1.
+    x = np.ones(shape.to_value("pix").astype(int)) + 1.0
     x = x / x.sum() * f
     z = x
     t = 1.0
@@ -442,14 +449,12 @@ def optimise_fb(Hv, Visib, Lip, flux, lambd, shape, pixel, maxiter, tol):
 
     n_iterations = 0  # number of iterations done in the proximal steps to update the minimizer
     for i in range(maxiter):
-
         J_old = np.copy(J)
         x_old = np.copy(x)
         t_old = np.copy(t)
 
         # GRADIENT STEP
-        grad = 2 * np.matmul((np.matmul(Hv, z.flatten()) - Visib),
-                             Hv).reshape(*shape.to_value('pix').astype(int))
+        grad = 2 * np.matmul((np.matmul(Hv, z.flatten()) - Visib), Hv).reshape(*shape.to_value("pix").astype(int))
         y = z - 1 / Lip * grad
 
         # PROXIMAL STEP
@@ -482,13 +487,13 @@ def optimise_fb(Hv, Visib, Lip, flux, lambd, shape, pixel, maxiter, tol):
 
         # ACCELERATION
 
-        t = (1 + np.sqrt(1. + 4. * t_old ** 2.)) / 2.
-        tau = (t_old - 1.) / t
+        t = (1 + np.sqrt(1.0 + 4.0 * t_old**2.0)) / 2.0
+        tau = (t_old - 1.0) / t
         z = x + tau * (x - x_old) + (t_old / t) * (p - x)
 
-        logger.info(f'Iter: {i}, Obj function: {J}')
+        logger.info(f"Iter: {i}, Obj function: {J}")
 
-        if check and (np.sqrt(((x - x_old)**2.).sum()) < tol * np.sqrt((x_old**2).sum())):
+        if check and (np.sqrt(((x - x_old) ** 2.0).sum()) < tol * np.sqrt((x_old**2).sum())):
             break
 
     return x_old
@@ -526,11 +531,11 @@ def resistant_mean(data, sigma_cut):
     cutoff = sigma_cut * median_abs_deviation
     good_index = np.where(abs_deviation <= cutoff)
     if not good_index[0].size > 0:
-        raise ValueError('Unable to compute mean')
+        raise ValueError("Unable to compute mean")
 
     good_points = data[good_index]
     mean = np.mean(good_points)
-    sigma = np.sqrt((((good_points - mean)**2).sum()) / good_points.size)
+    sigma = np.sqrt((((good_points - mean) ** 2).sum()) / good_points.size)
 
     # Compensate Sigma for truncation (formula by HF):
     if sigma_cut <= 4.50:
@@ -542,7 +547,7 @@ def resistant_mean(data, sigma_cut):
     good_points = data[good_index]
 
     mean = np.mean(good_points)
-    sigma = np.sqrt((((good_points - mean)**2).sum()) / good_points.size)
+    sigma = np.sqrt((((good_points - mean) ** 2).sum()) / good_points.size)
 
     if sigma_cut <= 4.50:
         sigma = sigma / np.polyval(sig_coeff[::-1], sigma_cut)
@@ -576,12 +581,12 @@ def get_percent_lambda(vis):
     isc_min = 3
     nbig = 0
 
-    if hasattr(vis, 'label'):
+    if hasattr(vis, "label"):
         isc_sizes = np.array([float(s[:-1]) for s in vis.label])
         while isc_min >= 0 and nbig < 2:
             ibig = np.argwhere(isc_sizes >= isc_min)
             isc_min = isc_min - 1
-    elif hasattr(vis, 'isc'):
+    elif hasattr(vis, "isc"):
         ibig = np.arange(vis.isc.size)
 
     # If still don't have at least 2 vis, return -1, otherwise calculate mean
@@ -589,8 +594,7 @@ def get_percent_lambda(vis):
     if ibig.size < 2:
         snr_value = -1
     else:
-        snr_value, _ = resistant_mean(
-            (np.abs(vis.vis[ibig])/vis.amplitude_error[ibig]).flatten(), 3)
+        snr_value, _ = resistant_mean((np.abs(vis.vis[ibig]) / vis.amplitude_error[ibig]).flatten(), 3)
 
     # TODO magic numbers
     percent_lambda = 2 / (snr_value**2 + 90)
@@ -630,13 +634,13 @@ def mem(vis, percent_lambda=None, shape=None, pixel=None, maxiter=1000, tol=1e-3
     Hv, Lip, Visib = _prepare_for_optimise(pixel, shape, mean_vis)
 
     # should have same apu as image ct/ keV cm s arcsec**2
-    x = np.zeros(shape.to_value('pix').astype(int)).flatten()
+    x = np.zeros(shape.to_value("pix").astype(int)).flatten()
 
     # COMPUTATION OF THE; OBJECTIVE; FUNCTION; 'chi2'
-    x = x + total_flux/(shape[0]*shape[1]*pixel[0]*pixel[1]).value
+    x = x + total_flux / (shape[0] * shape[1] * pixel[0] * pixel[1]).value
     Hvx = np.matmul(Hv, x)
 
-    lambd = 2 * np.abs(np.matmul((Hvx.value - Visib), Hv)).max()*percent_lambda
+    lambd = 2 * np.abs(np.matmul((Hvx.value - Visib), Hv)).max() * percent_lambda
 
     im = optimise_fb(Hv, Visib, Lip, total_flux, lambd, shape, pixel, maxiter, tol)
 
