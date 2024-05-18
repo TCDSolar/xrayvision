@@ -1,11 +1,11 @@
 from pathlib import Path
 
-import pytest
-
 import astropy.units as apu
+import pytest
 from astropy.tests.helper import assert_quantity_allclose
 
 import xrayvision.visibility as vm
+
 
 @pytest.fixture
 def test_data_dir():
@@ -18,7 +18,7 @@ def visibilities_base():
     u = [0.023, -0.08]*1/apu.arcsec
     v = [-0.0013, 0.013]*1/apu.arcsec
     unc = [0.01, 0.15]*apu.ct
-    names = ['3a', '10b']   
+    names = ['3a', '10b']
     return vm.VisibilitiesBase(visibilities, u, v, names, uncertainty=unc)
 
 def test_vis_u(visibilities_base):
