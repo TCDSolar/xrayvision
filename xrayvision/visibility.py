@@ -6,7 +6,7 @@ certain spacecraft or instruments
 """
 
 import abc
-from typing import Union
+from typing import Any, Union
 from collections.abc import Iterable
 
 import astropy.units as apu
@@ -45,8 +45,7 @@ class VisMetaABC(abc.ABC):
         Location of the observer.
         """
 
-    property
-
+    @property
     @abc.abstractmethod
     def vis_labels(self) -> Union[Iterable[str], None]:
         """
@@ -139,7 +138,7 @@ class Visibilities(VisibilitiesABC):
         observer_coordinate: Union[SkyCoord, None] = None,
         energy_range: Union[apu.Quantity[apu.keV], None] = None,
         time_range: Union[Time, None] = None,
-        meta: Union[dict, None] = None,
+        meta: Any = dict(),
         amplitude: Union[apu.Quantity, None] = None,
         amplitude_uncertainty: Union[apu.Quantity, None] = None,
         phase: Union[apu.Quantity[apu.arcsec], None] = None,
@@ -170,7 +169,7 @@ class Visibilities(VisibilitiesABC):
             The energy range over which the visibilities were calculated.
         time_range : `astropy.time.Time`, optional
             The time range over which the visibilities were calculated.
-        meta : `VisMetaABC` or `dict`, optional
+        meta : `VisMetaABC` or dict-like, optional
             Metadata associated with the visibilities.
         amplitude : `astropy.units.Quantity`, optional
             The amplitude of the visibilities.  If not given, amplitudes
@@ -231,8 +230,8 @@ class Visibilities(VisibilitiesABC):
         self._units_key = "units"
 
         # Build meta.
-        if meta is None:
-            meta = {}
+        if not isinstance(meta, VisMetaABC):
+            meta = VisMeta(meta)
         meta[self._phase_center_key] = phase_center
         if observer_coordinate is not None:
             meta[self._obs_coord_key] = observer_coordinate
@@ -286,12 +285,8 @@ class Visibilities(VisibilitiesABC):
 
     @property
     def meta(self):
-        # Copy underlying metadata
-        meta = copy.deepcopy(self._data.attrs[self._meta_key])
-        # Add vis labels to meta.
+        meta = self._data.attrs[self._meta_key]
         meta[self._vis_labels_key] = self._data.coords[self._vis_labels_key][1]
-        # Construct a VisMeta object and return.
-        meta = VisMeta(meta)
         return meta
 
     @property
