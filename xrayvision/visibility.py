@@ -148,8 +148,8 @@ class VisibilitiesBase(VisibilitiesBaseABC):
         names: Iterable[str],
         meta: Any = None,
         dims: Iterable[str] = ("uv",),
-        uncertainty: Union[apu.Quantity, None],
-        coords: dict = {},
+        uncertainty: Union[apu.Quantity, None] = None,
+        coords: dict = {}
     ):
         r"""
         Initialise a new Visibility object.
@@ -334,8 +334,8 @@ class Visibilities(VisibilitiesBase, VisibilitiesABC):
         names: Iterable[str],
         meta: VisMetaABC,
         dims: Iterable[str] = ("uv",),
-        uncertainty: Union[apu.Quantity, None],
-        coords: dict = {},
+        uncertainty: Union[apu.Quantity, None] = None,
+        coords: dict = {}
     ):
         r"""
         Initialise a new Visibility object.
