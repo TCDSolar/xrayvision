@@ -358,21 +358,48 @@ class Visibilities(VisibilitiesBase,VisibilitiesABC):
         super().__init__(visibilities, u, v, names, uncertainty=uncertainty, meta=meta)
 
 
-class VisMeta(VisMetaABC, SimpleNamespace):
-    def __init__(self, **kwargs):
-        energy_range = kwargs.get("energy_range", None)
-        time_range = kwargs.get("time_range", None)
-        center_range = kwargs.get("center", None)
-        observer_coordinate = kwargs.get("observer_coordinate", None)
+class VisMeta(VisMetaABC, dict):
+    """
+    A class for holding Visibility-specific metadata.
+
+    Parameters
+    ----------
+    meta: `dict`
+        A dictionary of the metadata
+    """
+    def __init__(self, meta):
+        energy_range = meta.get("energy_range", None)
+        time_range = meta.get("time_range", None)
+        center_range = meta.get("center", None)
+        observer_coordinate = meta.get("observer_coordinate", None)
         if not isinstance(energy_range, apu.Quantity) or len(energy_range) != 2:
-            raise ValueError('energy_range must be length 2.')
+            raise ValueError("Input must contain the key 'energy_range' "
+                             "which gives a length-2 astropy Quantity.")
         if not isinstance(time_range, Time) or len(time_range) != 2:
-            raise ValueError('time_range must be a length 2 astropy time object.')
+            raise ValueError("Input must contain the key 'time_range' "
+                             "which gives a length 2 astropy time object.")
         if not isinstance(center, SkyCoord) or not center.isscalar:
-            raise ValueError('center must be a scalar SkyCoord.')
+            raise ValueError("Input must contain the key 'center' which gives a scalar SkyCoord.")
         if not isinstance(observer_coordinate, SkyCoord) or not observer_coordinate.isscalar:
-            raise ValueError('observer_coordinate must be a scalar SkyCoord.')
-        super().__init__(**kwargs)
+            raise ValueError("Input must contain the key 'observer_coordinate' "
+                             "which gives a scalar SkyCoord.")
+        super().__init__(meta)
+
+    @property
+    def energy_range(self):
+        return self["energy_range"]
+
+    @property
+    def time_range(self):
+        return self["energy_range"]
+
+    @property
+    def center(self):
+        return self["center"]
+
+    @property
+    def observer_coordinate(self):
+        return self["observer_coordinate"]
 
 
 class BaseVisibility:
