@@ -6,7 +6,6 @@ certain spacecraft or instruments
 """
 
 import abc
-from types import SimpleNamespace
 from typing import Any, Union
 from collections.abc import Iterable
 
@@ -16,7 +15,7 @@ import xarray
 from astropy.coordinates import SkyCoord
 from astropy.time import Time
 
-__all__ = ['Visibility', 'Visibilities', 'VisibilitiesBase', 'VisMeta']
+__all__ = ["Visibility", "Visibilities", "VisibilitiesBase", "VisMeta"]
 
 
 class VisMetaABC(abc.ABC):
@@ -94,6 +93,7 @@ class VisibilitiesBaseABC(abc.ABC):
         Meta data.
         """
 
+
 class VisibilitiesABC(VisibilitiesBaseABC):
     @property
     @abc.abstractmethod
@@ -115,6 +115,7 @@ class VisibilitiesABC(VisibilitiesBaseABC):
         """
         Phases of the visibilities.
         """
+
     @property
     @abc.abstractmethod
     def amplitude_uncertainty(self) -> np.ndarray:
@@ -138,32 +139,18 @@ class VisibilitiesABC(VisibilitiesBaseABC):
 
 
 class VisibilitiesBase(VisibilitiesBaseABC):
-    r"""
-    Hold a set of related visibilities and information.
-
-    Attributes
-    ----------
-    vis : `numpy.ndarray`
-        Array of N complex visibilities at coordinates in `uv`
-    u : `numpy.ndarray`
-        Array of `u` coordinates where visibilities will be evaluated
-    v : `numpy.ndarray`
-        Array of `v` coordinates where visibilities will be evaluated
-    center : `float` (x, y), optional
-        The x, y offset of phase center
-
-    """
     @apu.quantity_input()
-    def __init__(self,
-                 visibilities: apu.Quantity,
-                 u: apu.Quantity[1/apu.arcsec],
-                 v: apu.Quantity[1/apu.arcsec],
-                 names: Iterable[str],
-                 uncertainty: Union[apu.Quantity, None],
-                 meta: Any = None,
-                 dims: Iterable[str] = ("uv",),
-                 coords: dict = {}):
-
+    def __init__(
+        self,
+        visibilities: apu.Quantity,
+        u: apu.Quantity[1 / apu.arcsec],
+        v: apu.Quantity[1 / apu.arcsec],
+        names: Iterable[str],
+        meta: Any = None,
+        dims: Iterable[str] = ("uv",),
+        uncertainty: Union[apu.Quantity, None],
+        coords: dict = {},
+    ):
         r"""
         Initialise a new Visibility object.
 
@@ -175,22 +162,31 @@ class VisibilitiesBase(VisibilitiesBaseABC):
             Array of `u` coordinates where visibilities will be evaluated.
         v : `numpy.ndarray`
             Array of `v` coordinates where visibilities will be evaluated.
-        center :
-            Phase centre
+        names : iterable of `str`
+            The names of the axes.
+        meta :, optional
+            A place for metadata.
+        dims : iterable of `str`
+            The labels for each dimension type. Must contain 'uv' to denote
+            the UV plane dimension.
+        uncertainty :, optional
+            The uncertainty of visibilities.
+        coords : `dict`, optional
+            Coordinate grid values for any additional dimensions.
         """
         if not isinstance(visibilities, apu.Quantity) or visibilities.isscalar:
-            raise TypeError('visibilities must all be a non scalar Astropy quantity.')
+            raise TypeError("visibilities must all be a non scalar Astropy quantity.")
         nvis = len(visibilities)
         if len(u) != nvis:
-            raise ValueError('u must be the same length as visibilities.')
+            raise ValueError("u must be the same length as visibilities.")
         if len(v) != nvis:
-            raise ValueError('v must be the same length as visibilities.')
+            raise ValueError("v must be the same length as visibilities.")
         if len(names) != nvis:
-            raise ValueError('names must be the same length as visibilities.')
+            raise ValueError("names must be the same length as visibilities.")
         if not np.array(isinstance(name, str) for name in names).all():
-            raise TypeError('names must all be strings.')
+            raise TypeError("names must all be strings.")
         if uncertainty is not None and not isinstance(uncertainty, apu.Quantity):
-            raise TypeError('uncertainty must be None or same type as visibilities.')
+            raise TypeError("uncertainty must be None or same type as visibilities.")
         uv_name = "uv"
         if uv_name not in dims:
             raise ValueError(f"dims must contain '{uv_name}'.")
@@ -199,8 +195,9 @@ class VisibilitiesBase(VisibilitiesBaseABC):
             data["uncertainty"] = (dims, uncertainty.to_value(visibilities.unit))
         for key, value in coords.items():
             print(key, value)
-        units = dict([(key, value[1].unit) if hasattr(value[1], "unit") else (key, None)
-                      for key, value in coords.items()])
+        units = dict(
+            [(key, value[1].unit) if hasattr(value[1], "unit") else (key, None) for key, value in coords.items()]
+        )
         units["data"] = visibilities.unit
         units["u"] = u.unit
         units["v"] = v.unit
@@ -229,7 +226,11 @@ class VisibilitiesBase(VisibilitiesBaseABC):
     @property
     def uncertainty(self):
         unc_name = "uncertainty"
-        return apu.Quantity(self._data[unc_name], unit=self._data.attrs["units"]["data"]) if unc_name in self._data.keys() else None
+        return (
+            apu.Quantity(self._data[unc_name], unit=self._data.attrs["units"]["data"])
+            if unc_name in self._data.keys()
+            else None
+        )
 
     @property
     def meta(self):
@@ -259,8 +260,10 @@ class VisibilitiesBase(VisibilitiesBaseABC):
             return self._build_quantity(label, unit_label=unit_label)
         else:
             amplitude = self.amplitude
-            return np.sqrt((np.real(self.visibilities) / amplitude * np.real(self.uncertainty)) ** 2
-                           + (np.imag(self.visibilities) / amplitude * np.imag(self.uncertainty)) ** 2 )
+            return np.sqrt(
+                (np.real(self.visibilities) / amplitude * np.real(self.uncertainty)) ** 2
+                + (np.imag(self.visibilities) / amplitude * np.imag(self.uncertainty)) ** 2
+            )
 
     @property
     def phase(self):
@@ -278,8 +281,13 @@ class VisibilitiesBase(VisibilitiesBaseABC):
             return self._build_quantity(label, unit_label=unit_label)
         else:
             amplitude = self.amplitude
-            return (np.sqrt(np.imag(self.visibilities) ** 2 / amplitude ** 4 * np.real(self.uncertainty) ** 2
-                            + np.real(self.visibilities) ** 2 / amplitude ** 4 * np.imag(self.uncertainty) ** 2 ) * apu.rad).to(apu.deg)
+            return (
+                np.sqrt(
+                    np.imag(self.visibilities) ** 2 / amplitude**4 * np.real(self.uncertainty) ** 2
+                    + np.real(self.visibilities) ** 2 / amplitude**4 * np.imag(self.uncertainty) ** 2
+                )
+                * apu.rad
+            ).to(apu.deg)
 
     def __repr__(self):
         r"""
@@ -316,24 +324,19 @@ class VisibilitiesBase(VisibilitiesBaseABC):
             return False
 
 
-class Visibilities(VisibilitiesBase,VisibilitiesABC):
-    r"""
-    Hold a set of related visibilities and information.
-
-    Attributes
-    ----------
-    vis : `numpy.ndarray`
-        Array of N complex visibilities at coordinates in `uv`
-    u : `numpy.ndarray`
-        Array of `u` coordinates where visibilities will be evaluated
-    v : `numpy.ndarray`
-        Array of `v` coordinates where visibilities will be evaluated
-    center : `float` (x, y), optional
-        The x, y offset of phase center
-
-    """
-    #@apu.quantity_input(u=1/apu.arcsec, v=1/apu.arcsec)
-    def __init__(self, visibilities, u, v, names, uncertainty=None, meta=None):
+class Visibilities(VisibilitiesBase, VisibilitiesABC):
+    @apu.quantity_input()
+    def __init__(
+        self,
+        visibilities: apu.Quantity,
+        u: apu.Quantity[1 / apu.arcsec],
+        v: apu.Quantity[1 / apu.arcsec],
+        names: Iterable[str],
+        meta: VisMetaABC,
+        dims: Iterable[str] = ("uv",),
+        uncertainty: Union[apu.Quantity, None],
+        coords: dict = {},
+    ):
         r"""
         Initialise a new Visibility object.
 
@@ -345,34 +348,66 @@ class Visibilities(VisibilitiesBase,VisibilitiesABC):
             Array of `u` coordinates where visibilities will be evaluated.
         v : `numpy.ndarray`
             Array of `v` coordinates where visibilities will be evaluated.
-        center :
-            Phase centre
+        names : iterable of `str`
+            The names of the axes.
+        meta : `VisMetaABC`
+            Metadata associated with visibilities. Must contain certain information
+            as defined by the `VisMetaABC`.
+        dims : iterable of `str`
+            The labels for each dimension type. Must contain 'uv' to denote
+            the UV plane dimension.
+        uncertainty :, optional
+            The uncertainty of visibilities.
+        coords : `dict`, optional
+            Coordinate grid values for any additional dimensions.
         """
         nvis = len(visibilities)
         if uncertainty.isscalar or len(uncertainty) != nvis:
-            raise TypeError('uncertainty must be the same length as visibilities.')
-
-        if not isinstance(meta, VisMetaABC):
-            raise TypeError('Meta must be an instance of VisMetaABC.')
-
-        super().__init__(visibilities, u, v, names, uncertainty=uncertainty, meta=meta)
+            raise TypeError("uncertainty must be the same length as visibilities.")
+        super().__init__(visibilities, u, v, names, meta, dims=dims, uncertainty=uncertainty,
+                         coords=coords)
 
 
-class VisMeta(VisMetaABC, SimpleNamespace):
-    def __init__(self, **kwargs):
-        energy_range = kwargs.get("energy_range", None)
-        time_range = kwargs.get("time_range", None)
-        center_range = kwargs.get("center", None)
-        observer_coordinate = kwargs.get("observer_coordinate", None)
+class VisMeta(VisMetaABC, dict):
+    """
+    A class for holding Visibility-specific metadata.
+
+    Parameters
+    ----------
+    meta: `dict`
+        A dictionary of the metadata
+    """
+
+    def __init__(self, meta):
+        energy_range = meta.get("energy_range", None)
+        time_range = meta.get("time_range", None)
+        center_range = meta.get("center", None)
+        observer_coordinate = meta.get("observer_coordinate", None)
         if not isinstance(energy_range, apu.Quantity) or len(energy_range) != 2:
-            raise ValueError('energy_range must be length 2.')
+            raise ValueError("Input must contain the key 'energy_range' " "which gives a length-2 astropy Quantity.")
         if not isinstance(time_range, Time) or len(time_range) != 2:
-            raise ValueError('time_range must be a length 2 astropy time object.')
+            raise ValueError("Input must contain the key 'time_range' " "which gives a length 2 astropy time object.")
         if not isinstance(center, SkyCoord) or not center.isscalar:
-            raise ValueError('center must be a scalar SkyCoord.')
+            raise ValueError("Input must contain the key 'center' which gives a scalar SkyCoord.")
         if not isinstance(observer_coordinate, SkyCoord) or not observer_coordinate.isscalar:
-            raise ValueError('observer_coordinate must be a scalar SkyCoord.')
-        super().__init__(**kwargs)
+            raise ValueError("Input must contain the key 'observer_coordinate' " "which gives a scalar SkyCoord.")
+        super().__init__(meta)
+
+    @property
+    def energy_range(self):
+        return self["energy_range"]
+
+    @property
+    def time_range(self):
+        return self["energy_range"]
+
+    @property
+    def center(self):
+        return self["center"]
+
+    @property
+    def observer_coordinate(self):
+        return self["observer_coordinate"]
 
 
 class BaseVisibility:
