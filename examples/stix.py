@@ -56,7 +56,7 @@ clean_map.plot()
 ###############################################################################
 # MEM
 
-mem_map = mem(stix_vis, shape=[129, 129] * apu.pixel, pixel=[2, 2] * apu.arcsec / apu.pix)
+mem_map = mem(stix_vis, shape=[129, 129] * apu.pixel, pixel_size=[2, 2] * apu.arcsec / apu.pix)
 mem_map.plot()
 
 ###############################################################################

@@ -24,7 +24,7 @@ ANGLE = apu.get_physical_type(apu.deg)
 WEIGHT_SCHEMES = ("natural", "uniform")
 
 
-def get_weights(vis: Visibility, scheme: Optional[str] = "natural", norm: Optional[bool] = True) -> np.ndarray:
+def get_weights(vis: Visibility, scheme: str = "natural", norm: bool = True) -> np.ndarray:
     r"""
     Return spatial frequency weight factors for each visibility.
 
@@ -91,48 +91,83 @@ def validate_and_expand_kwarg(q: Quantity, name: Optional[str] = "") -> Quantity
     return q
 
 
-@apu.quantity_input()
-def vis_psf_image(
-    vis: Visibility,
+@apu.quantity_input
+def image_to_vis(
+    image: Quantity,
     *,
+    u: Quantity[apu.arcsec**-1],
+    v: Quantity[apu.arcsec**-1],
+    phase_centre: Optional[Quantity[apu.arcsec]] = (0.0, 0.0) * apu.arcsec,
+    pixel_size: Optional[Quantity[apu.arcsec / apu.pix]] = 1.0 * apu.arcsec / apu.pix,
+) -> Visibility:
+    r"""
+    Return a Visibility created from the image and u, v sampling.
+
+    Parameters
+    ----------
+    image :
+        The 2D input image
+    u :
+        Array of u coordinates where the visibilities will be evaluated
+    v :
+        Array of v coordinates where the visibilities will be evaluated
+    phase_centre :
+        The coordinates the phase_centre.
+    pixel_size :
+        Size of pixels, if only one value is passed, assume square pixels (repeating the value).
+
+    Returns
+    -------
+    :
+        The new visibility object
+
+    """
+    pixel_size = validate_and_expand_kwarg(pixel_size, "pixel_size")
+    if not (apu.get_physical_type((1 / u).unit) == ANGLE and apu.get_physical_type((1 / v).unit) == ANGLE):
+        raise ValueError("u and v must be inverse angle (e.g. 1/deg or 1/arcsec")
+    vis = dft_map(image, u=u, v=v, phase_centre=phase_centre, pixel_size=pixel_size)
+    return Visibility(vis, u=u, v=v, offset=phase_centre)
+
+
+@apu.quantity_input()
+def vis_to_image(
+    vis: Visibility,
     shape: Quantity[apu.pix] = (65, 65) * apu.pixel,
     pixel_size: Optional[Quantity[apu.arcsec / apu.pix]] = 1 * apu.arcsec / apu.pix,
-    scheme: Optional[str] = "natural",
+    scheme: str = "natural",
 ) -> Quantity:
     """
-    Create the point spread function for given u, v point of the visibilities.
+    Create an image by 'back projecting' the given visibilities onto the sky.
 
     Parameters
     ----------
     vis :
         Input visibilities
     shape :
-        Shape of the image, if only one value passed, assume square (repeating the value).
+        Shape of the image, if only one value is passed assume square (repeating the value).
     pixel_size :
-        Size of pixels, if only one value is passed, assume square pixels (repeating the value).
+        Size of pixels, if only one value is passed assume square pixels (repeating the value).
     scheme :
-        Weight scheme, natural by default.
+        Weight scheme natural by default.
 
     Returns
     -------
-    :
-        Point spread function
+    `~astropy.units.Quantity`
+        Back projection image
 
     """
     shape = validate_and_expand_kwarg(shape, "shape")
     pixel_size = validate_and_expand_kwarg(pixel_size, "pixel_size")
     shape = shape.to(apu.pixel)
     weights = get_weights(vis, scheme=scheme)
-
-    # Make sure psf is always odd so power is in exactly one pixel
-    shape = [s // 2 * 2 + 1 for s in shape.to_value(apu.pix)] * shape.unit
-    psf_arr = idft_map(
-        np.ones(vis.vis.shape) * vis.vis.unit, u=vis.u, v=vis.v, shape=shape, weights=weights, pixel_size=pixel_size
+    bp_arr = idft_map(
+        vis.vis, u=vis.u, v=vis.v, shape=shape, weights=weights, pixel_size=pixel_size, phase_centre=vis.phase_centre
     )
-    return psf_arr
+
+    return bp_arr
 
 
-@apu.quantity_input()
+@apu.quantity_input
 def vis_psf_map(
     vis: Visibility,
     *,
@@ -167,41 +202,44 @@ def vis_psf_map(
 
 
 @apu.quantity_input()
-def vis_to_image(
+def vis_psf_image(
     vis: Visibility,
+    *,
     shape: Quantity[apu.pix] = (65, 65) * apu.pixel,
-    pixel_size: Optional[Quantity[apu.arcsec / apu.pix]] = 1 * apu.arcsec / apu.pix,
-    scheme: Optional[str] = "natural",
+    pixel_size: Quantity[apu.arcsec / apu.pix] = 1 * apu.arcsec / apu.pix,
+    scheme: str = "natural",
 ) -> Quantity:
     """
-    Create an image by 'back projecting' the given visibilities onto the sky.
+    Create the point spread function for given u, v point of the visibilities.
 
     Parameters
     ----------
     vis :
         Input visibilities
     shape :
-        Shape of the image, if only one value is passed assume square (repeating the value).
+        Shape of the image, if only one value passed, assume square (repeating the value).
     pixel_size :
-        Size of pixels, if only one value is passed assume square pixels (repeating the value).
+        Size of pixels, if only one value is passed, assume square pixels (repeating the value).
     scheme :
-        Weight scheme natural by default.
+        Weight scheme, natural by default.
 
     Returns
     -------
-    `~astropy.units.Quantity`
-        Back projection image
+    :
+        Point spread function
 
     """
     shape = validate_and_expand_kwarg(shape, "shape")
     pixel_size = validate_and_expand_kwarg(pixel_size, "pixel_size")
     shape = shape.to(apu.pixel)
     weights = get_weights(vis, scheme=scheme)
-    bp_arr = idft_map(
-        vis.vis, u=vis.u, v=vis.v, shape=shape, weights=weights, pixel_size=pixel_size, phase_centre=vis.phase_centre
-    )
 
-    return bp_arr
+    # Make sure psf is always odd so power is in exactly one pixel
+    shape = [s // 2 * 2 + 1 for s in shape.to_value(apu.pix)] * shape.unit
+    psf_arr = idft_map(
+        np.ones(vis.vis.shape) * vis.vis.unit, u=vis.u, v=vis.v, shape=shape, weights=weights, pixel_size=pixel_size
+    )
+    return psf_arr
 
 
 @apu.quantity_input()
@@ -271,44 +309,6 @@ def generate_header(vis: Visibility, *, shape: Quantity[apu.pix], pixel_size: Qu
         "cunit2": "arcsec",
     }
     return header
-
-
-@apu.quantity_input
-def image_to_vis(
-    image: Quantity,
-    *,
-    u: Quantity[apu.arcsec**-1],
-    v: Quantity[apu.arcsec**-1],
-    phase_centre: Optional[Quantity[apu.arcsec]] = (0.0, 0.0) * apu.arcsec,
-    pixel_size: Optional[Quantity[apu.arcsec / apu.pix]] = 1.0 * apu.arcsec / apu.pix,
-) -> Visibility:
-    r"""
-    Return a Visibility created from the image and u, v sampling.
-
-    Parameters
-    ----------
-    image :
-        The 2D input image
-    u :
-        Array of u coordinates where the visibilities will be evaluated
-    v :
-        Array of v coordinates where the visibilities will be evaluated
-    phase_centre :
-        The coordinates the phase_centre.
-    pixel_size :
-        Size of pixels, if only one value is passed, assume square pixels (repeating the value).
-
-    Returns
-    -------
-    :
-        The new visibility object
-
-    """
-    pixel_size = validate_and_expand_kwarg(pixel_size, "pixel_size")
-    if not (apu.get_physical_type((1 / u).unit) == ANGLE and apu.get_physical_type((1 / v).unit) == ANGLE):
-        raise ValueError("u and v must be inverse angle (e.g. 1/deg or 1/arcsec")
-    vis = dft_map(image, u=u, v=v, phase_centre=phase_centre, pixel_size=pixel_size)
-    return Visibility(vis, u=u, v=v, offset=phase_centre)
 
 
 @apu.quantity_input()

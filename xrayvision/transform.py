@@ -21,6 +21,7 @@ __all__ = ["generate_xy", "generate_uv", "dft_map", "idft_map"]
 @apu.quantity_input()
 def generate_xy(
     number_pixels: Quantity[apu.pix],
+    *,
     phase_centre: Optional[Quantity[apu.arcsec]] = 0.0 * apu.arcsec,
     pixel_size: Optional[Quantity[apu.arcsec / apu.pix]] = 1.0 * apu.arcsec / apu.pix,
 ) -> Quantity[apu.arcsec]:
@@ -68,6 +69,7 @@ def generate_xy(
 @apu.quantity_input()
 def generate_uv(
     number_pixels: Quantity[apu.pix],
+    *,
     phase_centre: Optional[Quantity[apu.arcsec]] = 0.0 * apu.arcsec,
     pixel_size: Optional[Quantity[apu.arcsec / apu.pix]] = 1.0 * apu.arcsec / apu.pix,
 ) -> Quantity[1 / apu.arcsec]:
@@ -126,8 +128,8 @@ def dft_map(
     *,
     u: Quantity[1 / apu.arcsec],
     v: Quantity[1 / apu.arcsec],
-    phase_centre: Optional[Quantity[apu.arcsec]] = (0.0, 0.0) * apu.arcsec,
-    pixel_size: Optional[Quantity[apu.arcsec / apu.pix]] = (1.0, 1.0) * apu.arcsec / apu.pix,
+    phase_centre: Quantity[apu.arcsec] = (0.0, 0.0) * apu.arcsec,
+    pixel_size: Quantity[apu.arcsec / apu.pix] = (1.0, 1.0) * apu.arcsec / apu.pix,
 ) -> Union[Quantity, npt.NDArray]:
     r"""
     Discrete Fourier transform in terms of coordinates returning 1-D array complex visibilities.
@@ -152,8 +154,8 @@ def dft_map(
 
     """
     m, n = input_array.shape * apu.pix
-    x = generate_xy(m, phase_centre[0], pixel_size[0])  # type: ignore
-    y = generate_xy(n, phase_centre[1], pixel_size[1])  # type: ignore
+    x = generate_xy(m, phase_centre=phase_centre[0], pixel_size=pixel_size[0])  # type: ignore
+    y = generate_xy(n, phase_centre=phase_centre[1], pixel_size=pixel_size[1])  # type: ignore
 
     x, y = np.meshgrid(x, y, indexing="ij")
     uv = np.vstack([u, v])
@@ -180,7 +182,7 @@ def dft_map(
         )
 
 
-@apu.quantity_input()
+@apu.quantity_input
 def idft_map(
     input_vis: Union[Quantity, npt.NDArray],
     *,
@@ -188,8 +190,8 @@ def idft_map(
     v: Quantity[1 / apu.arcsec],
     shape: Quantity[apu.pix],
     weights: Optional[npt.NDArray] = None,
-    phase_centre: Optional[Quantity[apu.arcsec]] = (0.0, 0.0) * apu.arcsec,
-    pixel_size: Optional[Quantity[apu.arcsec / apu.pix]] = (1.0, 1.0) * apu.arcsec / apu.pix,
+    phase_centre: Quantity[apu.arcsec] = (0.0, 0.0) * apu.arcsec,
+    pixel_size: Quantity[apu.arcsec / apu.pix] = (1.0, 1.0) * apu.arcsec / apu.pix,
 ) -> Union[Quantity, npt.NDArray]:
     r"""
     Inverse discrete Fourier transform in terms of coordinates returning a 2D real array or image.
@@ -218,8 +220,8 @@ def idft_map(
 
     """
     m, n = shape
-    x = generate_xy(m, phase_centre[0], pixel_size[0])  # type: ignore
-    y = generate_xy(n, phase_centre[1], pixel_size[1])  # type: ignore
+    x = generate_xy(m, phase_centre=phase_centre[0], pixel_size=pixel_size[0])  # type: ignore
+    y = generate_xy(n, phase_centre=phase_centre[1], pixel_size=pixel_size[1])  # type: ignore
 
     x, y = np.meshgrid(x, y, indexing="ij")
 

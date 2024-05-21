@@ -8,34 +8,41 @@ appropriate component shapes at different scales.
 """
 
 import logging
+from typing import Union, Optional
+from collections.abc import Iterable
 
+import astropy.units as u
 import numpy as np
 from astropy.convolution import Gaussian2DKernel
+from astropy.units import Quantity
+from numpy.typing import NDArray
 from scipy import signal
 from scipy.ndimage import shift
 from sunpy.map.map_factory import Map
 
 from xrayvision.imaging import vis_psf_image, vis_to_map
+from xrayvision.visibility import Visibility
 
 __all__ = ["clean", "vis_clean", "ms_clean", "vis_ms_clean"]
+
 
 logger = logging.getLogger(__name__)
 logger.setLevel("DEBUG")
 
 __common_clean_doc__ = r"""
-    clean_beam_width : `float`
+    clean_beam_width :
         The width of the gaussian to convolve the model with. If set to 0.0 \
         the gaussian to convolution is disabled
-    gain : `float`
+    gain :
         The gain per loop or loop gain
-    thres : `float`
+    thres :
         Terminates clean when ``residual.max() <= thres``
-    niter : `int`
+    niter :
         Maximum number of iterations to perform
 
     Returns
     -------
-    `numpy.ndarray`
+    :
         The CLEAN image 2D
 
     Notes
@@ -59,23 +66,32 @@ __common_clean_doc__ = r"""
     """
 
 
-def clean(dirty_map, dirty_beam, pixel_size=None, clean_beam_width=4.0, gain=0.1, thres=0.01, niter=5000):
+@u.quantity_input
+def clean(
+    dirty_map: Quantity,
+    dirty_beam: Quantity,
+    pixel_size: Quantity[u.arcsec / u.pix] = None,
+    clean_beam_width: Optional[Quantity[u.arcsec]] = 4.0 * u.arcsec,
+    gain: Optional[float] = 0.1,
+    thres: Optional[float] = None,
+    niter: int = 5000,
+) -> Union[Quantity, NDArray[np.float64]]:
     r"""
     Clean the image using Hogbom's original method.
 
     CLEAN iteratively subtracts the PSF or dirty beam from the dirty map to create the residual.
-    At each iteration the location of the maximum residual is found and a shifted dirty beam is
-    subtracted that location updating the residual. This process continues until either `niter`
-    iterations is reached or the maximum residual <= `thres`.
+    At each iteration, the location of the maximum residual is found and a shifted dirty beam is
+    subtracted at that location. This process continues until either `niter` iterations are reached or
+    the maximum residual <= `thres`.
 
     Parameters
     ----------
-    dirty_map : `numpy.ndarray`
+    dirty_map :
         The dirty map to be cleaned 2D
-    dirty_beam : `numpy.ndarray`
+    dirty_beam :
         The dirty beam or point spread function (PSF) 2D must
     pixel_size :
-        Size of a pixel
+        The pixel size in arcsec
     """
     # Ensure both beam and map are even/odd on same axes
     # if not [x % 2 == 0 for x in dirty_map.shape] == [x % 2 == 0 for x in dirty_beam.shape]:
@@ -104,7 +120,8 @@ def clean(dirty_map, dirty_beam, pixel_size=None, clean_beam_width=4.0, gain=0.1
         # imax = imax * max_beam
         model[mx, my] += gain * imax
 
-        logger.debug(f"Iter: {i}, strength: {imax}, location: {mx, my}")
+        if i % 25 == 0:
+            logger.debug(f"Iter: {i}, strength: {imax}, location: {mx, my}")
 
         offset = map_center[0] - mx, map_center[1] - my
         shifted_beam_center = int(beam_center[0] + offset[0]), int(beam_center[1] + offset[1])
@@ -119,10 +136,11 @@ def clean(dirty_map, dirty_beam, pixel_size=None, clean_beam_width=4.0, gain=0.1
 
         dirty_map = np.subtract(dirty_map, comp)
 
-        # if dirty_map.max() <= thres:
-        #      logger.info("Threshold reached")
-        #      break
-        # # el
+        if thres:
+            if np.abs(dirty_map).max() <= thres:
+                logger.info("Threshold reached")
+                break
+
         if np.abs(dirty_map.min()) > dirty_map.max():
             logger.info("Largest residual negative")
             break
@@ -130,21 +148,21 @@ def clean(dirty_map, dirty_beam, pixel_size=None, clean_beam_width=4.0, gain=0.1
     else:
         print("Max iterations reached")
 
-    if clean_beam_width != 0.0:
+    if clean_beam_width is not None:
         # Convert from FWHM to StDev   FWHM = sigma*(8ln2)**0.5 = 2.3548200450309493
-        x_stdev = (clean_beam_width / pixel_size[0] / 2.3548200450309493).value
-        y_stdev = (clean_beam_width / pixel_size[1] / 2.3548200450309493).value
+        x_stdev = (clean_beam_width / pixel_size[1]).to_value(u.pix) / 2.3548200450309493
+        y_stdev = (clean_beam_width / pixel_size[0]).to_value(u.pix) / 2.3548200450309493
         clean_beam = Gaussian2DKernel(x_stdev, y_stdev, x_size=dirty_beam.shape[1], y_size=dirty_beam.shape[0]).array
         # Normalise beam
         clean_beam = clean_beam / clean_beam.max()
 
         # Convolve clean beam with model and scale
         clean_map = signal.convolve2d(model, clean_beam / clean_beam.sum(), mode="same") / (
-            pixel_size[0] * pixel_size[1]
+            pixel_size[0].value * pixel_size[1].value
         )
 
         # Scale residual map with model and scale
-        dirty_map = dirty_map / clean_beam.sum() / (pixel_size[0] * pixel_size[1])
+        dirty_map = dirty_map / clean_beam.sum() / (pixel_size[0].value * pixel_size[1].value)
         return clean_map + dirty_map, model, dirty_map
 
     return model + dirty_map, model, dirty_map
@@ -153,7 +171,17 @@ def clean(dirty_map, dirty_beam, pixel_size=None, clean_beam_width=4.0, gain=0.1
 clean.__doc__ += __common_clean_doc__  # type: ignore
 
 
-def vis_clean(vis, shape, pixel_size, clean_beam_width=4.0, niter=5000, map=True, gain=0.1, **kwargs):
+@u.quantity_input
+def vis_clean(
+    vis: Visibility,
+    shape: Quantity[u.pix],
+    pixel_size: Quantity[u.arcsec / u.pix],
+    clean_beam_width: Optional[Quantity[u.arcsec]] = 4.0,
+    niter: Optional[int] = 5000,
+    map: Optional[bool] = True,
+    gain: Optional[float] = 0.1,
+    **kwargs,
+):
     r"""
     Clean the visibilities using Hogbom's original method.
 
@@ -161,14 +189,14 @@ def vis_clean(vis, shape, pixel_size, clean_beam_width=4.0, niter=5000, map=True
 
     Parameters
     ----------
-    vis : `xrayvision.visibility.Visibly`
+    vis :
         The visibilities to clean
     shape :
         Size of map
     pixel_size :
-        Size of pixel
-    map : `boolean` optional
-        Return an `sunpy.map.Map` by default or data only if `False`
+        The pixel size in arcsec
+    map :
+        Return a `sunpy.map.Map` by default or array only if `False`
     """
 
     dirty_map = vis_to_map(vis, shape=shape, pixel_size=pixel_size, **kwargs)
@@ -190,23 +218,22 @@ def vis_clean(vis, shape, pixel_size, clean_beam_width=4.0, niter=5000, map=True
 
 vis_clean.__doc__ += __common_clean_doc__  # type: ignore
 
-
 __common_ms_clean_doc__ = r"""
     scales : array-like, optional, optional
         The scales to use eg ``[1, 2, 4, 8]``
-    clean_beam_width : `float`
+    clean_beam_width :
         The width of the gaussian to convolve the model with. If set to 0.0 the gaussian \
         convolution is disabled
-    gain : `float`
+    gain :
         The gain per loop or loop gain
-    thres : `float`
+    thres :
         Terminates clean when `residuals.max() <= thres``
-    niter : `int`
+    niter :
         Maximum number of iterations to perform
 
     Returns
     -------
-    `numpy.ndarray`
+    :
         Cleaned image
 
     Notes
@@ -226,20 +253,32 @@ __common_ms_clean_doc__ = r"""
     """
 
 
-def ms_clean(dirty_map, dirty_beam, pixel, scales=None, clean_beam_width=4.0, gain=0.1, thres=0.01, niter=5000):
+@u.quantity_input
+def ms_clean(
+    dirty_map: Quantity,
+    dirty_beam: Quantity,
+    pixel_size: Quantity[u.arcsec / u.pix],
+    scales: Union[Iterable, NDArray, None] = None,
+    clean_beam_width: Quantity = 4.0 * u.arcsec,
+    gain: float = 0.1,
+    thres: float = 0.01,
+    niter: int = 5000,
+) -> Union[Quantity, NDArray[np.float64]]:
     r"""
     Clean the map using a multiscale clean algorithm.
 
     Parameters
     ----------
-    dirty_map : `numpy.ndarray`
+    dirty_map :
         The 2D dirty map to be cleaned
-    dirty_beam : `numpy.ndarray`
+    dirty_beam :
         The 2D dirty beam should have the same dimensions as `dirty_map`
+    pixel_size :
+        The pixel size in arcsec
     """
     # Compute the number of dyadic scales, their sizes and scale biases
-    number_of_scales = np.floor(np.log2(min(dirty_map.shape))).astype(int)
-    scale_sizes = 2 ** np.arange(number_of_scales)
+    number_of_scales: int = np.floor(np.log2(min(dirty_map.shape))).astype(int)
+    scale_sizes: NDArray[np.int_] = 2 ** np.arange(number_of_scales)
 
     if scales:
         scales = np.array(scales)
@@ -265,7 +304,7 @@ def ms_clean(dirty_map, dirty_beam, pixel, scales=None, clean_beam_width=4.0, ga
     cross_terms = {}
 
     for i, scale in enumerate(scale_sizes):
-        scales[:, :, i] = component(scale=scale, shape=dirty_map.shape)
+        scales[:, :, i] = _component(scale=scale, shape=dirty_map.shape)
         scaled_residuals[:, :, i] = signal.convolve(dirty_map, scales[:, :, i], mode="same")
         scaled_dirty_beams[:, :, i] = signal.convolve(dirty_beam, scales[:, :, i], mode="same")
         max_scaled_dirty_beams[i] = scaled_dirty_beams[:, :, i].max()
@@ -279,8 +318,11 @@ def ms_clean(dirty_map, dirty_beam, pixel, scales=None, clean_beam_width=4.0, ga
         # print(f'Clean loop {i}')
         # For each scale find the strength and location of max residual
         # Chose scale with has maximum strength
-        max_index = np.argmax(scaled_residuals)
-        max_x, max_y, max_scale = np.unravel_index(max_index, scaled_residuals.shape)
+        max_index: int = np.argmax(scaled_residuals).astype(int)
+        max_x: int
+        max_y: int
+        max_scale: int
+        max_x, max_y, max_scale = (int(x) for x in np.unravel_index(max_index, scaled_residuals.shape))
 
         strength = scaled_residuals[max_x, max_y, max_scale]
 
@@ -326,9 +368,9 @@ def ms_clean(dirty_map, dirty_beam, pixel, scales=None, clean_beam_width=4.0, ga
             scaled_residuals[:, :, j] = np.subtract(scaled_residuals[:, :, j], comp)
 
         # End max(res(a)) or niter
-        if scaled_residuals[:, :, max_scale].max() <= thres:
+        if np.abs(scaled_residuals[:, :, max_scale].max()) <= thres:
             logger.info("Threshold reached")
-            # break
+            break
 
         # Largest scales largest residual is negative
         if np.abs(scaled_residuals[:, :, 0].min()) > scaled_residuals[:, :, 0].max():
@@ -339,18 +381,18 @@ def ms_clean(dirty_map, dirty_beam, pixel, scales=None, clean_beam_width=4.0, ga
         logger.info("Max iterations reached")
 
     # Convolve model with clean beam B_G * I^M
-    if clean_beam_width != 0.0:
-        x_stdev = (clean_beam_width / pixel[0] / (2.0 * np.sqrt(2.0 * np.log(2.0)))).value
-        y_stdev = (clean_beam_width / pixel[1] / (2.0 * np.sqrt(2.0 * np.log(2.0)))).value
+    if clean_beam_width is not None:
+        x_stdev = ((clean_beam_width / pixel_size[0]).to_value(u.pix) / (2.0 * np.sqrt(2.0 * np.log(2.0)))).value
+        y_stdev = ((clean_beam_width / pixel_size[1]).to_value(u.pix) / (2.0 * np.sqrt(2.0 * np.log(2.0)))).value
         clean_beam = Gaussian2DKernel(x_stdev, y_stdev, x_size=dirty_beam.shape[1], y_size=dirty_beam.shape[0]).array
 
         # Normalise beam
         clean_beam = clean_beam / clean_beam.max()
 
-        clean_map = signal.convolve2d(model, clean_beam, mode="same") / (pixel[0] * pixel[1])
+        clean_map = signal.convolve2d(model, clean_beam, mode="same") / (pixel_size[0] * pixel_size[1])
 
         # Scale residual map with model and scale
-        dirty_map = (scaled_residuals / clean_beam.sum() / (pixel[0] * pixel[1])).sum(axis=2)
+        dirty_map = (scaled_residuals / clean_beam.sum() / (pixel_size[0] * pixel_size[1])).sum(axis=2)
 
         return clean_map + dirty_map, model, dirty_map
     # Add residuals B_G * I^M + I^R
@@ -360,7 +402,17 @@ def ms_clean(dirty_map, dirty_beam, pixel, scales=None, clean_beam_width=4.0, ga
 ms_clean.__doc__ += __common_ms_clean_doc__  # type: ignore
 
 
-def vis_ms_clean(vis, shape, pixel, scales=None, clean_beam_width=4.0, gain=0.1, thres=0.01, niter=5000, map=True):
+def vis_ms_clean(
+    vis: Visibility,
+    shape: Quantity[u.pix],
+    pixel_size: Quantity[u.arcsec / u.pix],
+    scales: Optional[Iterable],
+    clean_beam_width: Optional[Quantity[u.arcsec]] = 4.0,
+    niter: Optional[int] = 5000,
+    map: Optional[bool] = True,
+    gain: Optional[float] = 0.1,
+    thres: Optional[float] = 0.01,
+) -> Union[Quantity, NDArray[np.float64]]:
     r"""
     Clean the visibilities using a multiscale clean method.
 
@@ -368,20 +420,38 @@ def vis_ms_clean(vis, shape, pixel, scales=None, clean_beam_width=4.0, gain=0.1,
 
     Parameters
     ----------
-    vis : `xrayvision.visibility.Visibly`
+    vis :
         The visibilities to clean
     shape :
         Size of map
-    pixel :
-        Size of pixel
+    pixel_size :
+        The pixel size in arcsec
+    scales : array-like, optional, optional
+        The scales to use eg ``[1, 2, 4, 8]``
+    clean_beam_width :
+        The width of the gaussian to convolve the model with. If set to 0.0 the gaussian \
+        convolution is disabled
+    gain :
+        The gain per loop or loop gain
+    thres :
+        Terminates clean when `residuals.max() <= thres``
+    niter :
+        Maximum number of iterations to perform
+    map :
+        Return a `sunpy.map.Map` by default or array only if `False`
+
+    Returns
+    -------
+    :
+        Cleaned image
 
     """
-    dirty_map = vis_to_map(vis, shape=shape, pixel_size=pixel)
-    dirty_beam = vis_psf_image(vis, shape=shape * 3, pixel_size=pixel)
+    dirty_map = vis_to_map(vis, shape=shape, pixel_size=pixel_size)
+    dirty_beam = vis_psf_image(vis, shape=shape * 3, pixel_size=pixel_size)
     clean_map, model, residual = ms_clean(
         dirty_map.data,
         dirty_beam,
-        pixel,
+        pixel_size=pixel_size,
         scales=scales,
         clean_beam_width=clean_beam_width,
         gain=gain,
@@ -397,7 +467,7 @@ def vis_ms_clean(vis, shape, pixel, scales=None, clean_beam_width=4.0, gain=0.1,
 # vis_ms_clean.__doc__ += __common_ms_clean_doc__
 
 
-def radial_prolate_sphereoidal(nu):
+def _radial_prolate_sphereoidal(nu):
     r"""
     Calculate prolate spheroidal wave function approximation.
 
@@ -474,7 +544,7 @@ def radial_prolate_sphereoidal(nu):
             return 0
 
 
-def vec_radial_prolate_sphereoidal(nu):
+def _vec_radial_prolate_sphereoidal(nu):
     r"""
     Calculate prolate spheroidal wave function approximation.
 
@@ -553,7 +623,7 @@ def vec_radial_prolate_sphereoidal(nu):
     return out
 
 
-def component(scale, shape):
+def _component(scale, shape):
     r"""
 
     Parameters
@@ -586,9 +656,9 @@ def component(scale, shape):
     rad_zeros_indices = radii_squared <= 0.0
     amp_zero_indices = radii_squared >= 1.0
 
-    wave_amp = vec_radial_prolate_sphereoidal(np.sqrt(radii_squared.reshape(radii_squared.size)))
+    wave_amp = _vec_radial_prolate_sphereoidal(np.sqrt(radii_squared.reshape(radii_squared.size)))
     wave_amp = wave_amp.reshape(shape)
-    wave_amp[rad_zeros_indices] = vec_radial_prolate_sphereoidal([0])[0]
+    wave_amp[rad_zeros_indices] = _vec_radial_prolate_sphereoidal([0])[0]
 
     wave_amp = wave_amp * (1 - radii_squared)
 

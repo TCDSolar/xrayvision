@@ -93,7 +93,7 @@ clean_map, model_map, residual_map = vis_clean(
 ###############################################################################
 # MEM
 
-mem_map = mem(vis, shape=[129, 129] * apu.pixel, pixel=[2, 2] * apu.arcsec / apu.pix)
+mem_map = mem(vis, shape=[129, 129] * apu.pixel, pixel_size=[2, 2] * apu.arcsec / apu.pix)
 mem_map.plot()
 
 

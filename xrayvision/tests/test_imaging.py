@@ -28,23 +28,77 @@ def uv():
     return u.flatten() / apu.arcsec, v.flatten() / apu.arcsec
 
 
+@pytest.mark.parametrize("shape", [(10, 10), (5, 5), (2, 2)])
+def test_image_to_vis_vis_to_image(shape):
+    # Images with the same total flux
+    extent = [10, 10] * apu.arcsec
+    arr1 = np.full((shape), 1) * apu.ct / np.prod(shape)
+    ps1 = extent / (shape * apu.pix)
+    img1 = arr1 / (ps1[0] * ps1[1] * apu.pix**2)
+
+    # flux in image is 1
+    assert_allclose(img1.sum() * ps1[0] * apu.pix * ps1[1] * apu.pix, 1 * apu.ct)
+
+    # Calculate full u, v coverage so will be equivalent to a discrete Fourier transform (DFT)
+    u = generate_uv((shape[0]) * apu.pix, pixel_size=ps1[0])
+    v = generate_uv((shape[1]) * apu.pix, pixel_size=ps1[1])
+    u, v = np.meshgrid(u, v, indexing="ij")
+    u, v = np.array([u, v]).reshape(2, np.prod(shape)) / apu.arcsec
+
+    vis1 = image_to_vis(img1, u=u, v=v, pixel_size=ps1)
+    res1 = vis_to_image(vis1, shape=shape * apu.pix, pixel_size=ps1)
+    assert_allclose(res1, img1)
+
+
+@pytest.mark.skip(reason="WIP")
+def test_vis_to_image_conserve():
+    shape = (3, 3)
+    shape1 = (5, 5)
+    shape2 = (7, 7)
+    # Images with the same total flux
+    extent = [10, 10] * apu.arcsec
+    arr1 = np.zeros(shape)
+    arr1[shape[0] // 2, shape[1] // 2] = 1 / np.prod(shape)
+    ps = extent / (shape * apu.pix)
+    img1 = arr1 / (ps[0] * ps[1] * apu.pix**2)
+
+    # flux in image is same
+    assert_allclose(img1.sum() * ps[0] * apu.pix * ps[1] * apu.pix, arr1.sum())
+
+    u = generate_uv(shape[0] * apu.pix, pixel_size=ps[0])
+    v = generate_uv(shape[1] * apu.pix, pixel_size=ps[1])
+    u, v = np.meshgrid(u, v, indexing="ij")
+    u, v = np.array([u, v]).reshape(2, np.prod(shape)) / apu.arcsec
+
+    vis1 = image_to_vis(img1, u=u, v=v, pixel_size=ps)
+
+    ps2 = extent / (shape1 * apu.pix)
+    ps3 = extent / (shape2 * apu.pix)
+    res = vis_to_image(vis1, shape=shape * apu.pix, pixel_size=ps)
+    res2 = vis_to_image(vis1, shape=shape1 * apu.pix, pixel_size=ps2)
+    res3 = vis_to_image(vis1, shape=shape2 * apu.pix, pixel_size=ps3)
+
+    assert_allclose(res, img1)
+    assert_allclose(res2, img1)
+    assert_allclose(res3, img1)
+
+
 @pytest.mark.parametrize("pixel_size", [(0.5), (1), (2)])
-def test_psf_to_image(pixel_size, uv):
+def test_vis_to_psf(pixel_size, uv):
     u, v = uv
+    ps = [pixel_size, pixel_size] * apu.arcsec / apu.pix
     img = np.zeros((65, 65)) * (apu.ph / apu.cm**2)
-    img[32, 32] = 1.0 * (apu.ph / apu.cm**2)
-    obs_vis = dft_map(img, u=u, v=v, pixel_size=[2.0, 2.0] * apu.arcsec / apu.pix)
+    img[32, 32] = 1 * (apu.ph / apu.cm**2)  # pixel size of 4 -> 1/4
+    obs_vis = dft_map(img, u=u, v=v, pixel_size=ps)
     weights = np.sqrt(u**2 + v**2).value
     weights /= weights.sum()
-    psf_calc = idft_map(
-        obs_vis, u=u, v=v, shape=[65, 65] * apu.pix, pixel_size=[2, 2] * apu.arcsec / apu.pix, weights=weights
-    )
+    psf_calc = idft_map(obs_vis, u=u, v=v, shape=[65, 65] * apu.pix, pixel_size=ps, weights=weights)
     vis = Visibility(obs_vis, u=u, v=v)
-    res = vis_psf_image(vis, shape=[65, 65] * apu.pixel, pixel_size=2 * apu.arcsec / apu.pix, scheme="uniform")
-    assert np.allclose(psf_calc, res)
+    res = vis_psf_image(vis, shape=[65, 65] * apu.pixel, pixel_size=ps, scheme="uniform")
+    assert_allclose(res, psf_calc)
 
 
-def test_vis_to_image(uv):
+def test_vis_to_image_against_idft(uv):
     u, v = uv
     img = np.zeros((65, 65)) * (apu.ph / apu.cm**2)
     img[32, 32] = 1.0 * (apu.ph / apu.cm**2)
@@ -132,8 +186,8 @@ def test_map_to_vis(pos, pixel):
     assert np.allclose(res, data)
 
 
-def test_vis_to_image1():
-    m = n = 33
+def test_vis_to_image():
+    m = n = 30
     size = m * n
 
     # Calculate full u, v coverage so will be equivalent to a discrete Fourier transform (DFT)
@@ -145,6 +199,8 @@ def test_vis_to_image1():
 
     # Astropy index order is opposite to that of numpy, is 1st dim is across second down
     data = Gaussian2DKernel(6, x_size=n, y_size=m).array
+    data = np.zeros((m, n))
+    data[m // 2, n // 2] = 1
 
     vis = image_to_vis(data, u=u, v=v)
     res = vis_to_image(vis, shape=(m, n) * apu.pixel)
