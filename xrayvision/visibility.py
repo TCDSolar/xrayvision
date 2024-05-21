@@ -6,9 +6,9 @@ certain spacecraft or instruments
 """
 
 import abc
-from collections.abc import Iterable
 from types import SimpleNamespace
 from typing import Any, Union
+from collections.abc import Iterable
 
 import astropy.units as apu
 import numpy as np
@@ -16,34 +16,33 @@ import xarray
 from astropy.coordinates import SkyCoord
 from astropy.time import Time
 
+__all__ = ['Visibility', 'Visibilities', 'VisibilitiesBase', 'VisMeta']
 
-__all__ = ['Visibilities', 'VisibilitiesBase', 'VisMeta']
 
-
-class VisMetaABC(abc.ABC): 
+class VisMetaABC(abc.ABC):
     @property
-    @abc.abstractmethod   
+    @abc.abstractmethod
     def energy_range(self) -> Iterable[apu.Quantity]:
         """
         Energy range over which the visibilities are computed.
         """
 
     @property
-    @abc.abstractmethod   
+    @abc.abstractmethod
     def time_range(self) -> Iterable[Time]:
         """
         Centre time over which the visibilities are computed.
-        """ 
+        """
 
     @property
-    @abc.abstractmethod   
+    @abc.abstractmethod
     def center(self) -> SkyCoord:
         """
         Center of the image described by the visibilities.
         """
 
     @property
-    @abc.abstractmethod   
+    @abc.abstractmethod
     def observer_coordinate(self) -> SkyCoord:
         """
         Location of the observer.
@@ -52,44 +51,44 @@ class VisMetaABC(abc.ABC):
 
 class VisibilitiesBaseABC(abc.ABC):
     @property
-    @abc.abstractmethod   
+    @abc.abstractmethod
     def visibilities(self) -> Iterable[apu.Quantity]:
         """
         Complex numbers representing the visibilities.
         """
 
     @property
-    @abc.abstractmethod   
+    @abc.abstractmethod
     def u(self) -> Iterable[apu.Quantity]:
         """
         u-coordinate on the complex plane of the visibilities.
         """
 
     @property
-    @abc.abstractmethod   
+    @abc.abstractmethod
     def v(self) -> Iterable[apu.Quantity]:
         """
         v-coordinate on the complex plane of the visibilities.
         """
 
     @property
-    @abc.abstractmethod   
+    @abc.abstractmethod
     def names(self) -> Iterable[str]:
         """
-        Names for each visibility. 
+        Names for each visibility.
 
         Must be same length as self.vis.
         """
 
     @property
-    @abc.abstractmethod   
+    @abc.abstractmethod
     def uncertainty(self) -> Any:
         """
         Uncertainties on visibilities values.
         """
 
     @property
-    @abc.abstractmethod   
+    @abc.abstractmethod
     def meta(self) -> Any:
         """
         Meta data.
@@ -97,7 +96,7 @@ class VisibilitiesBaseABC(abc.ABC):
 
 class VisibilitiesABC(VisibilitiesBaseABC):
     @property
-    @abc.abstractmethod   
+    @abc.abstractmethod
     def uncertainty(self) -> Iterable[apu.Quantity]:
         """
         Uncertainties on visibilities values.
@@ -109,9 +108,9 @@ class VisibilitiesABC(VisibilitiesBaseABC):
         """
         Amplitudes of the visibilities.
         """
-    
+
     @property
-    @abc.abstractmethod   
+    @abc.abstractmethod
     def phase(self) -> np.ndarray:
         """
         Phases of the visibilities.
@@ -122,16 +121,16 @@ class VisibilitiesABC(VisibilitiesBaseABC):
         """
         Amplitude uncertainty of the visibilities.
         """
-    
+
     @property
-    @abc.abstractmethod   
+    @abc.abstractmethod
     def phase_uncertainty(self) -> np.ndarray:
         """
         Phase uncertainty of the visibilities.
         """
 
     @property
-    @abc.abstractmethod   
+    @abc.abstractmethod
     def meta(self) -> VisMetaABC:
         """
         Meta data.
@@ -182,13 +181,13 @@ class VisibilitiesBase(VisibilitiesBaseABC):
         if not isinstance(visibilities, apu.Quantity) or visibilities.isscalar:
             raise TypeError('visibilities must all be a non scalar Astropy quantity.')
         nvis = len(visibilities)
-        if len(u) != nvis: 
+        if len(u) != nvis:
             raise ValueError('u must be the same length as visibilities.')
-        if len(v) != nvis: 
+        if len(v) != nvis:
             raise ValueError('v must be the same length as visibilities.')
-        if len(names) != nvis: 
+        if len(names) != nvis:
             raise ValueError('names must be the same length as visibilities.')
-        if not np.array(isinstance(name, str) for name in names).all(): 
+        if not np.array(isinstance(name, str) for name in names).all():
             raise TypeError('names must all be strings.')
         if uncertainty is not None and not isinstance(uncertainty, apu.Quantity):
             raise TypeError('uncertainty must be None or same type as visibilities.')
@@ -198,7 +197,10 @@ class VisibilitiesBase(VisibilitiesBaseABC):
         data = {"data": (dims, visibilities.value)}
         if uncertainty is not None:
             data["uncertainty"] = (dims, uncertainty.to_value(visibilities.unit))
-        units = dict([(key, value[1].unit) for key, value in coords.items()])
+        for key, value in coords.items():
+            print(key, value)
+        units = dict([(key, value[1].unit) if hasattr(value[1], "unit") else (key, None)
+                      for key, value in coords.items()])
         units["data"] = visibilities.unit
         units["u"] = u.unit
         units["v"] = v.unit
@@ -209,28 +211,28 @@ class VisibilitiesBase(VisibilitiesBaseABC):
         self._data = xarray.Dataset(data, coords=coords, attrs=attrs)
 
     @property
-    def visibilities(self): 
+    def visibilities(self):
         return apu.Quantity(self._data["data"], unit=self._data.attrs["units"]["data"])
-    
+
     @property
-    def u(self): 
+    def u(self):
         return apu.Quantity(self._data.coords["u"].values, unit=self._data.attrs["units"]["u"])
 
     @property
-    def v(self): 
+    def v(self):
         return apu.Quantity(self._data.coords["v"].values, unit=self._data.attrs["units"]["v"])
-    
+
     @property
-    def names(self): 
-        return self._data.coords["names"].values
-     
+    def names(self):
+        return self._data.coords["names"]
+
     @property
     def uncertainty(self):
         unc_name = "uncertainty"
         return apu.Quantity(self._data[unc_name], unit=self._data.attrs["units"]["data"]) if unc_name in self._data.keys() else None
 
     @property
-    def meta(self): 
+    def meta(self):
         return self._data.attrs["meta"]
 
     ################# Everything above is required by ABC, adding extra functionality below #################
@@ -248,16 +250,16 @@ class VisibilitiesBase(VisibilitiesBaseABC):
             return self._build_quantity(label, unit_label=unit_label)
         else:
             return np.sqrt(np.real(self.visibilities) ** 2 + np.imag(self.visibilities) ** 2)
-   
+
     @property
-    def amplitude_uncertainty(self): 
+    def amplitude_uncertainty(self):
         label = "amplitude_uncertainty"
         unit_label = label if label in self._data.attrs["units"].keys() else "data"
         if label in self._data.keys():
             return self._build_quantity(label, unit_label=unit_label)
         else:
             amplitude = self.amplitude
-            return np.sqrt((np.real(self.visibilities) / amplitude * np.real(self.uncertainty)) ** 2 
+            return np.sqrt((np.real(self.visibilities) / amplitude * np.real(self.uncertainty)) ** 2
                            + (np.imag(self.visibilities) / amplitude * np.imag(self.uncertainty)) ** 2 )
 
     @property
@@ -276,7 +278,7 @@ class VisibilitiesBase(VisibilitiesBaseABC):
             return self._build_quantity(label, unit_label=unit_label)
         else:
             amplitude = self.amplitude
-            return (np.sqrt(np.imag(self.visibilities) ** 2 / amplitude ** 4 * np.real(self.uncertainty) ** 2 
+            return (np.sqrt(np.imag(self.visibilities) ** 2 / amplitude ** 4 * np.real(self.uncertainty) ** 2
                             + np.real(self.visibilities) ** 2 / amplitude ** 4 * np.imag(self.uncertainty) ** 2 ) * apu.rad).to(apu.deg)
 
     def __repr__(self):
@@ -347,12 +349,12 @@ class Visibilities(VisibilitiesBase,VisibilitiesABC):
             Phase centre
         """
         nvis = len(visibilities)
-        if uncertainty.isscalar or len(uncertainty) != nvis: 
+        if uncertainty.isscalar or len(uncertainty) != nvis:
             raise TypeError('uncertainty must be the same length as visibilities.')
 
         if not isinstance(meta, VisMetaABC):
             raise TypeError('Meta must be an instance of VisMetaABC.')
-    
+
         super().__init__(visibilities, u, v, names, uncertainty=uncertainty, meta=meta)
 
 
@@ -362,12 +364,99 @@ class VisMeta(VisMetaABC, SimpleNamespace):
         time_range = kwargs.get("time_range", None)
         center_range = kwargs.get("center", None)
         observer_coordinate = kwargs.get("observer_coordinate", None)
-        if not isinstance(energy_range, apu.Quantity) or len(energy_range) != 2: 
-            raise ValueError('energy_range must be length 2.')          
-        if not isinstance(time_range, Time) or len(time_range) != 2: 
-            raise ValueError('time_range must be a length 2 astropy time object.')   
-        if not isinstance(center, SkyCoord) or not center.isscalar: 
-            raise ValueError('center must be a scalar SkyCoord.') 
-        if not isinstance(observer_coordinate, SkyCoord) or not observer_coordinate.isscalar: 
-            raise ValueError('observer_coordinate must be a scalar SkyCoord.')  
+        if not isinstance(energy_range, apu.Quantity) or len(energy_range) != 2:
+            raise ValueError('energy_range must be length 2.')
+        if not isinstance(time_range, Time) or len(time_range) != 2:
+            raise ValueError('time_range must be a length 2 astropy time object.')
+        if not isinstance(center, SkyCoord) or not center.isscalar:
+            raise ValueError('center must be a scalar SkyCoord.')
+        if not isinstance(observer_coordinate, SkyCoord) or not observer_coordinate.isscalar:
+            raise ValueError('observer_coordinate must be a scalar SkyCoord.')
         super().__init__(**kwargs)
+
+
+class BaseVisibility:
+    r"""
+    Base visibility containing bare essential fields, u, v, and complex vis
+    """
+
+    @apu.quantity_input(u=1 / apu.arcsec, v=1 / apu.arcsec, center=apu.arcsec)
+    def __int__(self, u, v, vis, center=(0, 0) * apu.arcsec):
+        self.u = u
+        self.v = v
+        self.vis = vis
+        self.center = center
+
+
+class Visibility:
+    r"""
+    Hold a set of related visibilities and information.
+
+    Attributes
+    ----------
+    vis : `numpy.ndarray`
+        Array of N complex visibilities at coordinates in `uv`
+    u : `numpy.ndarray`
+        Array of `u` coordinates where visibilities will be evaluated
+    v : `numpy.ndarray`
+        Array of `v` coordinates where visibilities will be evaluated
+    center : `float` (x, y), optional
+        The x, y offset of phase center
+
+    """
+
+    @apu.quantity_input(uv=1 / apu.arcsec, offset=apu.arcsec, center=apu.arcsec, pixel_size=apu.arcsec)
+    def __init__(self, vis, *, u, v, offset=(0.0, 0.0) * apu.arcsec, center=(0.0, 0.0) * apu.arcsec):
+        r"""
+        Initialise a new Visibility object.
+
+        Parameters
+        ----------
+        vis : `numpy.ndarray`
+            Array of N complex visibilities at coordinates in `uv`.
+        u : `numpy.ndarray`
+            Array of `u` coordinates where visibilities will be evaluated.
+        v : `numpy.ndarray`
+            Array of `v` coordinates where visibilities will be evaluated.
+        center :
+            Phase centre
+        """
+        self.u = u
+        self.v = v
+        self.vis = vis
+        self.center = center
+        self.offset = offset
+
+    def __repr__(self):
+        r"""
+        Return a printable representation of the visibility.
+
+        Returns
+        -------
+        `str`
+
+        """
+        return f"{self.__class__.__name__}< {self.u.size}, {self.vis}>"
+
+    def __eq__(self, other):
+        r"""
+        Equality for Visibility class
+
+        Parameters
+        ----------
+        other : `Visibility`
+            The other visibility to compare
+
+        Returns
+        -------
+        `boolean`
+
+        """
+        props_equal = []
+        for key in self.__dict__.keys():
+            props_equal.append(np.array_equal(self.__dict__[key], other.__dict__[key]))
+
+        if all(props_equal):
+            return True
+        else:
+            return False
