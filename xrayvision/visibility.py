@@ -139,22 +139,6 @@ class VisibilitiesABC(VisibilitiesBaseABC):
 
 
 class VisibilitiesBase(VisibilitiesBaseABC):
-    r"""
-    Hold a set of related visibilities and information.
-
-    Attributes
-    ----------
-    vis : `numpy.ndarray`
-        Array of N complex visibilities at coordinates in `uv`
-    u : `numpy.ndarray`
-        Array of `u` coordinates where visibilities will be evaluated
-    v : `numpy.ndarray`
-        Array of `v` coordinates where visibilities will be evaluated
-    center : `float` (x, y), optional
-        The x, y offset of phase center
-
-    """
-
     @apu.quantity_input()
     def __init__(
         self,
@@ -162,9 +146,9 @@ class VisibilitiesBase(VisibilitiesBaseABC):
         u: apu.Quantity[1 / apu.arcsec],
         v: apu.Quantity[1 / apu.arcsec],
         names: Iterable[str],
-        uncertainty: Union[apu.Quantity, None],
         meta: Any = None,
         dims: Iterable[str] = ("uv",),
+        uncertainty: Union[apu.Quantity, None],
         coords: dict = {},
     ):
         r"""
@@ -178,8 +162,17 @@ class VisibilitiesBase(VisibilitiesBaseABC):
             Array of `u` coordinates where visibilities will be evaluated.
         v : `numpy.ndarray`
             Array of `v` coordinates where visibilities will be evaluated.
-        center :
-            Phase centre
+        names : iterable of `str`
+            The names of the axes.
+        meta :, optional
+            A place for metadata.
+        dims : iterable of `str`
+            The labels for each dimension type. Must contain 'uv' to denote
+            the UV plane dimension.
+        uncertainty :, optional
+            The uncertainty of visibilities.
+        coords : `dict`, optional
+            Coordinate grid values for any additional dimensions.
         """
         if not isinstance(visibilities, apu.Quantity) or visibilities.isscalar:
             raise TypeError("visibilities must all be a non scalar Astropy quantity.")
@@ -332,24 +325,18 @@ class VisibilitiesBase(VisibilitiesBaseABC):
 
 
 class Visibilities(VisibilitiesBase, VisibilitiesABC):
-    r"""
-    Hold a set of related visibilities and information.
-
-    Attributes
-    ----------
-    vis : `numpy.ndarray`
-        Array of N complex visibilities at coordinates in `uv`
-    u : `numpy.ndarray`
-        Array of `u` coordinates where visibilities will be evaluated
-    v : `numpy.ndarray`
-        Array of `v` coordinates where visibilities will be evaluated
-    center : `float` (x, y), optional
-        The x, y offset of phase center
-
-    """
-
-    # @apu.quantity_input(u=1/apu.arcsec, v=1/apu.arcsec)
-    def __init__(self, visibilities, u, v, names, uncertainty=None, meta=None):
+    @apu.quantity_input()
+    def __init__(
+        self,
+        visibilities: apu.Quantity,
+        u: apu.Quantity[1 / apu.arcsec],
+        v: apu.Quantity[1 / apu.arcsec],
+        names: Iterable[str],
+        meta: VisMetaABC,
+        dims: Iterable[str] = ("uv",),
+        uncertainty: Union[apu.Quantity, None],
+        coords: dict = {},
+    ):
         r"""
         Initialise a new Visibility object.
 
@@ -361,17 +348,24 @@ class Visibilities(VisibilitiesBase, VisibilitiesABC):
             Array of `u` coordinates where visibilities will be evaluated.
         v : `numpy.ndarray`
             Array of `v` coordinates where visibilities will be evaluated.
-        center :
-            Phase centre
+        names : iterable of `str`
+            The names of the axes.
+        meta : `VisMetaABC`
+            Metadata associated with visibilities. Must contain certain information
+            as defined by the `VisMetaABC`.
+        dims : iterable of `str`
+            The labels for each dimension type. Must contain 'uv' to denote
+            the UV plane dimension.
+        uncertainty :, optional
+            The uncertainty of visibilities.
+        coords : `dict`, optional
+            Coordinate grid values for any additional dimensions.
         """
         nvis = len(visibilities)
         if uncertainty.isscalar or len(uncertainty) != nvis:
             raise TypeError("uncertainty must be the same length as visibilities.")
-
-        if not isinstance(meta, VisMetaABC):
-            raise TypeError("Meta must be an instance of VisMetaABC.")
-
-        super().__init__(visibilities, u, v, names, uncertainty=uncertainty, meta=meta)
+        super().__init__(visibilities, u, v, names, meta, dims=dims, uncertainty=uncertainty,
+                         coords=coords)
 
 
 class VisMeta(VisMetaABC, dict):
