@@ -6,7 +6,7 @@ certain spacecraft or instruments
 """
 
 import abc
-from typing import Any, Union
+from typing import Union
 from collections.abc import Iterable
 
 import astropy.units as apu
@@ -21,6 +21,7 @@ _E_RANGE_KEY = "energy_range"
 _T_RANGE_KEY = "time_range"
 _OBS_COORD_KEY = "observer_coordinate"
 _VIS_LABELS_KEY = "vis_labels"
+
 
 class VisMetaABC(abc.ABC):
     @property
@@ -45,6 +46,7 @@ class VisMetaABC(abc.ABC):
         """
 
     property
+
     @abc.abstractmethod
     def vis_labels(self) -> Union[Iterable[str], None]:
         """
@@ -141,7 +143,7 @@ class Visibilities(VisibilitiesABC):
         amplitude: Union[apu.Quantity, None] = None,
         amplitude_uncertainty: Union[apu.Quantity, None] = None,
         phase: Union[apu.Quantity[apu.arcsec], None] = None,
-        phase_uncertainty: Union[apu.Quantity[apu.arcsec], None] = None
+        phase_uncertainty: Union[apu.Quantity[apu.arcsec], None] = None,
     ):
         r"""
         A class for holding visibilities.
@@ -240,26 +242,23 @@ class Visibilities(VisibilitiesABC):
             meta[self._t_range_key] = time_range
 
         # Construct underlying data object.
-        # In case visiblities is multi-dimensional, assume last axis is the uv-axis.
+        # In case visibilities is multi-dimensional, assume last axis is the uv-axis.
         # and give other axes arbitrary names.
-        dims = [f"dim{i}" for i in range(0, len(visibilities.shape)-1)] + [self._uv_key]
+        dims = [f"dim{i}" for i in range(0, len(visibilities.shape) - 1)] + [self._uv_key]
         data = {self._vis_key: (dims, visibilities.value)}
-        coords = {self._u_key: ([self._uv_key], u.value),
-                  self._v_key: ([self._uv_key], v.to_value(u.unit))}
-        units = {self._vis_key: visibilities.unit,
-                 self._uv_key: u.unit}
+        coords = {self._u_key: ([self._uv_key], u.value), self._v_key: ([self._uv_key], v.to_value(u.unit))}
+        units = {self._vis_key: visibilities.unit, self._uv_key: u.unit}
         if uncertainty is not None:
             data[self._uncert_key] = (dims, uncertainty.to_value(visibilities.unit))
         if amplitude is not None:
             data[self._amplitude_key] = (dims, amplitude.to_value(visibilities.unit))
         if amplitude_uncertainty is not None:
-            data[self._amplitude_uncert_key] = (
-                dims, amplitude_uncertainty.to_value(visibilities.unit))
+            data[self._amplitude_uncert_key] = (dims, amplitude_uncertainty.to_value(visibilities.unit))
         if phase is not None:
             data[self._phase_key] = (dims, phase.value.to_value(visibilities.unit))
             units[self._phase_key] = phase.unit
         if phase_uncertainty is not None:
-            data[self._phase:uncert_key] = (dims, phase_uncertainty.to_value(phase.unit))
+            data[self._phase : uncert_key] = (dims, phase_uncertainty.to_value(phase.unit))
         if vis_labels is not None:
             coords[self._vis_labels_key] = ([self._uv_key], vis_labels)
         attrs = {self._units_key: units, self._meta_key: meta}
@@ -283,12 +282,11 @@ class Visibilities(VisibilitiesABC):
 
     @property
     def uncertainty(self):
-        return (self._build_quantity(self._uncert_key, self._vis_key)
-                if self._uncert_key in self._data.keys() else None)
+        return self._build_quantity(self._uncert_key, self._vis_key) if self._uncert_key in self._data.keys() else None
 
     @property
     def meta(self):
-        # Copy underlaying metadata
+        # Copy underlying metadata
         meta = copy.deepcopy(self._data.attrs[self._meta_key])
         # Add vis labels to meta.
         meta[self._vis_labels_key] = self._data.coords[self._vis_labels_key][1]
@@ -311,8 +309,9 @@ class Visibilities(VisibilitiesABC):
             vis = self.visibilities
             uncert = self.uncertainty
             amplitude = self.amplitude
-            return np.sqrt((np.real(vis) / amplitude * np.real(uncert)) ** 2
-                           + (np.imag(vis) / amplitude * np.imag(uncert)) ** 2)
+            return np.sqrt(
+                (np.real(vis) / amplitude * np.real(uncert)) ** 2 + (np.imag(vis) / amplitude * np.imag(uncert)) ** 2
+            )
 
     @property
     def phase(self):
@@ -330,9 +329,13 @@ class Visibilities(VisibilitiesABC):
             vis = self.visibilities
             uncert = self.uncertainty
             amplitude = self.amplitude
-            return (np.sqrt(np.imag(vis) ** 2 / amplitude**4 * np.real(uncert) ** 2
-                            + np.real(vis) ** 2 / amplitude**4 * np.imag(uncert) ** 2
-                           ) * apu.rad).to(apu.deg)
+            return (
+                np.sqrt(
+                    np.imag(vis) ** 2 / amplitude**4 * np.real(uncert) ** 2
+                    + np.real(vis) ** 2 / amplitude**4 * np.imag(uncert) ** 2
+                )
+                * apu.rad
+            ).to(apu.deg)
 
     def _build_quantity(self, label, unit_label=None):
         if unit_label is None:
@@ -360,6 +363,7 @@ class VisMeta(VisMetaABC, dict):
     meta: `dict`
         A dictionary of the metadata
     """
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._e_range_key = _E_RANGE_KEY
@@ -382,7 +386,6 @@ class VisMeta(VisMetaABC, dict):
     @property
     def vis_labels(self):
         return self.get(self._vis_labels_key, None)
-
 
 
 class BaseVisibility:
