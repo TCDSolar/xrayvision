@@ -21,23 +21,16 @@ __all__ = ["Visibility", "Visibilities", "VisibilitiesBase", "VisMeta"]
 class VisMetaABC(abc.ABC):
     @property
     @abc.abstractmethod
-    def energy_range(self) -> Iterable[apu.Quantity]:
+    def energy_range(self) -> Union[Iterable[apu.Quantity], None]:
         """
         Energy range over which the visibilities are computed.
         """
 
     @property
     @abc.abstractmethod
-    def time_range(self) -> Iterable[Time]:
+    def time_range(self) -> Union[Iterable[Time], None]:
         """
         Centre time over which the visibilities are computed.
-        """
-
-    @property
-    @abc.abstractmethod
-    def center(self) -> SkyCoord:
-        """
-        Center of the image described by the visibilities.
         """
 
     @property
@@ -72,7 +65,14 @@ class VisibilitiesBaseABC(abc.ABC):
 
     @property
     @abc.abstractmethod
-    def names(self) -> Iterable[str]:
+    def phase_center(self) -> apu.Quantity[apu.deg]:
+        """
+        The position of the phase center of the visibilities.
+        """
+
+    @property
+    @abc.abstractmethod
+    def names(self) -> Union[Iterable[str], None]:
         """
         Names for each visibility.
 
@@ -104,28 +104,28 @@ class VisibilitiesABC(VisibilitiesBaseABC):
 
     @property
     @abc.abstractmethod
-    def amplitude(self) -> np.ndarray:
+    def amplitude(self) -> Iterable[apu.Quantity]:
         """
         Amplitudes of the visibilities.
         """
 
     @property
     @abc.abstractmethod
-    def phase(self) -> np.ndarray:
+    def phase(self) -> Iterable[apu.Quantity[apu.deg]]:
         """
         Phases of the visibilities.
         """
 
     @property
     @abc.abstractmethod
-    def amplitude_uncertainty(self) -> np.ndarray:
+    def amplitude_uncertainty(self) -> Iterable[apu.Quantity]:
         """
         Amplitude uncertainty of the visibilities.
         """
 
     @property
     @abc.abstractmethod
-    def phase_uncertainty(self) -> np.ndarray:
+    def phase_uncertainty(self) -> Iterable[apu.Quantity[apu.deg]]:
         """
         Phase uncertainty of the visibilities.
         """
@@ -134,7 +134,7 @@ class VisibilitiesABC(VisibilitiesBaseABC):
     @abc.abstractmethod
     def meta(self) -> VisMetaABC:
         """
-        Meta data.
+        Metadata.
         """
 
 
@@ -145,9 +145,10 @@ class VisibilitiesBase(VisibilitiesBaseABC):
         visibilities: apu.Quantity,
         u: apu.Quantity[1 / apu.arcsec],
         v: apu.Quantity[1 / apu.arcsec],
-        names: Iterable[str],
-        meta: Any = None,
+        phase_center: apu.Quantity[apu.deg],
+        meta: Any = {},
         dims: Iterable[str] = ("uv",),
+        names: Union[Iterable[str], None] = None,
         uncertainty: Union[apu.Quantity, None] = None,
         coords: dict = {}
     ):
@@ -162,13 +163,16 @@ class VisibilitiesBase(VisibilitiesBaseABC):
             Array of `u` coordinates where visibilities will be evaluated.
         v : `numpy.ndarray`
             Array of `v` coordinates where visibilities will be evaluated.
-        names : iterable of `str`
-            The names of the axes.
+        phase_center : `astropy.units.Quantity` with angular unit.
+            The location of the phase center of the visibilities.
         meta :, optional
             A place for metadata.
         dims : iterable of `str`
             The labels for each dimension type. Must contain 'uv' to denote
             the UV plane dimension.
+        names : iterable of `str`, optional
+            The names of the visibility values. Must be same length as
+            number of visibilities.
         uncertainty :, optional
             The uncertainty of visibilities.
         coords : `dict`, optional
@@ -203,7 +207,9 @@ class VisibilitiesBase(VisibilitiesBaseABC):
         units["v"] = v.unit
         coords["u"] = ([uv_name], u)
         coords["v"] = ([uv_name], v)
-        coords["names"] = ([uv_name], names)
+        if names:
+            coords["names"] = ([uv_name], names)
+        meta["phase_center"] = phase_center
         attrs = {"units": units, "meta": meta}
         self._data = xarray.Dataset(data, coords=coords, attrs=attrs)
 
@@ -220,8 +226,12 @@ class VisibilitiesBase(VisibilitiesBaseABC):
         return apu.Quantity(self._data.coords["v"].values, unit=self._data.attrs["units"]["v"])
 
     @property
+    def phase_center(self):
+        return self._data.meta["phase_center"]
+
+    @property
     def names(self):
-        return self._data.coords["names"]
+        return self._data.coords.get("names", None)
 
     @property
     def uncertainty(self):
@@ -331,9 +341,10 @@ class Visibilities(VisibilitiesBase, VisibilitiesABC):
         visibilities: apu.Quantity,
         u: apu.Quantity[1 / apu.arcsec],
         v: apu.Quantity[1 / apu.arcsec],
-        names: Iterable[str],
+        phase_center: apu.Quantity[apu.deg],
         meta: VisMetaABC,
         dims: Iterable[str] = ("uv",),
+        names: Union[Iterable[str], None] = None,
         uncertainty: Union[apu.Quantity, None] = None,
         coords: dict = {}
     ):
@@ -348,14 +359,16 @@ class Visibilities(VisibilitiesBase, VisibilitiesABC):
             Array of `u` coordinates where visibilities will be evaluated.
         v : `numpy.ndarray`
             Array of `v` coordinates where visibilities will be evaluated.
-        names : iterable of `str`
-            The names of the axes.
+        phase_center : `astropy.units.Quantity` with angular unit.
+            The location of the phase center of the visibilities.
         meta : `VisMetaABC`
             Metadata associated with visibilities. Must contain certain information
             as defined by the `VisMetaABC`.
         dims : iterable of `str`
             The labels for each dimension type. Must contain 'uv' to denote
             the UV plane dimension.
+        names : iterable of `str`, optional
+            The names of each visibilitiy.
         uncertainty :, optional
             The uncertainty of visibilities.
         coords : `dict`, optional
@@ -383,31 +396,25 @@ class VisMeta(VisMetaABC, dict):
         time_range = meta.get("time_range", None)
         center_range = meta.get("center", None)
         observer_coordinate = meta.get("observer_coordinate", None)
-        if not isinstance(energy_range, apu.Quantity) or len(energy_range) != 2:
+        if not (energy_range is None or (isinstance(energy_range, apu.Quantity) and len(energy_range) == 2)):
             raise ValueError("Input must contain the key 'energy_range' " "which gives a length-2 astropy Quantity.")
-        if not isinstance(time_range, Time) or len(time_range) != 2:
+        if not (time_range is None or (isinstance(time_range, Time) and len(time_range) == 2)):
             raise ValueError("Input must contain the key 'time_range' " "which gives a length 2 astropy time object.")
-        if not isinstance(center, SkyCoord) or not center.isscalar:
-            raise ValueError("Input must contain the key 'center' which gives a scalar SkyCoord.")
         if not isinstance(observer_coordinate, SkyCoord) or not observer_coordinate.isscalar:
             raise ValueError("Input must contain the key 'observer_coordinate' " "which gives a scalar SkyCoord.")
         super().__init__(meta)
 
     @property
     def energy_range(self):
-        return self["energy_range"]
+        return self.get("energy_range", None)
 
     @property
     def time_range(self):
-        return self["energy_range"]
-
-    @property
-    def center(self):
-        return self["center"]
+        return self.get("time_range", None)
 
     @property
     def observer_coordinate(self):
-        return self["observer_coordinate"]
+        return self.get("observer_coordinate", None)
 
 
 class BaseVisibility:

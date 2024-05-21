@@ -18,9 +18,10 @@ def visibilities_base():
     visibilities = [1 + 2 * 1j, 3 + 3 * 1j] * apu.ct
     u = [0.023, -0.08] * 1 / apu.arcsec
     v = [-0.0013, 0.013] * 1 / apu.arcsec
+    phase_center = [0, 0] * apu.arcsec
     unc = [0.01, 0.15] * apu.ct
     names = ["3a", "10b"]
-    return vm.VisibilitiesBase(visibilities, u, v, names, uncertainty=unc)
+    return vm.VisibilitiesBase(visibilities, u, v, phase_center, names=names, uncertainty=unc)
 
 
 def test_vis_u(visibilities_base):
