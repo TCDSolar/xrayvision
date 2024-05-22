@@ -279,6 +279,10 @@ class Visibilities(VisibilitiesABC):
     def phase_center(self):
         return self._data.meta[self._phase_center_key]
 
+    @phase_center.setter
+    def phase_center(self, value: apu.Quantity[apu.deg]):
+        self._data.attrs[self._meta_key][self._phase_center_key] = value
+
     @property
     def uncertainty(self):
         return self._build_quantity(self._uncert_key, self._vis_key) if self._uncert_key in self._data.keys() else None
