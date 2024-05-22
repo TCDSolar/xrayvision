@@ -70,11 +70,3 @@ def test_vis_phase_uncertainty(visibilities):
     expected_phase_uncertainty = [0.22918312, 1.4323945] * apu.deg
 
     assert_quantity_allclose(output_phase_uncertainty, expected_phase_uncertainty)
-
-
-def test_vis_phase_uncertainty(visibilities):
-    vis_base = visibilities
-    output_phase_uncertainty = vis_base.phase_uncertainty
-    expected_phase_uncertainty = [0.22918312, 1.4323945] * apu.deg
-
-    assert_quantity_allclose(output_phase_uncertainty, expected_phase_uncertainty)

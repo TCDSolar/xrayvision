@@ -15,7 +15,7 @@ import xarray
 from astropy.coordinates import SkyCoord
 from astropy.time import Time
 
-__all__ = ["Visibility", "Visibilities", "VisibilitiesBase", "VisMeta"]
+__all__ = ["Visibility", "Visibilities", "VisMeta"]
 
 _E_RANGE_KEY = "energy_range"
 _T_RANGE_KEY = "time_range"
@@ -257,7 +257,7 @@ class Visibilities(VisibilitiesABC):
             data[self._phase_key] = (dims, phase.value.to_value(visibilities.unit))
             units[self._phase_key] = phase.unit
         if phase_uncertainty is not None:
-            data[self._phase : uncert_key] = (dims, phase_uncertainty.to_value(phase.unit))
+            data[self._phase_uncert_key] = (dims, phase_uncertainty.to_value(phase.unit))
         if vis_labels is not None:
             coords[self._vis_labels_key] = ([self._uv_key], vis_labels)
         attrs = {self._units_key: units, self._meta_key: meta}
