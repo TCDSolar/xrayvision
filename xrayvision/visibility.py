@@ -405,12 +405,6 @@ class VisMeta(VisMetaABC, dict):
     def phase_center(self):
         return self[_PHASE_CENTER_KEY]
 
-    @phase_center.setter
-    def phase_center(self, value: apu.Quantity[apu.deg]):
-        if value.shape[-1] != 2:
-            raise ValueError("Last dimension of phase_center must be length-2.")
-        self[_PHASE_CENTER_KEY] = value
-
     @property
     def observer_coordinate(self):
         return self.get(_OBS_COORD_KEY, None)
