@@ -147,15 +147,15 @@ class Visibilities(VisibilitiesABC):
     def __init__(
         self,
         visibilities: apu.Quantity,
-        u: apu.Quantity[1 / apu.arcsec],
-        v: apu.Quantity[1 / apu.arcsec],
+        u: apu.Quantity[1 / apu.deg],
+        v: apu.Quantity[1 / apu.deg],
         phase_center: Union[apu.Quantity[apu.deg], None] = None,
         meta: Any = dict(),
         uncertainty: Union[apu.Quantity, None] = None,
         amplitude: Union[apu.Quantity, None] = None,
         amplitude_uncertainty: Union[apu.Quantity, None] = None,
-        phase: Union[apu.Quantity[apu.arcsec], None] = None,
-        phase_uncertainty: Union[apu.Quantity[apu.arcsec], None] = None,
+        phase: Union[apu.Quantity[apu.deg], None] = None,
+        phase_uncertainty: Union[apu.Quantity[apu.deg], None] = None,
     ):
         r"""
         A class for holding visibilities.
@@ -229,7 +229,6 @@ class Visibilities(VisibilitiesABC):
         self._phase_uncert_key = "phase_uncertainty"
         self._u_key = "u"
         self._v_key = "v"
-        self._phase_center_key = "phase_center"
         self._meta_key = "meta"
         self._uv_key = "uv"
         self._units_key = "units"
@@ -238,8 +237,7 @@ class Visibilities(VisibilitiesABC):
         if not isinstance(meta, VisMetaABC) and meta.get(_PHASE_CENTER_KEY, None) is None:
             meta[_PHASE_CENTER_KEY] = [0, 0] / apu.arcsec if phase_center is None else phase_center
         elif phase_center is not None:
-            warning.warn("phase_center provided, but already exists in meta. "
-                         "Using value already in meta.")
+            warnings.warn("phase_center provided, but already exists in meta. Using value already in meta.")
         if not isinstance(meta, VisMetaABC):
             meta = VisMeta(meta)
 
@@ -264,9 +262,11 @@ class Visibilities(VisibilitiesABC):
         vis_labels = meta.vis_labels
         if vis_labels is not None:
             if len(vis_labels) != nvis:
-                raise ValueError("meta.vis_labels must be same length as number of visibilites. "
-                                 f"Number of labels = {len(meta.vis_labels)}; "
-                                 f"Number of visibilities = {nvis}")
+                raise ValueError(
+                    "meta.vis_labels must be same length as number of visibilites. "
+                    f"Number of labels = {len(meta.vis_labels)}; "
+                    f"Number of visibilities = {nvis}"
+                )
             coords[_VIS_LABELS_KEY] = ([self._uv_key], vis_labels)
         attrs = {self._units_key: units, self._meta_key: meta}
         self._data = xarray.Dataset(data, coords=coords, attrs=attrs)
@@ -318,7 +318,8 @@ class Visibilities(VisibilitiesABC):
                 return None
             else:
                 return np.sqrt(
-                    (np.real(vis) / amplitude * np.real(uncert)) ** 2 + (np.imag(vis) / amplitude * np.imag(uncert)) ** 2
+                    (np.real(vis) / amplitude * np.real(uncert)) ** 2
+                    + (np.imag(vis) / amplitude * np.imag(uncert)) ** 2
                 )
 
     @property
@@ -372,20 +373,36 @@ class VisMeta(VisMetaABC, dict):
     meta: `dict`
         A dictionary of the metadata
     """
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        if (_PHASE_CENTER_KEY not in self
-            or not isinstance(self[_PHASE_CENTER_KEY], apu.Quantity)):
-            raise KeyError(f"Inputs must include a key, '{_PHASE_CENTER_KEY}', "
-                           "that gives an astropy Quantity.")
-        try:
-            tmp = self[_PHASE_CENTER_KEY].to(apu.deg)
-        except apu.UnitConversionError:
-            raise ValueError(f"self[{_PHASE_CENTER_KEY}] must have angular units.")
+        # Check phase center is included and of right type.
+        controled_args = (
+            (_PHASE_CENTER_KEY, apu.Quantity, apu.deg, None, True),
+            (_OBS_COORD_KEY, SkyCoord),
+            (_E_RANGE_KEY, apu.Quantity, apu.keV, apu.spectral()),
+            (_T_RANGE_KEY, Time),
+        )
+        for args in controled_args:
+            self._check_input_type_and_unit(*args)
+
+    def _check_input_type_and_unit(self, key, type_, unit=None, equivalencies=None, required_key=False):
+        # Define condition to determine input is not of right type.
+        value = self.get(key, None)
+        value_is_wrong_type = (
+            not isinstance(value, type_) if required_key else not isinstance(value, (type_, type(None)))
+        )
+        if value_is_wrong_type:
+            raise KeyError(f"Inputs must include a key, '{key}', that gives a {type_}.")
+        if unit is not None and value is not None:
+            try:
+                tmp = value.to(unit, equivalencies=equivalencies)
+            except apu.UnitConversionError:
+                raise ValueError(f"'{key}' must have angular units.")
 
     @property
     def phase_center(self):
-        return self.get(_VIS_LABELS_KEY, None)
+        return self[_PHASE_CENTER_KEY]
 
     @phase_center.setter
     def phase_center(self, value: apu.Quantity[apu.deg]):
@@ -412,12 +429,11 @@ class VisMeta(VisMetaABC, dict):
     @property
     def instrument(self):
         instr = None
-        i, n = 0, len(_INSTR_KEY)
+        i, n = 0, len(_INSTR_KEYS)
         while not instr and i < n:
             instr = self.get(_INSTR_KEYS[i], None)
             i += 1
         return instr
-
 
 
 class BaseVisibility:
