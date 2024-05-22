@@ -35,7 +35,7 @@ class VisMetaABC(abc.ABC):
     @abc.abstractmethod
     def time_range(self) -> Union[Iterable[Time], None]:
         """
-        Centre time over which the visibilities are computed.
+        Time range over which the visibilities are computed.
         """
 
     @property
