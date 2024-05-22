@@ -16,7 +16,7 @@ import xarray
 from astropy.coordinates import SkyCoord
 from astropy.time import Time
 
-__all__ = ["Visibility", "Visibilities", "VisMeta"]
+__all__ = ["Visibility", "Visibilities", "VisMeta", "VisibilitiesABC", "VisMetaABC"]
 
 _E_RANGE_KEY = "energy_range"
 _T_RANGE_KEY = "time_range"
