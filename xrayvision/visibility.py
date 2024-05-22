@@ -297,8 +297,9 @@ class Visibilities(VisibilitiesABC):
 
     @property
     def meta(self):
-        meta = self._data.attrs[self._meta_key]
-        meta[_VIS_LABELS_KEY] = self._data.coords[_VIS_LABELS_KEY][1]
+        meta, coords = self._data.attrs[self._meta_key], self._data.coords
+        if _VIS_LABELS_KEY in coords:
+            meta[_VIS_LABELS_KEY] = coords[_VIS_LABELS_KEY].values
         return meta
 
     @property
@@ -376,7 +377,7 @@ class VisMeta(VisMetaABC, dict):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Check phase center is included and of right type.
+        # Check controlled/expected inputs are of correct type and units.
         controled_args = (
             (_PHASE_CENTER_KEY, apu.Quantity, apu.deg, None, True),
             (_OBS_COORD_KEY, SkyCoord),
@@ -386,11 +387,11 @@ class VisMeta(VisMetaABC, dict):
         for args in controled_args:
             self._check_input_type_and_unit(*args)
 
-    def _check_input_type_and_unit(self, key, type_, unit=None, equivalencies=None, required_key=False):
+    def _check_input_type_and_unit(self, key, type_, unit=None, equivalencies=None, required=False):
         # Define condition to determine input is not of right type.
         value = self.get(key, None)
         value_is_wrong_type = (
-            not isinstance(value, type_) if required_key else not isinstance(value, (type_, type(None)))
+            not isinstance(value, type_) if required else not isinstance(value, (type_, type(None)))
         )
         if value_is_wrong_type:
             raise KeyError(f"Inputs must include a key, '{key}', that gives a {type_}.")
