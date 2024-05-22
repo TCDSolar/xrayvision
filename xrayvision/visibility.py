@@ -6,6 +6,7 @@ certain spacecraft or instruments
 """
 
 import abc
+import warnings
 from typing import Any, Union
 from collections.abc import Iterable
 
@@ -21,9 +22,25 @@ _E_RANGE_KEY = "energy_range"
 _T_RANGE_KEY = "time_range"
 _OBS_COORD_KEY = "observer_coordinate"
 _VIS_LABELS_KEY = "vis_labels"
+_INSTR_KEYS = ["instrument", "INSTRUME"]
+_PHASE_CENTER_KEY = "phase_center"
 
 
 class VisMetaABC(abc.ABC):
+    @property
+    @abc.abstractmethod
+    def phase_center(self) -> apu.Quantity[apu.deg]:
+        """
+        The location of the visibilities phase center.
+        """
+
+    @property
+    @abc.abstractmethod
+    def observer_coordinate(self) -> Union[SkyCoord, None]:
+        """
+        Location of the observer.
+        """
+
     @property
     @abc.abstractmethod
     def energy_range(self) -> Union[Iterable[apu.Quantity], None]:
@@ -40,16 +57,16 @@ class VisMetaABC(abc.ABC):
 
     @property
     @abc.abstractmethod
-    def observer_coordinate(self) -> Union[SkyCoord, None]:
+    def vis_labels(self) -> Union[Iterable[str], None]:
         """
-        Location of the observer.
+        Labels of each visibility.
         """
 
     @property
     @abc.abstractmethod
-    def vis_labels(self) -> Union[Iterable[str], None]:
+    def instrument(self) -> Union[str, None]:
         """
-        Labels of each visibility.
+        The name of the instrument or observer that measured the visibilities.
         """
 
 
@@ -132,13 +149,9 @@ class Visibilities(VisibilitiesABC):
         visibilities: apu.Quantity,
         u: apu.Quantity[1 / apu.arcsec],
         v: apu.Quantity[1 / apu.arcsec],
-        phase_center: apu.Quantity[apu.deg],
-        uncertainty: Union[apu.Quantity, None] = None,
-        vis_labels: Union[Iterable[str], None] = None,
-        observer_coordinate: Union[SkyCoord, None] = None,
-        energy_range: Union[apu.Quantity[apu.keV], None] = None,
-        time_range: Union[Time, None] = None,
+        phase_center: Union[apu.Quantity[apu.deg], None] = None,
         meta: Any = dict(),
+        uncertainty: Union[apu.Quantity, None] = None,
         amplitude: Union[apu.Quantity, None] = None,
         amplitude_uncertainty: Union[apu.Quantity, None] = None,
         phase: Union[apu.Quantity[apu.arcsec], None] = None,
@@ -157,20 +170,18 @@ class Visibilities(VisibilitiesABC):
             Array of `v` coordinates where visibilities will be evaluated.
         phase_center : `astropy.units.Quantity` with angular unit.
             The location of the phase center of the visibilities.
+            Default = [0, 0] arcsec
+        meta : `VisMetaABC` or dict-like, optional
+            Metadata associated with the visibilities.
+            In order to use this Visibilities object to make a Map, ``meta``
+            must contain a key ``'observer_coordinate'`` which gives a
+            `~astropy.coordinates.SkyCoord`, designating the location from which
+            the visibilities were measured.
+            To give each visibility a label, include a key, ``'vis_labels'``,
+            giving an iterable of the same length as the number of visibilities.
         uncertainty: `astropy.units.Quantity`, optional
             The uncertainty of the visibilities.
             Must be same shape and unit as visibilities.
-        vis_labels : iterable of `str`, optional
-            The label of each visibility, e.g. the name of the detector that
-            measured it. Must be same length as visibilities.
-        observer_coordinate : `astropy.coordinates.SkyCoord`, optional
-            The position of the observer that measured the visibilities.
-        energy_range : `astropy.units.Quantity` with a spectral unit, optional
-            The energy range over which the visibilities were calculated.
-        time_range : `astropy.time.Time`, optional
-            The time range over which the visibilities were calculated.
-        meta : `VisMetaABC` or dict-like, optional
-            Metadata associated with the visibilities.
         amplitude : `astropy.units.Quantity`, optional
             The amplitude of the visibilities.  If not given, amplitudes
             be calculated directly from the visibilities.
@@ -190,7 +201,7 @@ class Visibilities(VisibilitiesABC):
             visibility uncertainties, and amplitudes.
             Must be same shape and unit as visibilities.
         """
-        # Saitize inputs.
+        # Sanitize inputs.
         if not isinstance(visibilities, apu.Quantity) or visibilities.isscalar:
             raise TypeError("visibilities must all be a non scalar Astropy quantity.")
         nvis = visibilities.shape[-1]
@@ -198,8 +209,6 @@ class Visibilities(VisibilitiesABC):
             raise ValueError("u must be the same length as visibilities.")
         if len(v) != nvis:
             raise ValueError("v must be the same length as visibilities.")
-        if len(vis_labels) != nvis:
-            raise ValueError("names must be the same length as visibilities.")
         if uncertainty is not None and uncertainty.shape != visibilities.shape:
             raise TypeError("uncertainty must be same shape as visibilities.")
         if amplitude is not None and amplitude.shape != visibilities.shape:
@@ -220,25 +229,19 @@ class Visibilities(VisibilitiesABC):
         self._phase_uncert_key = "phase_uncertainty"
         self._u_key = "u"
         self._v_key = "v"
-        self._vis_labels_key = _VIS_LABELS_KEY
         self._phase_center_key = "phase_center"
-        self._obs_coord_key = _OBS_COORD_KEY
-        self._e_range_key = _E_RANGE_KEY
-        self.t_range_key = _T_RANGE_KEY
         self._meta_key = "meta"
         self._uv_key = "uv"
         self._units_key = "units"
 
-        # Build meta.
+        # Build meta. Make sure that phase center is included.
+        if not isinstance(meta, VisMetaABC) and meta.get(_PHASE_CENTER_KEY, None) is None:
+            meta[_PHASE_CENTER_KEY] = [0, 0] / apu.arcsec if phase_center is None else phase_center
+        elif phase_center is not None:
+            warning.warn("phase_center provided, but already exists in meta. "
+                         "Using value already in meta.")
         if not isinstance(meta, VisMetaABC):
             meta = VisMeta(meta)
-        meta[self._phase_center_key] = phase_center
-        if observer_coordinate is not None:
-            meta[self._obs_coord_key] = observer_coordinate
-        if energy_range is not None:
-            meta[self._e_range_key] = energy_range
-        if time_range is not None:
-            meta[self._t_range_key] = time_range
 
         # Construct underlying data object.
         # In case visibilities is multi-dimensional, assume last axis is the uv-axis.
@@ -258,8 +261,13 @@ class Visibilities(VisibilitiesABC):
             units[self._phase_key] = phase.unit
         if phase_uncertainty is not None:
             data[self._phase_uncert_key] = (dims, phase_uncertainty.to_value(phase.unit))
+        vis_labels = meta.vis_labels
         if vis_labels is not None:
-            coords[self._vis_labels_key] = ([self._uv_key], vis_labels)
+            if len(vis_labels) != nvis:
+                raise ValueError("meta.vis_labels must be same length as number of visibilites. "
+                                 f"Number of labels = {len(meta.vis_labels)}; "
+                                 f"Number of visibilities = {nvis}")
+            coords[_VIS_LABELS_KEY] = ([self._uv_key], vis_labels)
         attrs = {self._units_key: units, self._meta_key: meta}
         self._data = xarray.Dataset(data, coords=coords, attrs=attrs)
 
@@ -277,11 +285,11 @@ class Visibilities(VisibilitiesABC):
 
     @property
     def phase_center(self):
-        return self._data.meta[self._phase_center_key]
+        return self._data.meta.phase_center
 
     @phase_center.setter
     def phase_center(self, value: apu.Quantity[apu.deg]):
-        self._data.attrs[self._meta_key][self._phase_center_key] = value
+        self._data.attrs[self._meta_key].phase_center = value
 
     @property
     def uncertainty(self):
@@ -290,7 +298,7 @@ class Visibilities(VisibilitiesABC):
     @property
     def meta(self):
         meta = self._data.attrs[self._meta_key]
-        meta[self._vis_labels_key] = self._data.coords[self._vis_labels_key][1]
+        meta[_VIS_LABELS_KEY] = self._data.coords[_VIS_LABELS_KEY][1]
         return meta
 
     @property
@@ -305,12 +313,13 @@ class Visibilities(VisibilitiesABC):
         if self._amplitude_uncert_key in self._data:
             return self._build_quantity(self._amplitude_uncert_key, self._vis_key)
         else:
-            vis = self.visibilities
-            uncert = self.uncertainty
-            amplitude = self.amplitude
-            return np.sqrt(
-                (np.real(vis) / amplitude * np.real(uncert)) ** 2 + (np.imag(vis) / amplitude * np.imag(uncert)) ** 2
-            )
+            vis, uncert, amplitude = self.visibilities, self.uncertainty, self.amplitude
+            if uncert is None:
+                return None
+            else:
+                return np.sqrt(
+                    (np.real(vis) / amplitude * np.real(uncert)) ** 2 + (np.imag(vis) / amplitude * np.imag(uncert)) ** 2
+                )
 
     @property
     def phase(self):
@@ -325,16 +334,17 @@ class Visibilities(VisibilitiesABC):
         if self._phase_uncert_key in self._data:
             return self._build_quantity(self._phase_uncert_key, self._phase_key)
         else:
-            vis = self.visibilities
-            uncert = self.uncertainty
-            amplitude = self.amplitude
-            return (
-                np.sqrt(
-                    np.imag(vis) ** 2 / amplitude**4 * np.real(uncert) ** 2
-                    + np.real(vis) ** 2 / amplitude**4 * np.imag(uncert) ** 2
-                )
-                * apu.rad
-            ).to(apu.deg)
+            vis, uncert, amplitude = self.visibilities, self.uncertainty, self.amplitude
+            if uncert is None:
+                return None
+            else:
+                return (
+                    np.sqrt(
+                        np.imag(vis) ** 2 / amplitude**4 * np.real(uncert) ** 2
+                        + np.real(vis) ** 2 / amplitude**4 * np.imag(uncert) ** 2
+                    )
+                    * apu.rad
+                ).to(apu.deg)
 
     def _build_quantity(self, label, unit_label=None):
         if unit_label is None:
@@ -362,29 +372,52 @@ class VisMeta(VisMetaABC, dict):
     meta: `dict`
         A dictionary of the metadata
     """
-
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._e_range_key = _E_RANGE_KEY
-        self._t_range_key = _T_RANGE_KEY
-        self._obs_coord_key = _OBS_COORD_KEY
-        self._vis_labels_key = _VIS_LABELS_KEY
+        if (_PHASE_CENTER_KEY not in self
+            or not isinstance(self[_PHASE_CENTER_KEY], apu.Quantity)):
+            raise KeyError(f"Inputs must include a key, '{_PHASE_CENTER_KEY}', "
+                           "that gives an astropy Quantity.")
+        try:
+            tmp = self[_PHASE_CENTER_KEY].to(apu.deg)
+        except apu.UnitConversionError:
+            raise ValueError(f"self[{_PHASE_CENTER_KEY}] must have angular units.")
 
     @property
-    def energy_range(self):
-        return self.get(self._e_range_key, None)
+    def phase_center(self):
+        return self.get(_VIS_LABELS_KEY, None)
 
-    @property
-    def time_range(self):
-        return self.get(self._t_range_key, None)
+    @phase_center.setter
+    def phase_center(self, value: apu.Quantity[apu.deg]):
+        if value.shape[-1] != 2:
+            raise ValueError("Last dimension of phase_center must be length-2.")
+        self[_PHASE_CENTER_KEY] = value
 
     @property
     def observer_coordinate(self):
-        return self.get(self._obs_coord_key, None)
+        return self.get(_OBS_COORD_KEY, None)
+
+    @property
+    def energy_range(self):
+        return self.get(_E_RANGE_KEY, None)
+
+    @property
+    def time_range(self):
+        return self.get(_T_RANGE_KEY, None)
 
     @property
     def vis_labels(self):
-        return self.get(self._vis_labels_key, None)
+        return self.get(_VIS_LABELS_KEY, None)
+
+    @property
+    def instrument(self):
+        instr = None
+        i, n = 0, len(_INSTR_KEY)
+        while not instr and i < n:
+            instr = self.get(_INSTR_KEYS[i], None)
+            i += 1
+        return instr
+
 
 
 class BaseVisibility:

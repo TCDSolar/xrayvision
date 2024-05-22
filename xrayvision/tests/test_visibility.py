@@ -20,8 +20,8 @@ def visibilities():
     v = [-0.0013, 0.013] * 1 / apu.arcsec
     phase_center = [0, 0] * apu.arcsec
     unc = [0.01, 0.15] * apu.ct
-    names = ["3a", "10b"]
-    return vm.Visibilities(visibilities, u, v, phase_center, vis_labels=names, uncertainty=unc)
+    meta = {"vis_labels": ["3a", "10b"]}
+    return vm.Visibilities(visibilities, u, v, phase_center, uncertainty=unc, meta=meta)
 
 
 def test_vis_u(visibilities):
