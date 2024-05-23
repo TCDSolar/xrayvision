@@ -6,8 +6,8 @@ certain spacecraft or instruments
 """
 
 import abc
-from typing import MutableMapping, Optional, Union
-from collections.abc import Iterable
+from typing import Union, Optional
+from collections.abc import Iterable, MutableMapping
 
 import astropy.units as apu
 import numpy as np
@@ -142,11 +142,11 @@ class Visibilities(VisibilitiesABC):
         v: apu.Quantity[1 / apu.deg],
         phase_center: apu.Quantity[apu.arcsec] = [0, 0] * apu.arcsec,
         meta: MutableMapping = dict(),
-        uncertainty: Optional[apu.Quantity],
-        amplitude: Optional[apu.Quantity],
-        amplitude_uncertainty: Optional[apu.Quantity],
-        phase: Optional[apu.Quantity[apu.deg]],
-        phase_uncertainty: Optional[apu.Quantity[apu.deg]],
+        uncertainty: Optional[apu.Quantity] = None,
+        amplitude: Optional[apu.Quantity] = None,
+        amplitude_uncertainty: Optional[apu.Quantity] = None,
+        phase: Optional[apu.Quantity[apu.deg]] = None,
+        phase_uncertainty: Optional[apu.Quantity[apu.deg]] = None,
     ):
         r"""
         A class for holding visibilities.
