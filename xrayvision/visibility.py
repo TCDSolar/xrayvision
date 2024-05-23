@@ -6,7 +6,6 @@ certain spacecraft or instruments
 """
 
 import abc
-import warnings
 from typing import Any, Union
 from collections.abc import Iterable
 
@@ -23,17 +22,9 @@ _T_RANGE_KEY = "time_range"
 _OBS_COORD_KEY = "observer_coordinate"
 _VIS_LABELS_KEY = "vis_labels"
 _INSTR_KEYS = ["instrument", "INSTRUME"]
-_PHASE_CENTER_KEY = "phase_center"
 
 
 class VisMetaABC(abc.ABC):
-    @property
-    @abc.abstractmethod
-    def phase_center(self) -> apu.Quantity[apu.deg]:
-        """
-        The location of the visibilities phase center.
-        """
-
     @property
     @abc.abstractmethod
     def observer_coordinate(self) -> Union[SkyCoord, None]:
@@ -234,10 +225,6 @@ class Visibilities(VisibilitiesABC):
         self._units_key = "units"
 
         # Build meta. Make sure that phase center is included.
-        if not isinstance(meta, VisMetaABC) and meta.get(_PHASE_CENTER_KEY, None) is None:
-            meta[_PHASE_CENTER_KEY] = [0, 0] / apu.arcsec if phase_center is None else phase_center
-        elif phase_center is not None:
-            warnings.warn("phase_center provided, but already exists in meta. Using value already in meta.")
         if not isinstance(meta, VisMetaABC):
             meta = VisMeta(meta)
 
@@ -271,6 +258,9 @@ class Visibilities(VisibilitiesABC):
         attrs = {self._units_key: units, self._meta_key: meta}
         self._data = xarray.Dataset(data, coords=coords, attrs=attrs)
 
+        # Attach phase_center
+        self._phase_center = phase_center
+
     @property
     def visibilities(self):
         return self._build_quantity(self._vis_key)
@@ -285,11 +275,11 @@ class Visibilities(VisibilitiesABC):
 
     @property
     def phase_center(self):
-        return self._data.meta.phase_center
+        return self._phase_center
 
     @phase_center.setter
     def phase_center(self, value: apu.Quantity[apu.deg]):
-        self._data.attrs[self._meta_key].phase_center = value
+        self._phase_center = value
 
     @property
     def uncertainty(self):
@@ -379,7 +369,6 @@ class VisMeta(VisMetaABC, dict):
         super().__init__(*args, **kwargs)
         # Check controlled/expected inputs are of correct type and units.
         controled_args = (
-            (_PHASE_CENTER_KEY, apu.Quantity, apu.deg, None, True),
             (_OBS_COORD_KEY, SkyCoord),
             (_E_RANGE_KEY, apu.Quantity, apu.keV, apu.spectral()),
             (_T_RANGE_KEY, Time),
@@ -387,23 +376,12 @@ class VisMeta(VisMetaABC, dict):
         for args in controled_args:
             self._check_input_type_and_unit(*args)
 
-    def _check_input_type_and_unit(self, key, type_, unit=None, equivalencies=None, required=False):
-        # Define condition to determine input is not of right type.
+    def _check_input_type_and_unit(self, key, key_type, unit=None, equivalencies=None):
         value = self.get(key, None)
-        value_is_wrong_type = (
-            not isinstance(value, type_) if required else not isinstance(value, (type_, type(None)))
-        )
-        if value_is_wrong_type:
-            raise KeyError(f"Inputs must include a key, '{key}', that gives a {type_}.")
-        if unit is not None and value is not None:
-            try:
-                tmp = value.to(unit, equivalencies=equivalencies)
-            except apu.UnitConversionError:
-                raise ValueError(f"'{key}' must have angular units.")
-
-    @property
-    def phase_center(self):
-        return self[_PHASE_CENTER_KEY]
+        if not isinstance(value, (key_type, type(None))):
+            raise KeyError(f"Inputs must include a key, '{key}', that gives a {key_type}.")
+        if unit is not None and value is not None and not value.unit.is_equivalent(unit, equivalencies=equivalencies):
+            raise ValueError(f"'{key}' must have angular units.")
 
     @property
     def observer_coordinate(self):
