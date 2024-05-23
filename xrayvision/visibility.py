@@ -6,7 +6,7 @@ certain spacecraft or instruments
 """
 
 import abc
-from typing import Any, Union
+from typing import MutableMapping, Optional, Union
 from collections.abc import Iterable
 
 import astropy.units as apu
@@ -140,29 +140,29 @@ class Visibilities(VisibilitiesABC):
         visibilities: apu.Quantity,
         u: apu.Quantity[1 / apu.deg],
         v: apu.Quantity[1 / apu.deg],
-        phase_center: apu.Quantity[apu.arcsec] = (0,0) * apu.arcsec,
-        meta: Any = dict(),
-        uncertainty: Union[apu.Quantity, None] = None,
-        amplitude: Union[apu.Quantity, None] = None,
-        amplitude_uncertainty: Union[apu.Quantity, None] = None,
-        phase: Union[apu.Quantity[apu.deg], None] = None,
-        phase_uncertainty: Union[apu.Quantity[apu.deg], None] = None,
+        phase_center: apu.Quantity[apu.arcsec] = [0, 0] * apu.arcsec,
+        meta: MutableMapping = dict(),
+        uncertainty: Optional[apu.Quantity],
+        amplitude: Optional[apu.Quantity],
+        amplitude_uncertainty: Optional[apu.Quantity],
+        phase: Optional[apu.Quantity[apu.deg]],
+        phase_uncertainty: Optional[apu.Quantity[apu.deg]],
     ):
         r"""
         A class for holding visibilities.
 
         Parameters
         ----------
-        visibilities : `astropy.units.Quantity`
+        visibilities :
             Array of N complex visibilities at coordinates in `uv`.
-        u : `numpy.ndarray`
+        u :
             Array of `u` coordinates where visibilities will be evaluated.
-        v : `numpy.ndarray`
+        v :
             Array of `v` coordinates where visibilities will be evaluated.
         phase_center : `astropy.units.Quantity` with angular unit.
             The location of the phase center of the visibilities.
             Default = [0, 0] arcsec
-        meta : `VisMetaABC` or dict-like, optional
+        meta :
             Metadata associated with the visibilities.
             In order to use this Visibilities object to make a Map, ``meta``
             must contain a key ``'observer_coordinate'`` which gives a
@@ -170,23 +170,23 @@ class Visibilities(VisibilitiesABC):
             the visibilities were measured.
             To give each visibility a label, include a key, ``'vis_labels'``,
             giving an iterable of the same length as the number of visibilities.
-        uncertainty: `astropy.units.Quantity`, optional
+        uncertainty:
             The uncertainty of the visibilities.
             Must be same shape and unit as visibilities.
-        amplitude : `astropy.units.Quantity`, optional
+        amplitude :
             The amplitude of the visibilities.  If not given, amplitudes
             be calculated directly from the visibilities.
             Must be same shape and unit as visibilities.
-        amplitude_uncertainty : `astropy.units.Quantity`, optional
+        amplitude_uncertainty :
             The uncertainty of the visibility amplitudes. If not provided,
             amplitude uncertainties will be calculated from visibilities,
             visibility uncertainties, and amplitudes.
             Must be same shape and unit as visibilities.
-        phase : `astropy.units.Quantity` with an angle unit, optional
+        phase :
             The phase of the visibilities.  If not given, phases will
             be calculated directly from the visibilities.
             Must be same shape as visibilities.
-        phase_uncertainty : `astropy.units.Quantity` with an angle unit, optional
+        phase_uncertainty :
             The uncertainty of the visibility phases. If not provided,
             phase uncertainties will be calculated from visibilities,
             visibility uncertainties, and amplitudes.
