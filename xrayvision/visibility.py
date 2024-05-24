@@ -7,7 +7,7 @@ certain spacecraft or instruments
 
 import abc
 from typing import Union, Optional
-from collections.abc import Iterable, MutableMapping
+from collections.abc import Iterable
 
 import astropy.units as apu
 import numpy as np
@@ -141,7 +141,7 @@ class Visibilities(VisibilitiesABC):
         u: apu.Quantity[1 / apu.deg],
         v: apu.Quantity[1 / apu.deg],
         phase_center: apu.Quantity[apu.arcsec] = [0, 0] * apu.arcsec,
-        meta: MutableMapping = dict(),
+        meta: Optional[VisMetaABC] = None,
         uncertainty: Optional[apu.Quantity] = None,
         amplitude: Optional[apu.Quantity] = None,
         amplitude_uncertainty: Optional[apu.Quantity] = None,
@@ -224,10 +224,6 @@ class Visibilities(VisibilitiesABC):
         self._uv_key = "uv"
         self._units_key = "units"
 
-        # Build meta. Make sure that phase center is included.
-        if not isinstance(meta, VisMetaABC):
-            meta = VisMeta(meta)
-
         # Construct underlying data object.
         # In case visibilities is multi-dimensional, assume last axis is the uv-axis.
         # and give other axes arbitrary names.
@@ -246,6 +242,8 @@ class Visibilities(VisibilitiesABC):
             units[self._phase_key] = phase.unit
         if phase_uncertainty is not None:
             data[self._phase_uncert_key] = (dims, phase_uncertainty.to_value(phase.unit))
+        if meta is None:
+            meta = VisMeta({})
         vis_labels = meta.vis_labels
         if vis_labels is not None:
             if len(vis_labels) != nvis:
