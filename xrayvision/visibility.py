@@ -17,7 +17,7 @@ from astropy.time import Time
 
 __all__ = ["Visibility", "Visibilities", "VisMeta", "VisibilitiesABC", "VisMetaABC"]
 
-_E_RANGE_KEY = "energy_range"
+_E_RANGE_KEY = "spectral_range"
 _T_RANGE_KEY = "time_range"
 _OBS_COORD_KEY = "observer_coordinate"
 _VIS_LABELS_KEY = "vis_labels"
@@ -34,9 +34,9 @@ class VisMetaABC(abc.ABC):
 
     @property
     @abc.abstractmethod
-    def energy_range(self) -> Union[Iterable[apu.Quantity], None]:
+    def spectral_range(self) -> Union[Iterable[apu.Quantity], None]:
         """
-        Energy range over which the visibilities are computed.
+        Spectral range over which the visibilities are computed.
         """
 
     @property
@@ -388,7 +388,7 @@ class VisMeta(VisMetaABC, dict):
         return self.get(_OBS_COORD_KEY, None)
 
     @property
-    def energy_range(self):
+    def spectral_range(self):
         return self.get(_E_RANGE_KEY, None)
 
     @property
