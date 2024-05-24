@@ -34,21 +34,21 @@ class VisMetaABC(abc.ABC):
 
     @property
     @abc.abstractmethod
-    def spectral_range(self) -> Union[Iterable[apu.Quantity], None]:
+    def spectral_range(self) -> Optional[Iterable[apu.Quantity]]:
         """
         Spectral range over which the visibilities are computed.
         """
 
     @property
     @abc.abstractmethod
-    def time_range(self) -> Union[Iterable[Time], None]:
+    def time_range(self) -> Optional[Iterable[Time]]:
         """
         Time range over which the visibilities are computed.
         """
 
     @property
     @abc.abstractmethod
-    def vis_labels(self) -> Union[Iterable[str], None]:
+    def vis_labels(self) -> Optional[Iterable[str]]:
         """
         Labels of each visibility.
         """
@@ -223,6 +223,10 @@ class Visibilities(VisibilitiesABC):
         self._meta_key = "meta"
         self._uv_key = "uv"
         self._units_key = "units"
+
+        # Build meta. Make sure that phase center is included.
+        if not isinstance(meta, VisMetaABC):
+            meta = VisMeta(meta)
 
         # Construct underlying data object.
         # In case visibilities is multi-dimensional, assume last axis is the uv-axis.

@@ -1,9 +1,7 @@
 import astropy.units as apu
-from numpy.testing import assert_array_equal
-
-import astropy.units as apu
 import pytest
 from astropy.tests.helper import assert_quantity_allclose
+from numpy.testing import assert_array_equal
 
 import xrayvision.visibility as vm
 from xrayvision.visibility import Visibility
