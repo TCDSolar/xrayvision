@@ -17,6 +17,8 @@ from astropy.time import Time
 
 __all__ = ["Visibility", "Visibilities", "VisMeta", "VisibilitiesABC", "VisMetaABC"]
 
+from astropy.units import Quantity
+
 _E_RANGE_KEY = "spectral_range"
 _T_RANGE_KEY = "time_range"
 _OBS_COORD_KEY = "observer_coordinate"
@@ -131,6 +133,60 @@ class VisibilitiesABC(abc.ABC):
         """
         Phase uncertainty of the visibilities.
         """
+
+
+class VisMeta(VisMetaABC, dict):
+    """
+    A class for holding Visibility-specific metadata.
+
+    Parameters
+    ----------
+    meta: `dict`
+        A dictionary of the metadata
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Check controlled/expected inputs are of correct type and units.
+        controled_args = (
+            (_OBS_COORD_KEY, SkyCoord),
+            (_E_RANGE_KEY, apu.Quantity, apu.keV, apu.spectral()),
+            (_T_RANGE_KEY, Time),
+        )
+        for args in controled_args:
+            self._check_input_type_and_unit(*args)
+
+    def _check_input_type_and_unit(self, key, key_type, unit=None, equivalencies=None):
+        value = self.get(key, None)
+        if not isinstance(value, (key_type, type(None))):
+            raise KeyError(f"Inputs must include a key, '{key}', that gives a {key_type}.")
+        if unit is not None and value is not None and not value.unit.is_equivalent(unit, equivalencies=equivalencies):
+            raise ValueError(f"'{key}' must have angular units.")
+
+    @property
+    def observer_coordinate(self):
+        return self.get(_OBS_COORD_KEY, None)
+
+    @property
+    def spectral_range(self):
+        return self.get(_E_RANGE_KEY, None)
+
+    @property
+    def time_range(self):
+        return self.get(_T_RANGE_KEY, None)
+
+    @property
+    def vis_labels(self):
+        return self.get(_VIS_LABELS_KEY, None)
+
+    @property
+    def instrument(self):
+        instr = None
+        i, n = 0, len(_INSTR_KEYS)
+        while not instr and i < n:
+            instr = self.get(_INSTR_KEYS[i], None)
+            i += 1
+        return instr
 
 
 class Visibilities(VisibilitiesABC):
@@ -355,60 +411,6 @@ class Visibilities(VisibilitiesABC):
 
         """
         return f"{self.__class__.__name__}< {self.u.size}, {self.visibilities}>"
-
-
-class VisMeta(VisMetaABC, dict):
-    """
-    A class for holding Visibility-specific metadata.
-
-    Parameters
-    ----------
-    meta: `dict`
-        A dictionary of the metadata
-    """
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        # Check controlled/expected inputs are of correct type and units.
-        controled_args = (
-            (_OBS_COORD_KEY, SkyCoord),
-            (_E_RANGE_KEY, apu.Quantity, apu.keV, apu.spectral()),
-            (_T_RANGE_KEY, Time),
-        )
-        for args in controled_args:
-            self._check_input_type_and_unit(*args)
-
-    def _check_input_type_and_unit(self, key, key_type, unit=None, equivalencies=None):
-        value = self.get(key, None)
-        if not isinstance(value, (key_type, type(None))):
-            raise KeyError(f"Inputs must include a key, '{key}', that gives a {key_type}.")
-        if unit is not None and value is not None and not value.unit.is_equivalent(unit, equivalencies=equivalencies):
-            raise ValueError(f"'{key}' must have angular units.")
-
-    @property
-    def observer_coordinate(self):
-        return self.get(_OBS_COORD_KEY, None)
-
-    @property
-    def spectral_range(self):
-        return self.get(_E_RANGE_KEY, None)
-
-    @property
-    def time_range(self):
-        return self.get(_T_RANGE_KEY, None)
-
-    @property
-    def vis_labels(self):
-        return self.get(_VIS_LABELS_KEY, None)
-
-    @property
-    def instrument(self):
-        instr = None
-        i, n = 0, len(_INSTR_KEYS)
-        while not instr and i < n:
-            instr = self.get(_INSTR_KEYS[i], None)
-            i += 1
-        return instr
 
 
 class Visibility:
