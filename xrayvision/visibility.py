@@ -351,6 +351,8 @@ class Visibilities(VisibilitiesABC):
         new_vis : Same as self type
         """
         self_labels = self.meta.vis_labels
+        if self_labels is None:
+            raise ValueError("self.meta.vis_labels must be set to index by label.")
         idx = [np.where(self_labels == label)[0][0] for label in labels]
         data = self._data.isel({self._uv_key: idx})
         data.attrs[self._meta_key][_VIS_LABELS_KEY] = labels

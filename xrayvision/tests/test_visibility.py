@@ -98,10 +98,15 @@ def test_meta_eq(vis_meta):
     assert meta == meta
 
 
-def test_index_by_label(visibilities):
+@pytest.mark.parametrize(
+    "labels, item",
+    (
+        (["3a"], slice(0, 1)),
+        (["10b", "3a"], [1, 0]),
+    ),
+)
+def test_index_by_label(visibilities, labels, item):
     vis = visibilities
-    labels = ["3a"]
-    item = slice(0, 1)
     expected_meta = vis.meta
     expected_meta["vis_labels"] = expected_meta["vis_labels"][item]
     expected = vm.Visibilities(
