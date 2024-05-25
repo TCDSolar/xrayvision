@@ -7,6 +7,7 @@ certain spacecraft or instruments
 
 import abc
 import copy
+import numbers
 from typing import Union, Optional
 from collections.abc import Iterable
 
@@ -354,16 +355,31 @@ class Visibilities(VisibilitiesABC):
         if self_labels is None:
             raise ValueError("self.meta.vis_labels must be set to index by label.")
         idx = [np.where(self_labels == label)[0][0] for label in labels]
-        data = self._data.isel({self._uv_key: idx})
-        data.attrs[self._meta_key][_VIS_LABELS_KEY] = labels
+        new_data = self._data.isel({self._uv_key: idx})
+        new_data.attrs[self._meta_key][_VIS_LABELS_KEY] = labels
         new_vis = copy.deepcopy(self)
-        new_vis._data = data
+        new_vis._data = new_data
         return new_vis
 
     def _build_quantity(self, label, unit_label=None):
         if unit_label is None:
             unit_label = label
         return apu.Quantity(self._data[label], unit=self._data.attrs[self._units_key][unit_label])
+
+    def __getitem__(self, item):
+        if isinstance(item, numbers.Integral):
+            item = (slice(item, item + 1),)
+        if not isinstance(item, tuple):
+            item = (item,)
+        dims = self._data.dims
+        if len(item) != len(dims):
+            item = list(item) + [slice(None)] * (len(dims) - len(item))
+        ds_item = dict((key, idx) for key, idx in zip(dims, item))
+        new_data = self._data.isel(ds_item)
+        new_data.attrs[self._meta_key][_VIS_LABELS_KEY] = new_data.coords[_VIS_LABELS_KEY].values
+        new_vis = copy.deepcopy(self)
+        new_vis._data = new_data
+        return new_vis
 
     def __repr__(self):
         r"""
