@@ -6,6 +6,7 @@ certain spacecraft or instruments
 """
 
 import abc
+import copy
 from typing import Union, Optional
 from collections.abc import Iterable
 
@@ -335,6 +336,27 @@ class Visibilities(VisibilitiesABC):
                     )
                     * apu.rad
                 ).to(apu.deg)
+
+    def index_by_label(self, labels: Iterable[str]):
+        """
+        Extract visibilities based on their labels.
+
+        Parameters
+        ----------
+        labels :
+            The labels of the desired visibilities.
+
+        Returns
+        -------
+        new_vis : Same as self type
+        """
+        self_labels = self.meta.vis_labels
+        idx = [np.where(self_labels == label)[0][0] for label in labels]
+        data = self._data.isel({self._uv_key: idx})
+        data.attrs[self._meta_key][_VIS_LABELS_KEY] = labels
+        new_vis = copy.deepcopy(self)
+        new_vis._data = data
+        return new_vis
 
     def _build_quantity(self, label, unit_label=None):
         if unit_label is None:

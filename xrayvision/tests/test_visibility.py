@@ -96,3 +96,22 @@ def test_meta_eq(vis_meta):
     assert meta == meta
     meta = vm.VisMeta(dict())
     assert meta == meta
+
+
+def test_index_by_label(visibilities):
+    vis = visibilities
+    labels = ["3a"]
+    item = slice(0, 1)
+    expected_meta = vis.meta
+    expected_meta["vis_labels"] = expected_meta["vis_labels"][item]
+    expected = vm.Visibilities(
+        vis.visibilities[item],
+        vis.u[item],
+        vis.v[item],
+        vis.phase_center,
+        uncertainty=vis.uncertainty[item],
+        meta=expected_meta,
+    )
+    output = vis.index_by_label(labels)
+    assert output == expected
+    assert output.meta == expected_meta
