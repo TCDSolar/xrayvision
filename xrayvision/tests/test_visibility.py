@@ -2,7 +2,9 @@ from pathlib import Path
 
 import astropy.units as apu
 import pytest
+from astropy.coordinates import get_body
 from astropy.tests.helper import assert_quantity_allclose
+from astropy.time import Time
 
 import xrayvision.visibility as vm
 
@@ -14,14 +16,26 @@ def test_data_dir():
 
 
 @pytest.fixture
-def visibilities():
+def vis_meta():
+    return vm.VisMeta(
+        {
+            "observer_coordinate": get_body("Earth", Time("2000-01-01 00:00:00")),
+            "energy_range": [6, 10] * apu.keV,
+            "time_range": Time(["2000-01-01 00:00:00", "2000-01-01 00:00:01"]),
+            "vis_labels": ["3a", "10b"],
+            "instrument": "stix",
+        }
+    )
+
+
+@pytest.fixture
+def visibilities(vis_meta):
     visibilities = [1 + 2 * 1j, 3 + 3 * 1j] * apu.ct
     u = [0.023, -0.08] * 1 / apu.arcsec
     v = [-0.0013, 0.013] * 1 / apu.arcsec
     phase_center = [0, 0] * apu.arcsec
     unc = [0.01, 0.15] * apu.ct
-    meta = vm.VisMeta({"vis_labels": ["3a", "10b"]})
-    return vm.Visibilities(visibilities, u, v, phase_center, uncertainty=unc, meta=meta)
+    return vm.Visibilities(visibilities, u, v, phase_center, uncertainty=unc, meta=vis_meta)
 
 
 def test_vis_u(visibilities):
@@ -70,3 +84,15 @@ def test_vis_phase_uncertainty(visibilities):
     expected_phase_uncertainty = [0.22918312, 1.4323945] * apu.deg
 
     assert_quantity_allclose(output_phase_uncertainty, expected_phase_uncertainty)
+
+
+def test_vis_eq(visibilities):
+    vis = visibilities
+    assert vis == vis
+
+
+def test_meta_eq(vis_meta):
+    meta = vis_meta
+    assert meta == meta
+    meta = vm.VisMeta(dict())
+    assert meta == meta
