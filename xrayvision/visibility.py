@@ -352,6 +352,35 @@ class Visibilities(VisibilitiesABC):
         """
         return f"{self.__class__.__name__}< {self.u.size}, {self.visibilities}>"
 
+    def __eq__(self, other):
+        """
+        Checks whether two VisMeta objects are equal.
+
+        Does not check whether their metas are equal.
+        """
+        if not apu.quantity.allclose(self.visibilities, other.visibilities):
+            return False
+        if not apu.quantity.allclose(self.u, other.u):
+            return False
+        if not apu.quantity.allclose(self.v, other.v):
+            return False
+        if not apu.quantity.allclose(self.phase_center, other.phase_center):
+            return False
+        if not apu.quantity.allclose(self.amplitude, other.amplitude):
+            return False
+        if not apu.quantity.allclose(self.phase, other.phase):
+            return False
+
+        uncerts = ((self.uncertainty, other.uncertainty),
+                   (self.amplitude_uncertainty, other.amplitude_uncertainty),
+                   (self.phase_uncertainty, other.phase_uncertainty))
+        for (self_uncert, other_uncert) in uncerts:
+            if (not _attrs_both_none_or_neither(self_uncert, other_uncert)
+                or (self_uncert is not None and not apu.quantity.allclose(self_uncert, other_uncert))):
+                return False
+
+        return True
+
 
 class VisMeta(VisMetaABC, dict):
     """
@@ -405,6 +434,47 @@ class VisMeta(VisMetaABC, dict):
             instr = self.get(_INSTR_KEYS[i], None)
             i += 1
         return instr
+
+    @property
+    def __eq__(self, other):
+        if not _attrs_both_none_or_neither(self.observer_coordinate, other.observer_coordinate):
+            return False
+        if hasattr(self.observer_coordinate, "__len__"):
+            if not hasattr(other.observer_coordinate, "__len__"):
+                if all(self.observer_coordinate == other.observer_coordinate):
+                    return False
+            else:
+                return False
+        elif hasattr(other.observer_coordinate, "__len__"):
+            return False
+        elif self.observer_coordinate != other.observer_coordinate:
+            return False
+
+        if (not _attrs_both_none_or_neither(self.vis_labels, other.vis_labels)
+            or tuple(self.vis_labels) != tuple(other.vis_labels)):
+            return False
+
+        if (not _attrs_both_none_or_neither(self.instrument, other.instrument)
+            or tuple(self.instrument) != tuple(other.instrument)):
+            return False
+
+        if not (_attrs_both_none_or_neither(self.spectral_range, other.spectral_range)
+                and apu.quantity.allclose(self.spectral_range, other.spectral_range)):
+            return False
+
+        if not (_attrs_both_none_or_neither(self.time_range, other.time_range)
+                and np.allclose(self.time_range.mjd == other.time_range.mjd)):
+            return False
+        return True
+
+
+def _attrs_both_none_or_neither(attr1, attr2):
+    if attr1 is None:
+        if attr2 is not None:
+            return False
+    elif attr2 is None:
+        return False
+    return True
 
 
 class BaseVisibility:
