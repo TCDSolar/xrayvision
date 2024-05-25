@@ -17,11 +17,15 @@ def test_data_dir():
 
 @pytest.fixture
 def vis_meta():
-    return vm.VisMeta({"observer_coordinate": get_body("Earth", Time("2000-01-01 00:00:00")),
-                       "energy_range": [6, 10] * apu.keV,
-                       "time_range": Time(["2000-01-01 00:00:00", "2000-01-01 00:00:01"]),
-                       "vis_labels": ["3a", "10b"],
-                       "instrument": "stix"})
+    return vm.VisMeta(
+        {
+            "observer_coordinate": get_body("Earth", Time("2000-01-01 00:00:00")),
+            "energy_range": [6, 10] * apu.keV,
+            "time_range": Time(["2000-01-01 00:00:00", "2000-01-01 00:00:01"]),
+            "vis_labels": ["3a", "10b"],
+            "instrument": "stix",
+        }
+    )
 
 
 @pytest.fixture

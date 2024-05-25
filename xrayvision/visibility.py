@@ -371,12 +371,15 @@ class Visibilities(VisibilitiesABC):
         if not apu.quantity.allclose(self.phase, other.phase):
             return False
 
-        uncerts = ((self.uncertainty, other.uncertainty),
-                   (self.amplitude_uncertainty, other.amplitude_uncertainty),
-                   (self.phase_uncertainty, other.phase_uncertainty))
-        for (self_uncert, other_uncert) in uncerts:
-            if (not _attrs_both_none_or_neither(self_uncert, other_uncert)
-                or (self_uncert is not None and not apu.quantity.allclose(self_uncert, other_uncert))):
+        uncerts = (
+            (self.uncertainty, other.uncertainty),
+            (self.amplitude_uncertainty, other.amplitude_uncertainty),
+            (self.phase_uncertainty, other.phase_uncertainty),
+        )
+        for self_uncert, other_uncert in uncerts:
+            if not _attrs_both_none_or_neither(self_uncert, other_uncert) or (
+                self_uncert is not None and not apu.quantity.allclose(self_uncert, other_uncert)
+            ):
                 return False
 
         return True
@@ -450,20 +453,26 @@ class VisMeta(VisMetaABC, dict):
         elif self.observer_coordinate != other.observer_coordinate:
             return False
 
-        if (not _attrs_both_none_or_neither(self.vis_labels, other.vis_labels)
-            or tuple(self.vis_labels) != tuple(other.vis_labels)):
+        if not _attrs_both_none_or_neither(self.vis_labels, other.vis_labels) or tuple(self.vis_labels) != tuple(
+            other.vis_labels
+        ):
             return False
 
-        if (not _attrs_both_none_or_neither(self.instrument, other.instrument)
-            or tuple(self.instrument) != tuple(other.instrument)):
+        if not _attrs_both_none_or_neither(self.instrument, other.instrument) or tuple(self.instrument) != tuple(
+            other.instrument
+        ):
             return False
 
-        if not (_attrs_both_none_or_neither(self.spectral_range, other.spectral_range)
-                and apu.quantity.allclose(self.spectral_range, other.spectral_range)):
+        if not (
+            _attrs_both_none_or_neither(self.spectral_range, other.spectral_range)
+            and apu.quantity.allclose(self.spectral_range, other.spectral_range)
+        ):
             return False
 
-        if not (_attrs_both_none_or_neither(self.time_range, other.time_range)
-                and np.allclose(self.time_range.mjd == other.time_range.mjd)):
+        if not (
+            _attrs_both_none_or_neither(self.time_range, other.time_range)
+            and np.allclose(self.time_range.mjd == other.time_range.mjd)
+        ):
             return False
         return True
 
