@@ -7,7 +7,7 @@ certain spacecraft or instruments
 
 import abc
 from typing import Union, Optional
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 
 import astropy.units as apu
 import numpy as np
@@ -50,7 +50,7 @@ class VisMetaABC(abc.ABC):
 
     @property
     @abc.abstractmethod
-    def vis_labels(self) -> Optional[Iterable[str]]:
+    def vis_labels(self) -> Sequence[Iterable[str]]:
         """
         Labels of each visibility.
         """
@@ -304,12 +304,12 @@ class Visibilities(VisibilitiesABC):
             data[self._phase_uncert_key] = (dims, phase_uncertainty.to_value(phase.unit))
         if meta is None:
             meta = VisMeta(dict())
-        vis_labels = meta.vis_labels
+        vis_labels = getattr(meta, "vis_labels", None)
         if vis_labels is not None:
             if len(vis_labels) != nvis:
                 raise ValueError(
                     "meta.vis_labels must be same length as number of visibilites. "
-                    f"Number of labels = {len(meta.vis_labels)}; "
+                    f"Number of labels = {len(vis_labels)}; "
                     f"Number of visibilities = {nvis}"
                 )
             coords[_VIS_LABELS_KEY] = ([self._uv_key], vis_labels)
