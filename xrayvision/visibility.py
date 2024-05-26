@@ -354,7 +354,7 @@ class Visibilities(VisibilitiesABC):
 
     def __eq__(self, other):
         """
-        Checks whether two VisMeta objects are equal.
+        Checks whether two Visibilities objects are equal.
 
         Does not check whether their metas are equal.
         """
