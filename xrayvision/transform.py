@@ -7,128 +7,163 @@ takes inputs which have positional information `dft_map` and the inverse `idft_m
 
 """
 
+from typing import Union, Optional
+
 import astropy.units as apu
 import numpy as np
+import numpy.typing as npt
+from astropy.units import Quantity
 from astropy.units.core import UnitsError
 
+__all__ = ["generate_xy", "generate_uv", "dft_map", "idft_map"]
 
-@apu.quantity_input(center="angle", pixel_size="angle")
-def generate_xy(number_pixels, center=0.0 * apu.arcsec, pixel_size=1.0 * apu.arcsec):
+
+@apu.quantity_input()
+def generate_xy(
+    number_pixels: Quantity[apu.pix],
+    *,
+    phase_centre: Optional[Quantity[apu.arcsec]] = 0.0 * apu.arcsec,
+    pixel_size: Optional[Quantity[apu.arcsec / apu.pix]] = 1.0 * apu.arcsec / apu.pix,
+) -> Quantity[apu.arcsec]:
     """
-    Generate the x or y coordinates given the number of pixels, center and pixel size.
+    Generate the x or y coordinates given the number of pixels, phase_centre and pixel size.
 
     Parameters
     ----------
     number_pixels : `int`
         Number of pixels
-    center : `float`, optional
+    phase_centre : `float`, optional
         Center coordinates
     pixel_size : `float`, optional
         Size of pixel in physical units (e.g. arcsecs, meters)
 
     Returns
     -------
-    `numpy.array`
+    :
         The generated x, y coordinates
 
     See Also
     --------
-    `generate_uv` : Generates corresponding coordinates but un u, v space
+    generate_uv:
+        Generates corresponding coordinates but in Fourier or u, v space.
 
     Examples
     --------
-    >>> generate_xy(9)
+    >>> import astropy.units as apu
+    >>> generate_xy(9*apu.pix)
     <Quantity [-4., -3., -2., -1.,  0.,  1.,  2.,  3.,  4.] arcsec>
 
-    >>> generate_xy(9, pixel_size=2.5 * apu.arcsec)
-    <Quantity [-10. , -7.5, -5. , -2.5,  0. ,  2.5,  5. ,  7.5, 10. ] arcsec>
+    >>> generate_xy(9*apu.pix, pixel_size=2.5 * apu.arcsec/apu.pix)
+    <Quantity [-10. ,  -7.5,  -5. ,  -2.5,   0. ,   2.5,   5. ,   7.5,  10. ] arcsec>
 
-    >>> generate_xy(9, center=10 * apu.arcsec, pixel_size=2.5 * apu.arcsec)
+    >>> generate_xy(9*apu.pix, phase_centre=10 * apu.arcsec, pixel_size=2.5 * apu.arcsec/apu.pix)
     <Quantity [ 0. ,  2.5,  5. ,  7.5, 10. , 12.5, 15. , 17.5, 20. ] arcsec>
 
     """
-    x = (np.arange(number_pixels) - number_pixels / 2 + 0.5) * pixel_size + center
+    x = (
+        np.arange(number_pixels.to_value(apu.pixel)) - (number_pixels.to_value(apu.pix) / 2) + 0.5
+    ) * apu.pix * pixel_size + phase_centre
     return x
 
 
-@apu.quantity_input(center="angle", pixel_size="angle")
-def generate_uv(number_pixels, center=0.0 * apu.arcsec, pixel_size=1.0 * apu.arcsec):
+@apu.quantity_input()
+def generate_uv(
+    number_pixels: Quantity[apu.pix],
+    *,
+    phase_centre: Optional[Quantity[apu.arcsec]] = 0.0 * apu.arcsec,
+    pixel_size: Optional[Quantity[apu.arcsec / apu.pix]] = 1.0 * apu.arcsec / apu.pix,
+) -> Quantity[1 / apu.arcsec]:
     """
-    Generate the u or v  coordinates given the number of pixels, center and pixel size.
+    Generate the u or v coordinates given the number of pixels, phase_centre and pixel size.
 
     Parameters
     ----------
     number_pixels : `int`
         Number of pixels
-    center : `float`, optional
+    phase_centre : `float`, optional
         Center coordinates
     pixel_size : `float`, optional
         Size of pixel in physical units (e.g. arcsecs, meters)
 
     Returns
     -------
-    `numpy.array`
-        The generated u, v coordinates
+    :
+        The generated u, v coordinates.
 
     See Also
     --------
-    `generate_xy` : Generates corresponding coordinate but un x, y space
+    generate_xy:
+        Generates corresponding coordinates but in Fourier or u, v space.
 
     Examples
     --------
-    >>> generate_uv(9)
+    >>> import astropy.units as apu
+    >>> generate_uv(9*apu.pix)
     <Quantity [-0.44444444, -0.33333333, -0.22222222, -0.11111111,  0.        ,
                 0.11111111,  0.22222222,  0.33333333,  0.44444444] 1 / arcsec>
 
-    >>> generate_uv(9, pixel_size=2.5 * apu.arcsec)
+    >>> generate_uv(9*apu.pix, pixel_size=2.5 * apu.arcsec/apu.pix)
     <Quantity [-0.17777778, -0.13333333, -0.08888889, -0.04444444,  0.        ,
                 0.04444444,  0.08888889,  0.13333333,  0.17777778] 1 / arcsec>
 
-    >>> generate_uv(9, center=10 * apu.arcsec, pixel_size=2.5 * apu.arcsec)
+    >>> generate_uv(9*apu.pix, phase_centre=10 * apu.arcsec, pixel_size=2.5 * apu.arcsec/apu.pix)
     <Quantity [-0.07777778, -0.03333333,  0.01111111,  0.05555556,  0.1       ,
                 0.14444444,  0.18888889,  0.23333333,  0.27777778] 1 / arcsec>
 
     """
-    x = (np.arange(number_pixels) - number_pixels / 2 + 0.5) / (pixel_size * number_pixels)
-    if center.value != 0.0:
-        x += 1 / center
+    # x = (np.arange(number_pixels) - number_pixels / 2 + 0.5) / (pixel_size * number_pixels)
+
+    x = (np.arange(number_pixels.to_value(apu.pixel)) - (number_pixels.to_value(apu.pix) / 2) + 0.5) / (
+        pixel_size * number_pixels
+    )
+
+    if phase_centre.value != 0.0:  # type: ignore
+        x += 1 / phase_centre  # type: ignore
     return x
 
 
-@apu.quantity_input(center="angle", pixel_size="angle")
-def dft_map(input_array, *, u, v, center=(0.0, 0.0) * apu.arcsec, pixel_size=(1.0, 1.0) * apu.arcsec):
+@apu.quantity_input()
+def dft_map(
+    input_array: Union[Quantity, npt.NDArray],
+    *,
+    u: Quantity[1 / apu.arcsec],
+    v: Quantity[1 / apu.arcsec],
+    phase_centre: Quantity[apu.arcsec] = (0.0, 0.0) * apu.arcsec,
+    pixel_size: Quantity[apu.arcsec / apu.pix] = (1.0, 1.0) * apu.arcsec / apu.pix,
+) -> Union[Quantity, npt.NDArray]:
     r"""
     Discrete Fourier transform in terms of coordinates returning 1-D array complex visibilities.
 
     Parameters
     ----------
-    input_array : `numpy.ndarray`
+    input_array :
         Input array to be transformed should be 2D (m, n)
-    uv : `numpy.array`
-        Array of 2xN u, v coordinates where the visibilities will be evaluated
-    center : `float` (x, y), optional
-        Coordinates of the center of the map e.g. ``(0,0)`` or ``[5.0, -2.0]``
+    u :
+        Array of 2xN u coordinates where the visibilities are evaluated.
+    v :
+        Array of 2xN v coordinates where the visibilities are evaluated.
+    phase_centre :
+        Coordinates of the phase_centre of the map e.g. ``(0,0)`` or ``[5.0, -2.0]``.
     pixel_size : `float` (dx, dy), optional
-        The pixel size in x and y directions, need not be square e.g. ``(1, 3)``
+        The pixel size need not be square e.g. ``(1, 3)``.
 
     Returns
     -------
-    `numpy.ndarray`
-        Array of N `complex` visibilities evaluated at the u, v coordinates given by `uv`
+    :
+        Array of N `complex` visibilities evaluated at the given `u`, `v` coordinates.
 
     """
-    m, n = input_array.shape
+    m, n = input_array.shape * apu.pix
+    x = generate_xy(m, phase_centre=phase_centre[0], pixel_size=pixel_size[0])  # type: ignore
+    y = generate_xy(n, phase_centre=phase_centre[1], pixel_size=pixel_size[1])  # type: ignore
 
-    y = generate_xy(m, center[1], pixel_size[1])
-    x = generate_xy(n, center[0], pixel_size[0])
-
-    x, y = np.meshgrid(x, y)
+    x, y = np.meshgrid(x, y, indexing="ij")
     uv = np.vstack([u, v])
     # Check units are correct for exp need to be dimensionless and then remove units for speed
     if (uv[0, :] * x[0, 0]).unit == apu.dimensionless_unscaled and (
         uv[1, :] * y[0, 0]
     ).unit == apu.dimensionless_unscaled:
-        uv = uv.value
+        uv = uv.value  # type: ignore
         x = x.value
         y = y.value
 
@@ -147,38 +182,48 @@ def dft_map(input_array, *, u, v, center=(0.0, 0.0) * apu.arcsec, pixel_size=(1.
         )
 
 
-@apu.quantity_input(center="angle", pixel_size="angle")
+@apu.quantity_input
 def idft_map(
-    input_vis, *, u, v, shape, weights=None, center=(0.0, 0.0) * apu.arcsec, pixel_size=(1.0, 1.0) * apu.arcsec
-):
+    input_vis: Union[Quantity, npt.NDArray],
+    *,
+    u: Quantity[1 / apu.arcsec],
+    v: Quantity[1 / apu.arcsec],
+    shape: Quantity[apu.pix],
+    weights: Optional[npt.NDArray] = None,
+    phase_centre: Quantity[apu.arcsec] = (0.0, 0.0) * apu.arcsec,
+    pixel_size: Quantity[apu.arcsec / apu.pix] = (1.0, 1.0) * apu.arcsec / apu.pix,
+) -> Union[Quantity, npt.NDArray]:
     r"""
     Inverse discrete Fourier transform in terms of coordinates returning a 2D real array or image.
 
     Parameters
     ----------
-    uv : `numpy.ndarray`
-        Array of 2xN u, v coordinates corresponding to the input visibilities in `input_vis`
-    input_vis : `numpy.ndarray`
-        Array of N `complex` input visibilities
-    shape : `float` (m,n)
-        The shape of the output array to create
-    weights : `numpy.ndarray`
-        Array of weights for visibilities
-    center : `float` (x, y), optional
-        Coordinates of the center of the map e.g. ``(0,0)`` or ``[5.0, -2.0]``
-    pixel_size : `float` (dx, dy), optional
-        The pixel size in x and y directions, need not be square e.g. ``(1, 3)``
+    input_vis :
+        Input array of N complex visibilities to be transformed to a 2D array.
+    u :
+        Array of N u coordinates corresponding to the input visibilities in `input_vis`
+    v :
+        Array of N v coordinates corresponding to the input visibilities in `input_vis`
+    shape :
+        The shape of the output array to create.
+    weights :
+        Array of weights for visibilities.
+    phase_centre :
+        Coordinates of the phase_centre of the map e.g. ``(0,0)`` or ``[5.0, -2.0]``.
+    pixel_size :
+        The pixel size this need not be square e.g. ``(1, 3)``.
 
     Returns
     -------
-    `numpy.ndarray`
-        The complex visibilities evaluated at the u, v coordinates
+    :
+        2D image obtained from the visibilities evaluated at the given `u`, `v` coordinates.
 
     """
     m, n = shape
-    y = generate_xy(m, center[1], pixel_size[1])
-    x = generate_xy(n, center[0], pixel_size[0])
-    x, y = np.meshgrid(x, y)
+    x = generate_xy(m, phase_centre=phase_centre[0], pixel_size=pixel_size[0])  # type: ignore
+    y = generate_xy(n, phase_centre=phase_centre[1], pixel_size=pixel_size[1])  # type: ignore
+
+    x, y = np.meshgrid(x, y, indexing="ij")
 
     if weights is None:
         weights = np.ones(input_vis.shape)
@@ -187,7 +232,7 @@ def idft_map(
     if (uv[0, :] * x[0, 0]).unit == apu.dimensionless_unscaled and (
         uv[1, :] * y[0, 0]
     ).unit == apu.dimensionless_unscaled:
-        uv = uv.value
+        uv = uv.value  # type: ignore
         x = x.value
         y = y.value
 
