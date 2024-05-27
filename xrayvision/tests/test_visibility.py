@@ -2,8 +2,8 @@ import astropy.units as apu
 import pytest
 from astropy.coordinates import get_body
 from astropy.tests.helper import assert_quantity_allclose
-from numpy.testing import assert_array_equal
 from astropy.time import Time
+from numpy.testing import assert_array_equal
 
 import xrayvision.visibility as vm
 from xrayvision.visibility import Visibility
