@@ -3,10 +3,13 @@ Implementation of Maximum Entropy Method
 """
 
 from types import SimpleNamespace
+from typing import Union, Optional
 
 import astropy.units as apu
 import numpy as np
+from astropy.units import Quantity
 from numpy.linalg import norm
+from numpy.typing import NDArray
 from sunpy.map import Map
 
 from xrayvision.imaging import generate_header
@@ -14,21 +17,22 @@ from xrayvision.transform import generate_xy
 from xrayvision.utils import get_logger
 
 __all__ = [
-    "get_entropy",
-    "get_fourier_matrix",
-    "estimate_flux",
-    "get_mean_visibilities",
-    "proximal_entropy",
-    "proximal_operator",
-    "optimise_fb",
+    "_get_entropy",
+    "_get_fourier_matrix",
+    "_estimate_flux",
+    "_get_mean_visibilities",
+    "_proximal_entropy",
+    "_proximal_operator",
+    "_optimise_fb",
     "mem",
 ]
 
+from xrayvision.visibility import Visibility
 
 logger = get_logger(__name__, "DEBUG")
 
 
-def get_entropy(image, flux):
+def _get_entropy(image, flux):
     r"""
     Return the entropy of an image.
 
@@ -55,7 +59,7 @@ def get_entropy(image, flux):
     return np.sum(image * np.log(image / (flux * np.e)))
 
 
-def get_fourier_matrix(vis, shape=[64, 64] * apu.pix, pixel_size=[4.0312500, 4.0312500] * apu.arcsec):
+def _get_fourier_matrix(vis, shape=(64, 64) * apu.pix, pixel_size=(4.0312500, 4.0312500) * apu.arcsec):
     r"""
     Return the complex Fourier matrix used to compute the value of the visibilities.
 
@@ -76,10 +80,10 @@ def get_fourier_matrix(vis, shape=[64, 64] * apu.pix, pixel_size=[4.0312500, 4.0
     -------
     The complex Fourier matrix
     """
-    m, n = shape.to_value("pix")
-    y = generate_xy(m, 0 * apu.arcsec, pixel_size[1])
-    x = generate_xy(n, 0 * apu.arcsec, pixel_size[0])
-    x, y = np.meshgrid(x, y)
+    m, n = shape.to("pix")
+    y = generate_xy(m, phase_centre=0 * apu.arcsec, pixel_size=pixel_size[1])
+    x = generate_xy(n, phase_centre=0 * apu.arcsec, pixel_size=pixel_size[0])
+    x, y = np.meshgrid(x, y, indexing="ij")
     uv = np.vstack([vis.u, vis.v])
     # Check apu are correct for exp need to be dimensionless and then remove apu for speed
     if (vis.u * x[0, 0]).unit == apu.dimensionless_unscaled and (vis.v * y[0, 0]).unit == apu.dimensionless_unscaled:
@@ -91,10 +95,10 @@ def get_fourier_matrix(vis, shape=[64, 64] * apu.pix, pixel_size=[4.0312500, 4.0
             1j * 2 * np.pi * (x[..., np.newaxis] * uv[np.newaxis, 0, :] + y[..., np.newaxis] * uv[np.newaxis, 1, :])
         )
 
-        return Hv * pixel_size[0] * pixel_size[1]
+        return Hv * pixel_size[0].value * pixel_size[1].value
 
 
-def estimate_flux(vis, shape, pixel, maxiter=1000, tol=1e-3):
+def _estimate_flux(vis, shape, pixel, maxiter=1000, tol=1e-3):
     r"""
     Estimate the total flux in the image by solving an optimisation problem.
 
@@ -151,7 +155,9 @@ def estimate_flux(vis, shape, pixel, maxiter=1000, tol=1e-3):
         diff_V = Hvx - Visib
         chi2 = (diff_V**2.0).sum()
 
-        logger.info(f"Iter: {i}, Chi2: {chi2}")
+        if i % 25 == 0:
+            logger.info(f"Iter: {i}, Chi2: {chi2}")
+
         if np.sqrt(((x - x_old) ** 2.0).sum()) < tol * np.sqrt((x_old**2.0).sum()):
             break
 
@@ -179,7 +185,7 @@ def _prepare_for_optimise(pixel, shape, vis):
     -------
 
     """
-    Hv = get_fourier_matrix(vis, shape, pixel)
+    Hv = _get_fourier_matrix(vis, shape, pixel)
     # Division of real and imaginary part of the matrix 'Hv'
     ReHv = np.real(Hv)
     ImHv = np.imag(Hv)
@@ -210,7 +216,7 @@ def _prepare_for_optimise(pixel, shape, vis):
     return Hv, Lip, Visib
 
 
-def get_mean_visibilities(vis, shape, pixel):
+def _get_mean_visibilities(vis, shape, pixel):
     r"""
     Return the mean visibilities sampling the same call in the discretisation of the (u,v) plane.
 
@@ -237,9 +243,9 @@ def get_mean_visibilities(vis, shape, pixel):
     rv = np.around(iv)
 
     # index of the u coordinates of the sampling frequencies in the discretisation of the u axis
-    ru = ru + imsize2
+    ru = ru * apu.pix + imsize2.to(apu.pix)
     # index of the v coordinates of the sampling frequencies in the discretisation of the v axis
-    rv = rv + imsize2
+    rv = rv * apu.pix + imsize2.to(apu.pix)
 
     # matrix that represents the discretization of the (u,v)-plane
     iuarr = np.zeros(shape.to_value("pixel").astype(int))
@@ -293,7 +299,7 @@ def get_mean_visibilities(vis, shape, pixel):
     return SimpleNamespace(u=u, v=v, vis=visib, amplitude_error=weights)
 
 
-def proximal_entropy(y, m, lamba, Lip, tol=10**-10):
+def _proximal_entropy(y, m, lamba, Lip, tol=10**-10):
     r"""
     This function computes the value of the proximity operator of the entropy function subject to
     positivity constraint, i.e. it solves the problem
@@ -335,7 +341,7 @@ def proximal_entropy(y, m, lamba, Lip, tol=10**-10):
     return c
 
 
-def proximal_operator(z, f, m, lamb, Lip, niter=250):
+def _proximal_operator(z, f, m, lamb, Lip, niter=250):
     r"""
     Computes the value of the proximity operator of the entropy function subject to
     positivity constraint and flux constraint by means of a Dykstra-like proximal algorithm
@@ -371,7 +377,7 @@ def proximal_operator(z, f, m, lamb, Lip, niter=250):
         y = tmp + (f - tmp.sum()) / tmp.size
         p = x + p - y
 
-        x = proximal_entropy(y + q, m, lamb, Lip)
+        x = _proximal_entropy(y + q, m, lamb, Lip)
 
         if np.abs(x.sum() - f) <= 0.01 * f:
             break
@@ -381,7 +387,7 @@ def proximal_operator(z, f, m, lamb, Lip, niter=250):
     return x, i
 
 
-def optimise_fb(Hv, Visib, Lip, flux, lambd, shape, pixel, maxiter, tol):
+def _optimise_fb(Hv, Visib, Lip, flux, lambd, shape, pixel, maxiter, tol):
     r"""
     Solve the optimization problem using a forward-backward splitting algorithm
 
@@ -441,7 +447,7 @@ def optimise_fb(Hv, Visib, Lip, flux, lambd, shape, pixel, maxiter, tol):
 
     tmp = x.flatten()[:]
     Hvx = np.matmul(Hv, tmp)
-    f_R = get_entropy(x, m)
+    f_R = _get_entropy(x, m)
 
     diff_V = Hvx - Visib
     f_0 = (diff_V**2).sum()
@@ -458,12 +464,12 @@ def optimise_fb(Hv, Visib, Lip, flux, lambd, shape, pixel, maxiter, tol):
         y = z - 1 / Lip * grad
 
         # PROXIMAL STEP
-        p, pi = proximal_operator(y, f, m, lambd, Lip)
+        p, pi = _proximal_operator(y, f, m, lambd, Lip)
 
         # COMPUTATION OF THE OBJECTIVE FUNCTION 'Jp' IN 'p'
         tmp = p.flatten()
         Hvp = np.matmul(Hv, tmp)
-        f_Rp = get_entropy(p, m)
+        f_Rp = _get_entropy(p, m)
 
         diff_Vp = Hvp - Visib
         f_0 = (diff_Vp**2).sum()
@@ -491,7 +497,8 @@ def optimise_fb(Hv, Visib, Lip, flux, lambd, shape, pixel, maxiter, tol):
         tau = (t_old - 1.0) / t
         z = x + tau * (x - x_old) + (t_old / t) * (p - x)
 
-        logger.info(f"Iter: {i}, Obj function: {J}")
+        if i % 25 == 0:
+            logger.info(f"Iter: {i}, Obj function: {J}")
 
         if check and (np.sqrt(((x - x_old) ** 2.0).sum()) < tol * np.sqrt((x_old**2).sum())):
             break
@@ -558,7 +565,7 @@ def resistant_mean(data, sigma_cut):
     return mean, sigma
 
 
-def get_percent_lambda(vis):
+def _get_percent_lambda(vis):
     r"""
     Return 'percent_lambda' use with MEM
 
@@ -602,52 +609,63 @@ def get_percent_lambda(vis):
     return percent_lambda
 
 
-def mem(vis, percent_lambda=None, shape=None, pixel=None, maxiter=1000, tol=1e-3, map=True):
+@apu.quantity_input
+def mem(
+    vis: Visibility,
+    shape: Quantity[apu.pix],
+    pixel_size: Quantity[apu.arcsec / apu.pix],
+    *,
+    percent_lambda: Optional[Quantity[apu.percent]] = None,
+    maxiter: int = 1000,
+    tol: float = 1e-3,
+    map: bool = True,
+) -> Union[Quantity, NDArray[np.float64]]:
     r"""
-    Maximum Entropy Method for visibility based image reconstruction
+    Maximum Entropy Method visibility based image reconstruction
 
     Parameters
     ----------
     vis :
         Input Visibilities
-    percent_lambda
-        value used to compute the regularization parameter as a percentage of a maximum value
-        automatically overestimated by the algorithm. Must be in the range [0.0001,0.2]
-    shape
+    shape :
         Image size
-    pixel
+    pixel_size :
         Pixel size
-    maxiter : int
-        Maximum number of iterations of the optimization loop
+    percent_lambda
+        Value used to compute the regularization parameter as a percentage of a maximum value
+        automatically overestimated by the algorithm. Must be in the range [0.0001,0.2]
+    maxiter :
+        Maximum number of iterations of the optimisation loop
     tol : float
         tolerance value used in the stopping rule ( || x - x_old || <= tol || x_old ||)
-
+    map :
+        Return a sunpy map or bare array
     Returns
     -------
 
     """
-    total_flux = estimate_flux(vis, shape, pixel)
+    total_flux = _estimate_flux(vis, shape, pixel_size)
     if percent_lambda is None:
-        percent_lambda = get_percent_lambda(vis)
+        percent_lambda = _get_percent_lambda(vis)
 
-    mean_vis = get_mean_visibilities(vis, shape, pixel)
-    Hv, Lip, Visib = _prepare_for_optimise(pixel, shape, mean_vis)
+    mean_vis = _get_mean_visibilities(vis, shape, pixel_size)
+    Hv, Lip, Visib = _prepare_for_optimise(pixel_size, shape, mean_vis)
 
     # should have same apu as image ct/ keV cm s arcsec**2
     x = np.zeros(shape.to_value("pix").astype(int)).flatten()
 
     # COMPUTATION OF THE; OBJECTIVE; FUNCTION; 'chi2'
-    x = x + total_flux / (shape[0] * shape[1] * pixel[0] * pixel[1]).value
+    x = x + total_flux / (shape[0] * shape[1] * pixel_size[0] * pixel_size[1]).value
     Hvx = np.matmul(Hv, x)
 
     lambd = 2 * np.abs(np.matmul((Hvx.value - Visib), Hv)).max() * percent_lambda
 
-    im = optimise_fb(Hv, Visib, Lip, total_flux, lambd, shape, pixel, maxiter, tol)
+    im = _optimise_fb(Hv, Visib, Lip, total_flux, lambd, shape, pixel_size, maxiter, tol)
 
     # This is needed to match IDL output
     # im = np.rot90(im, -1)
 
     if map:
-        header = generate_header(vis, shape=shape, pixel_size=pixel)
+        header = generate_header(vis, shape=shape, pixel_size=pixel_size)
         return Map((im, header))
     return im

@@ -1,18 +1,21 @@
-from pathlib import Path
-
 import astropy.units as apu
 import pytest
 from astropy.coordinates import get_body
 from astropy.tests.helper import assert_quantity_allclose
+from numpy.testing import assert_array_equal
 from astropy.time import Time
 
 import xrayvision.visibility as vm
+from xrayvision.visibility import Visibility
 
 
-@pytest.fixture
-def test_data_dir():
-    path = Path(__file__).parent.parent / "data"
-    return path
+def test_visibility():
+    vis = Visibility(vis=1 * apu.ct, u=1 / apu.deg, v=1 / apu.deg)
+    assert vis.vis == 1 * apu.ct
+    assert vis.u == 1 / apu.deg
+    assert vis.v == 1 / apu.deg
+    assert_array_equal([0, 0] * apu.arcsec, vis.phase_centre)
+    assert_array_equal([0, 0] * apu.arcsec, vis.offset)
 
 
 @pytest.fixture

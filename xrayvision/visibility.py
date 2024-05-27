@@ -1,5 +1,5 @@
 """
-Modules contains visibility related classes.
+Module contains visibility related classes.
 
 This contains classes to hold general visibilities and specialised classes hold visibilities from
 certain spacecraft or instruments
@@ -9,7 +9,7 @@ import abc
 import copy
 import numbers
 from typing import Union, Optional
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 
 import astropy.units as apu
 import numpy as np
@@ -18,6 +18,8 @@ from astropy.coordinates import SkyCoord
 from astropy.time import Time
 
 __all__ = ["Visibility", "Visibilities", "VisMeta", "VisibilitiesABC", "VisMetaABC"]
+
+from astropy.units import Quantity
 
 _E_RANGE_KEY = "spectral_range"
 _T_RANGE_KEY = "time_range"
@@ -36,21 +38,21 @@ class VisMetaABC(abc.ABC):
 
     @property
     @abc.abstractmethod
-    def spectral_range(self) -> Union[Iterable[apu.Quantity], None]:
+    def spectral_range(self) -> Optional[Iterable[apu.Quantity]]:
         """
         Spectral range over which the visibilities are computed.
         """
 
     @property
     @abc.abstractmethod
-    def time_range(self) -> Union[Iterable[Time], None]:
+    def time_range(self) -> Optional[Iterable[Time]]:
         """
         Time range over which the visibilities are computed.
         """
 
     @property
     @abc.abstractmethod
-    def vis_labels(self) -> Union[Iterable[str], None]:
+    def vis_labels(self) -> Sequence[Iterable[str]]:
         """
         Labels of each visibility.
         """
@@ -133,6 +135,60 @@ class VisibilitiesABC(abc.ABC):
         """
         Phase uncertainty of the visibilities.
         """
+
+
+class VisMeta(VisMetaABC, dict):
+    """
+    A class for holding Visibility-specific metadata.
+
+    Parameters
+    ----------
+    meta: `dict`
+        A dictionary of the metadata
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Check controlled/expected inputs are of correct type and units.
+        controled_args = (
+            (_OBS_COORD_KEY, SkyCoord),
+            (_E_RANGE_KEY, apu.Quantity, apu.keV, apu.spectral()),
+            (_T_RANGE_KEY, Time),
+        )
+        for args in controled_args:
+            self._check_input_type_and_unit(*args)
+
+    def _check_input_type_and_unit(self, key, key_type, unit=None, equivalencies=None):
+        value = self.get(key, None)
+        if not isinstance(value, (key_type, type(None))):
+            raise KeyError(f"Inputs must include a key, '{key}', that gives a {key_type}.")
+        if unit is not None and value is not None and not value.unit.is_equivalent(unit, equivalencies=equivalencies):
+            raise ValueError(f"'{key}' must have angular units.")
+
+    @property
+    def observer_coordinate(self):
+        return self.get(_OBS_COORD_KEY, None)
+
+    @property
+    def spectral_range(self):
+        return self.get(_E_RANGE_KEY, None)
+
+    @property
+    def time_range(self):
+        return self.get(_T_RANGE_KEY, None)
+
+    @property
+    def vis_labels(self):
+        return self.get(_VIS_LABELS_KEY, None)
+
+    @property
+    def instrument(self):
+        instr = None
+        i, n = 0, len(_INSTR_KEYS)
+        while not instr and i < n:
+            instr = self.get(_INSTR_KEYS[i], None)
+            i += 1
+        return instr
 
 
 class Visibilities(VisibilitiesABC):
@@ -226,6 +282,10 @@ class Visibilities(VisibilitiesABC):
         self._uv_key = "uv"
         self._units_key = "units"
 
+        # Build meta. Make sure that phase center is included.
+        if not isinstance(meta, VisMetaABC):
+            meta = VisMeta(meta)
+
         # Construct underlying data object.
         # In case visibilities is multi-dimensional, assume last axis is the uv-axis.
         # and give other axes arbitrary names.
@@ -246,12 +306,12 @@ class Visibilities(VisibilitiesABC):
             data[self._phase_uncert_key] = (dims, phase_uncertainty.to_value(phase.unit))
         if meta is None:
             meta = VisMeta(dict())
-        vis_labels = meta.vis_labels
+        vis_labels = getattr(meta, "vis_labels", None)
         if vis_labels is not None:
             if len(vis_labels) != nvis:
                 raise ValueError(
                     "meta.vis_labels must be same length as number of visibilites. "
-                    f"Number of labels = {len(meta.vis_labels)}; "
+                    f"Number of labels = {len(vis_labels)}; "
                     f"Number of visibilities = {nvis}"
                 )
             coords[_VIS_LABELS_KEY] = ([self._uv_key], vis_labels)
@@ -425,160 +485,48 @@ class Visibilities(VisibilitiesABC):
         return True
 
 
-class VisMeta(VisMetaABC, dict):
-    """
-    A class for holding Visibility-specific metadata.
-
-    Parameters
-    ----------
-    meta: `dict`
-        A dictionary of the metadata
-    """
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        # Check controlled/expected inputs are of correct type and units.
-        controled_args = (
-            (_OBS_COORD_KEY, SkyCoord),
-            (_E_RANGE_KEY, apu.Quantity, apu.keV, apu.spectral()),
-            (_T_RANGE_KEY, Time),
-        )
-        for args in controled_args:
-            self._check_input_type_and_unit(*args)
-
-    def _check_input_type_and_unit(self, key, key_type, unit=None, equivalencies=None):
-        value = self.get(key, None)
-        if not isinstance(value, (key_type, type(None))):
-            raise KeyError(f"Inputs must include a key, '{key}', that gives a {key_type}.")
-        if unit is not None and value is not None and not value.unit.is_equivalent(unit, equivalencies=equivalencies):
-            raise ValueError(f"'{key}' must have angular units.")
-
-    @property
-    def observer_coordinate(self):
-        return self.get(_OBS_COORD_KEY, None)
-
-    @property
-    def spectral_range(self):
-        return self.get(_E_RANGE_KEY, None)
-
-    @property
-    def time_range(self):
-        return self.get(_T_RANGE_KEY, None)
-
-    @property
-    def vis_labels(self):
-        return self.get(_VIS_LABELS_KEY, None)
-
-    @property
-    def instrument(self):
-        instr = None
-        i, n = 0, len(_INSTR_KEYS)
-        while not instr and i < n:
-            instr = self.get(_INSTR_KEYS[i], None)
-            i += 1
-        return instr
-
-    @property
-    def __eq__(self, other):
-        if not _attrs_both_none_or_neither(self.observer_coordinate, other.observer_coordinate):
-            return False
-        if hasattr(self.observer_coordinate, "__len__"):
-            if not hasattr(other.observer_coordinate, "__len__"):
-                if all(self.observer_coordinate == other.observer_coordinate):
-                    return False
-            else:
-                return False
-        elif hasattr(other.observer_coordinate, "__len__"):
-            return False
-        elif self.observer_coordinate != other.observer_coordinate:
-            return False
-
-        if not _attrs_both_none_or_neither(self.vis_labels, other.vis_labels) or tuple(self.vis_labels) != tuple(
-            other.vis_labels
-        ):
-            return False
-
-        if not _attrs_both_none_or_neither(self.instrument, other.instrument) or tuple(self.instrument) != tuple(
-            other.instrument
-        ):
-            return False
-
-        if not (
-            _attrs_both_none_or_neither(self.spectral_range, other.spectral_range)
-            and apu.quantity.allclose(self.spectral_range, other.spectral_range)
-        ):
-            return False
-
-        if not (
-            _attrs_both_none_or_neither(self.time_range, other.time_range)
-            and np.allclose(self.time_range.mjd == other.time_range.mjd)
-        ):
-            return False
-        return True
-
-
-def _attrs_both_none_or_neither(attr1, attr2):
-    if attr1 is None:
-        if attr2 is not None:
-            return False
-    elif attr2 is None:
-        return False
-    return True
-
-
-class BaseVisibility:
-    r"""
-    Base visibility containing bare essential fields, u, v, and complex vis
-    """
-
-    @apu.quantity_input(u=1 / apu.arcsec, v=1 / apu.arcsec, center=apu.arcsec)
-    def __int__(self, u, v, vis, center=(0, 0) * apu.arcsec):
-        self.u = u
-        self.v = v
-        self.vis = vis
-        self.center = center
-
-
 class Visibility:
     r"""
     Hold a set of related visibilities and information.
 
-    Attributes
-    ----------
-    vis : `numpy.ndarray`
-        Array of N complex visibilities at coordinates in `uv`
-    u : `numpy.ndarray`
-        Array of `u` coordinates where visibilities will be evaluated
-    v : `numpy.ndarray`
-        Array of `v` coordinates where visibilities will be evaluated
-    center : `float` (x, y), optional
-        The x, y offset of phase center
 
     """
 
-    @apu.quantity_input(uv=1 / apu.arcsec, offset=apu.arcsec, center=apu.arcsec, pixel_size=apu.arcsec)
-    def __init__(self, vis, *, u, v, offset=(0.0, 0.0) * apu.arcsec, center=(0.0, 0.0) * apu.arcsec):
+    @apu.quantity_input
+    def __init__(
+        self,
+        vis,
+        *,
+        u: Quantity[1 / apu.arcsec],
+        v: Quantity[1 / apu.arcsec],
+        offset: Optional[Quantity[apu.arcsec]] = (0.0, 0.0) * apu.arcsec,
+        phase_centre: Optional[Quantity[apu.arcsec]] = (0.0, 0.0) * apu.arcsec,
+    ) -> None:
         r"""
-        Initialise a new Visibility object.
+        Generic Visibility object.
 
         Parameters
         ----------
-        vis : `numpy.ndarray`
-            Array of N complex visibilities at coordinates in `uv`.
-        u : `numpy.ndarray`
-            Array of `u` coordinates where visibilities will be evaluated.
-        v : `numpy.ndarray`
-            Array of `v` coordinates where visibilities will be evaluated.
-        center :
-            Phase centre
-        """
-        self.u = u
-        self.v = v
-        self.vis = vis
-        self.center = center
-        self.offset = offset
+        vis:
+            Array of N complex visibilities sampled at the `u`, `v` coordinates.
+        u:
+            Array of `u` coordinates where visibilities are sampled.
+        v:
+            Array of `v` coordinates where visibilities are sampled.
+        phase_centre:
+            Phase centre of the visibility, defaults to (0,0).
+        offset:
+            Offset of the phase_centre visibility, defaults to (0,0).
 
-    def __repr__(self):
+
+        """
+        self.u: Quantity[1 / apu.arcsec] = u
+        self.v: Quantity[1 / apu.arcsec] = v
+        self.vis: Quantity = vis
+        self.phase_centre: Quantity[apu.arcsec] = phase_centre
+        self.offset: Quantity[apu.arcsec] = offset
+
+    def __repr__(self) -> str:
         r"""
         Return a printable representation of the visibility.
 
@@ -589,7 +537,7 @@ class Visibility:
         """
         return f"{self.__class__.__name__}< {self.u.size}, {self.vis}>"
 
-    def __eq__(self, other):
+    def __eq__(self, other) -> bool:
         r"""
         Equality for Visibility class
 
@@ -609,5 +557,5 @@ class Visibility:
 
         if all(props_equal):
             return True
-        else:
-            return False
+
+        return False

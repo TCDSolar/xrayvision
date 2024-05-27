@@ -46,6 +46,9 @@ extensions = [
 # Add any paths that contain templates here, relative to this directory.
 # templates_path = ['_templates']
 
+# Set automodapi to generate files inside the generated directory
+automodapi_toctreedirnm = "generated/api"
+
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
 # This pattern also affects html_static_path and html_extra_path.
@@ -63,13 +66,16 @@ master_doc = "index"
 default_role = "obj"
 
 # Disable having a separate return type row
-napoleon_use_rtype = False
+napoleon_use_rtype = True
 
 # Disable google style docstrings
 napoleon_google_docstring = False
 
 # until sphinx-gallery / sphinx is fixed https://github.com/sphinx-doc/sphinx/issues/12300
 suppress_warnings = ["config.cache"]
+
+autodoc_typehints = "description"
+autoclass_content = "init"
 
 # -- Options for intersphinx extension ---------------------------------------
 
