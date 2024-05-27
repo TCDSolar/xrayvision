@@ -412,6 +412,47 @@ class Visibilities(VisibilitiesABC):
         """
         return f"{self.__class__.__name__}< {self.u.size}, {self.visibilities}>"
 
+    def __eq__(self, other):
+        """
+        Checks whether two Visibilities objects are equal.
+
+        Does not check whether their metas are equal.
+        """
+        if not apu.quantity.allclose(self.visibilities, other.visibilities):
+            return False
+        if not apu.quantity.allclose(self.u, other.u):
+            return False
+        if not apu.quantity.allclose(self.v, other.v):
+            return False
+        if not apu.quantity.allclose(self.phase_center, other.phase_center):
+            return False
+        if not apu.quantity.allclose(self.amplitude, other.amplitude):
+            return False
+        if not apu.quantity.allclose(self.phase, other.phase):
+            return False
+
+        uncerts = (
+            (self.uncertainty, other.uncertainty),
+            (self.amplitude_uncertainty, other.amplitude_uncertainty),
+            (self.phase_uncertainty, other.phase_uncertainty),
+        )
+        for self_uncert, other_uncert in uncerts:
+            if not _attrs_both_none_or_neither(self_uncert, other_uncert) or (
+                self_uncert is not None and not apu.quantity.allclose(self_uncert, other_uncert)
+            ):
+                return False
+
+        return True
+
+
+def _attrs_both_none_or_neither(attr1, attr2):
+    if attr1 is None:
+        if attr2 is not None:
+            return False
+    elif attr2 is None:
+        return False
+    return True
+
 
 class Visibility:
     r"""
