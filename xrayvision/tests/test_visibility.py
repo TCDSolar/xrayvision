@@ -120,7 +120,7 @@ def test_index_by_label(visibilities, labels, item):
         uncertainty=vis.uncertainty[item],
         meta=expected_meta,
     )
-    output = vis.index_by_label(labels)
+    output = vis.index_by_label(*labels)
     assert output == expected
     assert output.meta == expected_meta
 

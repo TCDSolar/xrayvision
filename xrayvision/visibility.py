@@ -8,7 +8,7 @@ certain spacecraft or instruments
 import abc
 import copy
 import numbers
-from typing import Union, Optional
+from typing import Any, Union, Optional
 from collections.abc import Iterable, Sequence
 
 import astropy.units as apu
@@ -400,7 +400,7 @@ class Visibilities(VisibilitiesABC):
                     * apu.rad
                 ).to(apu.deg)
 
-    def index_by_label(self, labels: Union[Sequence[str], str]):
+    def index_by_label(self, *labels: Any):
         """
         Extract visibilities based on their labels.
 
@@ -413,8 +413,6 @@ class Visibilities(VisibilitiesABC):
         -------
         new_vis : Same as self type
         """
-        if isinstance(labels, str):
-            labels = (labels,)
         self_labels = self.meta.vis_labels
         if self_labels is None:
             raise ValueError("self.meta.vis_labels must be set to index by label.")
