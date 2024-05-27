@@ -99,3 +99,45 @@ def test_meta_eq(vis_meta):
     assert meta == meta
     meta = vm.VisMeta(dict())
     assert meta == meta
+
+
+@pytest.mark.parametrize(
+    "labels, item",
+    (
+        (["3a"], slice(0, 1)),
+        (["10b", "3a"], [1, 0]),
+    ),
+)
+def test_index_by_label(visibilities, labels, item):
+    vis = visibilities
+    expected_meta = vis.meta
+    expected_meta["vis_labels"] = expected_meta["vis_labels"][item]
+    expected = vm.Visibilities(
+        vis.visibilities[item],
+        vis.u[item],
+        vis.v[item],
+        vis.phase_center,
+        uncertainty=vis.uncertainty[item],
+        meta=expected_meta,
+    )
+    output = vis.index_by_label(*labels)
+    assert output == expected
+    assert output.meta == expected_meta
+
+
+def test_getitem(visibilities):
+    vis = visibilities
+    item = slice(0, 1)
+    expected_meta = vis.meta
+    expected_meta["vis_labels"] = expected_meta["vis_labels"][item]
+    expected = vm.Visibilities(
+        vis.visibilities[item],
+        vis.u[item],
+        vis.v[item],
+        vis.phase_center,
+        uncertainty=vis.uncertainty[item],
+        meta=expected_meta,
+    )
+    output = vis[item]
+    assert output == expected
+    assert output.meta == expected_meta
