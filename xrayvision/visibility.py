@@ -250,10 +250,13 @@ class Visibilities(VisibilitiesABC):
             visibility uncertainties, and amplitudes.
             Must be same shape and unit as visibilities.
         """
+        # In case visibilities is multi-dimensional, assume last axis is the uv-axis.
+        naxes = len(visibilities.shape)
+        _uv_axis = naxes - 1
+        nvis = visibilities.shape[_uv_axis]
         # Sanitize inputs.
         if not isinstance(visibilities, apu.Quantity) or visibilities.isscalar:
             raise TypeError("visibilities must all be a non scalar Astropy quantity.")
-        nvis = visibilities.shape[-1]
         if len(u) != nvis:
             raise ValueError("u must be the same length as visibilities.")
         if len(v) != nvis:
@@ -287,9 +290,8 @@ class Visibilities(VisibilitiesABC):
             meta = VisMeta(meta)
 
         # Construct underlying data object.
-        # In case visibilities is multi-dimensional, assume last axis is the uv-axis.
-        # and give other axes arbitrary names.
-        dims = [f"dim{i}" for i in range(0, len(visibilities.shape) - 1)] + [self._uv_key]
+        dims = [f"dim{i}" for i in range(0, len(visibilities.shape))]
+        dims[_uv_axis] = self._uv_key
         data = {self._vis_key: (dims, visibilities.value)}
         coords = {self._u_key: ([self._uv_key], u.value), self._v_key: ([self._uv_key], v.to_value(u.unit))}
         units = {self._vis_key: visibilities.unit, self._uv_key: u.unit}
@@ -398,7 +400,7 @@ class Visibilities(VisibilitiesABC):
                     * apu.rad
                 ).to(apu.deg)
 
-    def index_by_label(self, labels: Iterable[str]):
+    def index_by_label(self, labels: Union[Sequence[str], str]):
         """
         Extract visibilities based on their labels.
 
@@ -411,6 +413,8 @@ class Visibilities(VisibilitiesABC):
         -------
         new_vis : Same as self type
         """
+        if isinstance(labels, str):
+            labels = (labels,)
         self_labels = self.meta.vis_labels
         if self_labels is None:
             raise ValueError("self.meta.vis_labels must be set to index by label.")
@@ -427,13 +431,13 @@ class Visibilities(VisibilitiesABC):
         return apu.Quantity(self._data[label], unit=self._data.attrs[self._units_key][unit_label])
 
     def __getitem__(self, item):
-        if isinstance(item, numbers.Integral):
-            item = (slice(item, item + 1),)
         if not isinstance(item, tuple):
             item = (item,)
         dims = self._data.dims
         if len(item) != len(dims):
             item = list(item) + [slice(None)] * (len(dims) - len(item))
+        if all(isinstance(idx, numbers.Integral) for idx in item):
+            ValueError("Slicing out single visibility not supported.")
         ds_item = dict((key, idx) for key, idx in zip(dims, item))
         new_data = self._data.isel(ds_item)
         new_data.attrs[self._meta_key][_VIS_LABELS_KEY] = new_data.coords[_VIS_LABELS_KEY].values
