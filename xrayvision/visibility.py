@@ -444,9 +444,8 @@ class VisMeta(VisMetaABC, dict):
             return False
         if hasattr(self.observer_coordinate, "__len__"):
             if not hasattr(other.observer_coordinate, "__len__"):
-                if all(self.observer_coordinate == other.observer_coordinate):
-                    return False
-            else:
+                return False
+            elif any(self.observer_coordinate != other.observer_coordinate):
                 return False
         elif hasattr(other.observer_coordinate, "__len__"):
             return False
