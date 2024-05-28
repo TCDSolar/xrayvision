@@ -285,10 +285,6 @@ class Visibilities(VisibilitiesABC):
         self._uv_key = "uv"
         self._units_key = "units"
 
-        # Build meta. Make sure that phase center is included.
-        if not isinstance(meta, VisMetaABC):
-            meta = VisMeta(meta)
-
         # Construct underlying data object.
         dims = [f"dim{i}" for i in range(0, len(visibilities.shape))]
         dims[_uv_axis] = self._uv_key
@@ -307,7 +303,7 @@ class Visibilities(VisibilitiesABC):
         if phase_uncertainty is not None:
             data[self._phase_uncert_key] = (dims, phase_uncertainty.to_value(phase.unit))
         if meta is None:
-            meta = VisMeta(dict())
+            meta = VisMeta()
         vis_labels = getattr(meta, "vis_labels", None)
         if vis_labels is not None:
             if len(vis_labels) != nvis:
