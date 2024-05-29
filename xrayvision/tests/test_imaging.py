@@ -7,7 +7,7 @@ from sunpy.map import Map
 
 from xrayvision.imaging import image_to_vis, map_to_vis, vis_psf_image, vis_to_image, vis_to_map
 from xrayvision.transform import dft_map, generate_uv, idft_map
-from xrayvision.visibility import Visibility, Visibilities
+from xrayvision.visibility import Visibilities
 
 
 @pytest.fixture

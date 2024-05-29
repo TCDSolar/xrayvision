@@ -27,7 +27,7 @@ __all__ = [
     "mem",
 ]
 
-from xrayvision.visibility import Visibility, Visibilities
+from xrayvision.visibility import Visibilities
 
 logger = get_logger(__name__, "DEBUG")
 

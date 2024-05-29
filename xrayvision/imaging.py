@@ -6,7 +6,7 @@ from astropy.units import Quantity
 from sunpy.map import GenericMap, Map
 
 from xrayvision.transform import dft_map, idft_map
-from xrayvision.visibility import Visibility, Visibilities
+from xrayvision.visibility import Visibilities
 
 __all__ = [
     "get_weights",
@@ -161,7 +161,13 @@ def vis_to_image(
     shape = shape.to(apu.pixel)
     weights = get_weights(vis, scheme=scheme)
     bp_arr = idft_map(
-        vis.visibilities, u=vis.u, v=vis.v, shape=shape, weights=weights, pixel_size=pixel_size, phase_center=vis.phase_center
+        vis.visibilities,
+        u=vis.u,
+        v=vis.v,
+        shape=shape,
+        weights=weights,
+        pixel_size=pixel_size,
+        phase_center=vis.phase_center,
     )
 
     return bp_arr
@@ -237,7 +243,12 @@ def vis_psf_image(
     # Make sure psf is always odd so power is in exactly one pixel
     shape = [s // 2 * 2 + 1 for s in shape.to_value(apu.pix)] * shape.unit
     psf_arr = idft_map(
-        np.ones(vis.visibilities.shape) * vis.visibilities.unit, u=vis.u, v=vis.v, shape=shape, weights=weights, pixel_size=pixel_size
+        np.ones(vis.visibilities.shape) * vis.visibilities.unit,
+        u=vis.u,
+        v=vis.v,
+        shape=shape,
+        weights=weights,
+        pixel_size=pixel_size,
     )
     return psf_arr
 
@@ -346,6 +357,8 @@ def map_to_vis(amap: GenericMap, *, u: Quantity[1 / apu.arcsec], v: Quantity[1 /
     if "cdelt2" in meta:
         new_psize[0] = float(meta["cdelt2"])
 
-    vis = image_to_vis(amap.quantity, u=u, v=v, pixel_size=new_psize * apu.arcsec / apu.pix, phase_center=new_pos * apu.arcsec)
+    vis = image_to_vis(
+        amap.quantity, u=u, v=v, pixel_size=new_psize * apu.arcsec / apu.pix, phase_center=new_pos * apu.arcsec
+    )
 
     return vis
