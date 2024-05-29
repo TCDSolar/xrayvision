@@ -18,31 +18,31 @@ def test_generate_xy_pixel_size(pixel_size):
     assert np.array_equal(even, generate_xy(32 * apu.pix, pixel_size=pixel_size))
 
 
-@pytest.mark.parametrize("phase_centre", [0, +5.5, -5.5])
-def test_generate_xy_offset(phase_centre):
-    phase_centre = phase_centre * apu.arcsec
-    even = np.linspace(-15.5, 15.5, 32) * apu.arcsec + phase_centre
-    odd = np.linspace(-16, 16, 33) * apu.arcsec + phase_centre
+@pytest.mark.parametrize("phase_center", [0, +5.5, -5.5])
+def test_generate_xy_offset(phase_center):
+    phase_center = phase_center * apu.arcsec
+    even = np.linspace(-15.5, 15.5, 32) * apu.arcsec + phase_center
+    odd = np.linspace(-16, 16, 33) * apu.arcsec + phase_center
 
-    assert np.array_equal(even, generate_xy(32 * apu.pix, phase_centre=phase_centre))
-    assert np.array_equal(odd, generate_xy(33 * apu.pix, phase_centre=phase_centre))
+    assert np.array_equal(even, generate_xy(32 * apu.pix, phase_center=phase_center))
+    assert np.array_equal(odd, generate_xy(33 * apu.pix, phase_center=phase_center))
 
 
 @pytest.mark.parametrize(
-    "phase_centre, pixel_size", [(0, (0.5, 1, 2, 3)), (+5.5, (0.5, 1, 2, 3)), (-5.5, (0.5, 1, 2, 3))]
+    "phase_center, pixel_size", [(0, (0.5, 1, 2, 3)), (+5.5, (0.5, 1, 2, 3)), (-5.5, (0.5, 1, 2, 3))]
 )
-def test_generate_xy_offset_size(phase_centre, pixel_size):
-    phase_centre = phase_centre * apu.arcsec
+def test_generate_xy_offset_size(phase_center, pixel_size):
+    phase_center = phase_center * apu.arcsec
     pixel_size = pixel_size * apu.arcsec / apu.pix
     # No sure if this is a good idea could be hard to debug
     for size in pixel_size:
         # Odd
-        odd = np.linspace(-16 * size, 16 * size, 33) * apu.pix + phase_centre
-        assert np.array_equal(odd, generate_xy(33 * apu.pix, phase_centre=phase_centre, pixel_size=size))
+        odd = np.linspace(-16 * size, 16 * size, 33) * apu.pix + phase_center
+        assert np.array_equal(odd, generate_xy(33 * apu.pix, phase_center=phase_center, pixel_size=size))
 
         # Even
-        even = np.linspace(-15.5 * size, 15.5 * size, 32) * apu.pix + phase_centre
-        assert np.array_equal(even, generate_xy(32 * apu.pix, phase_centre=phase_centre, pixel_size=size))
+        even = np.linspace(-15.5 * size, 15.5 * size, 32) * apu.pix + phase_center
+        assert np.array_equal(even, generate_xy(32 * apu.pix, phase_center=phase_center, pixel_size=size))
 
 
 @pytest.mark.parametrize("pixel_size", [0.5, 1, 2, 3])
@@ -62,30 +62,30 @@ def test_generate_uv_pixel_size(pixel_size):
     assert np.allclose(even, generate_uv(32 * apu.pix, pixel_size=pixel_size), atol=1e-8 / apu.arcsec)
 
 
-@pytest.mark.parametrize("phase_centre", [0.0, -5.5, 5.5])
-def test_generate_uv_pixel_offset(phase_centre):
-    phase_centre = phase_centre * apu.arcsec
+@pytest.mark.parametrize("phase_center", [0.0, -5.5, 5.5])
+def test_generate_uv_pixel_offset(phase_center):
+    phase_center = phase_center * apu.arcsec
     m = 33
     n = 32
 
     # Odd
     odd = np.linspace(-((m - 1) / 2) * (1 / m), ((m - 1) / 2) * (1 / m), m) / apu.arcsec
-    if phase_centre.value != 0:
-        odd += 1 / phase_centre
-    assert np.allclose(odd, generate_uv(m * apu.pix, phase_centre=phase_centre), atol=1e-8 / apu.arcsec)
+    if phase_center.value != 0:
+        odd += 1 / phase_center
+    assert np.allclose(odd, generate_uv(m * apu.pix, phase_center=phase_center), atol=1e-8 / apu.arcsec)
 
     # Even
     even = (np.arange(n) - n / 2 + 0.5) * (1 / n) / apu.arcsec
-    if phase_centre.value != 0:
-        even += 1 / phase_centre
-    assert np.allclose(even, generate_uv(n * apu.pix, phase_centre=phase_centre), atol=1e-8 / apu.arcsec)
+    if phase_center.value != 0:
+        even += 1 / phase_center
+    assert np.allclose(even, generate_uv(n * apu.pix, phase_center=phase_center), atol=1e-8 / apu.arcsec)
 
 
 @pytest.mark.parametrize(
-    "phase_centre, pixel_size", [(0, (0.5, 1, 2, 3)), (+5.5, (0.5, 1, 2, 3)), (-5.5, (0.5, 1, 2, 3))]
+    "phase_center, pixel_size", [(0, (0.5, 1, 2, 3)), (+5.5, (0.5, 1, 2, 3)), (-5.5, (0.5, 1, 2, 3))]
 )
-def test_generate_uv_offset_size(phase_centre, pixel_size):
-    phase_centre = phase_centre * apu.arcsec
+def test_generate_uv_offset_size(phase_center, pixel_size):
+    phase_center = phase_center * apu.arcsec
     pixel_size = pixel_size * apu.arcsec / apu.pix
     m = 33
     n = 32
@@ -93,18 +93,18 @@ def test_generate_uv_offset_size(phase_centre, pixel_size):
     for size in pixel_size:
         # Odd
         odd = np.linspace(-((m - 1) / 2) * (1 / (size * m)), ((m - 1) / 2) * (1 / (size * m)), m) / apu.pix
-        if phase_centre != 0:
-            odd += 1 / phase_centre
+        if phase_center != 0:
+            odd += 1 / phase_center
         assert np.allclose(
-            odd, generate_uv(m * apu.pix, phase_centre=phase_centre, pixel_size=size), atol=1e-8 / apu.arcsec
+            odd, generate_uv(m * apu.pix, phase_center=phase_center, pixel_size=size), atol=1e-8 / apu.arcsec
         )
 
         # Even
         even = (np.arange(n) - n / 2 + 0.5) * (1 / (size * n)) / apu.pix
-        if phase_centre != 0:
-            even += 1 / phase_centre
+        if phase_center != 0:
+            even += 1 / phase_center
         assert np.allclose(
-            even, generate_uv(n * apu.pix, phase_centre=phase_centre, pixel_size=size), atol=1e-8 / apu.arcsec
+            even, generate_uv(n * apu.pix, phase_center=phase_center, pixel_size=size), atol=1e-8 / apu.arcsec
         )
 
 
@@ -114,10 +114,10 @@ def test_generate_uv_offset_size(phase_centre, pixel_size):
 def test_dft_idft(shape, pixel_size, center):
     data = np.arange(np.prod(shape)).reshape(shape)
     uu = generate_uv(
-        shape[0] * apu.pix, phase_centre=center[0] * apu.arcsec, pixel_size=pixel_size[0] * apu.arcsec / apu.pix
+        shape[0] * apu.pix, phase_center=center[0] * apu.arcsec, pixel_size=pixel_size[0] * apu.arcsec / apu.pix
     )
     vv = generate_uv(
-        shape[1] * apu.pix, phase_centre=center[1] * apu.arcsec, pixel_size=pixel_size[1] * apu.arcsec / apu.pix
+        shape[1] * apu.pix, phase_center=center[1] * apu.arcsec, pixel_size=pixel_size[1] * apu.arcsec / apu.pix
     )
     u, v = np.meshgrid(uu, vv, indexing="ij")
     u = u.flatten()
@@ -213,45 +213,45 @@ def test_dft_idft(shape, pixel_size, center):
 #
 #
 # # @pytest.mark.skip('UV coordinate generation off somewhere')
-# @pytest.mark.parametrize("phase_centre", [(0, 0), (2.1, 1.1), (5.4, -4.5), (-5.6, 5.6)])
-# def test_dft_idft_map_center(phase_centre):
-#     phase_centre = phase_centre * apu.arcsec
+# @pytest.mark.parametrize("phase_center", [(0, 0), (2.1, 1.1), (5.4, -4.5), (-5.6, 5.6)])
+# def test_dft_idft_map_center(phase_center):
+#     phase_center = phase_center * apu.arcsec
 #     shape = (33, 33)
 #     m, n = shape
 #     size = m * n
 #     shape = shape * apu.pix
-#     uu = generate_uv(n * apu.pix, phase_centre=phase_centre[0])
-#     vv = generate_uv(m * apu.pix, phase_centre=phase_centre[1])
+#     uu = generate_uv(n * apu.pix, phase_center=phase_center[0])
+#     vv = generate_uv(m * apu.pix, phase_center=phase_center[1])
 #     u, v = np.meshgrid(uu, vv)
 #     u = u.flatten()
 #     v = v.flatten()
 #
 #     # All zeros
 #     zeros = np.zeros((m, n))
-#     vis = dft_map(zeros, u=u, v=v, phase_centre=phase_centre)
+#     vis = dft_map(zeros, u=u, v=v, phase_center=phase_center)
 #     # All visibilities should be zero
 #     assert_array_equal(vis, np.zeros(size, dtype=complex))
-#     out_map = idft_map(vis, u=u, v=v, shape=shape, phase_centre=phase_centre)
+#     out_map = idft_map(vis, u=u, v=v, shape=shape, phase_center=phase_center)
 #     # Should get back the original map after dft(idft())
 #     assert_array_equal(out_map / np.prod((m, n)), zeros)
 #
 #     # All ones
 #     ones = np.ones((m, n))
-#     vis = dft_map(ones, u=u, v=v, phase_centre=phase_centre)
-#     out_map = idft_map(vis, u=u, v=v, shape=shape, phase_centre=phase_centre)
+#     vis = dft_map(ones, u=u, v=v, phase_center=phase_center)
+#     out_map = idft_map(vis, u=u, v=v, shape=shape, phase_center=phase_center)
 #     assert_allclose(out_map / np.prod((m, n)), ones)
 #
 #     # Delta
 #     delta = zeros[:, :]
 #     delta[m // 2, n // 2] = 1.0
-#     vis = dft_map(delta, u=u, v=v, phase_centre=phase_centre)
-#     out_map = idft_map(vis, u=u, v=v, shape=shape, phase_centre=phase_centre)
+#     vis = dft_map(delta, u=u, v=v, phase_center=phase_center)
+#     out_map = idft_map(vis, u=u, v=v, shape=shape, phase_center=phase_center)
 #     assert_allclose(out_map / np.prod((m, n)), delta, atol=1e-14)
 #
 #     # Gaussian - astropy has axis in reverse order compared to numpy
 #     gaussian = Gaussian2DKernel(5, x_size=n, y_size=m).array
-#     vis = dft_map(gaussian, u=u, v=v, phase_centre=phase_centre)
-#     out_map = idft_map(vis, u=u, v=v, shape=shape, phase_centre=phase_centre)
+#     vis = dft_map(gaussian, u=u, v=v, phase_center=phase_center)
+#     out_map = idft_map(vis, u=u, v=v, shape=shape, phase_center=phase_center)
 #     assert_allclose(out_map / np.prod((m, n)), gaussian)
 #
 #
@@ -337,15 +337,15 @@ def test_equivalence_of_convolve():
 
     assert np.allclose(bp2, conv)
     assert np.allclose(bp2, bp3)
-    # Due to the enlarged psf need to only use the centre portion
+    # Due to the enlarged psf need to only use the center portion
     assert np.allclose(psf1[33:66, 33:66], psf2)
 
 
-def test_phase_centre_equivalence():
+def test_phase_center_equivalence():
     # Calculate full u, v coverage so will be equivalent to a discrete Fourier transform (DFT)
     data = np.random.randn(8, 8) / apu.arcsec**2
-    u = generate_uv(8 * apu.pix, phase_centre=0 * apu.arcsec, pixel_size=1 * apu.arcsec / apu.pix)
-    v = generate_uv(8 * apu.pix, phase_centre=0 * apu.arcsec, pixel_size=1 * apu.arcsec / apu.pix)
+    u = generate_uv(8 * apu.pix, phase_center=0 * apu.arcsec, pixel_size=1 * apu.arcsec / apu.pix)
+    v = generate_uv(8 * apu.pix, phase_center=0 * apu.arcsec, pixel_size=1 * apu.arcsec / apu.pix)
     u, v = np.meshgrid(u, v)
     u, v = np.array([u, v]).reshape(2, u.size) / apu.arcsec
 
@@ -360,11 +360,11 @@ def test_phase_centre_equivalence():
     phase = np.arctan2(np.imag(vis), np.real(vis))
     amp = np.abs(vis)
 
-    # change vis to a phase centre of 5, 5
+    # change vis to a phase center of 5, 5
     phase_shift = 2 * np.pi * (5 * apu.arcsec * u + 5 * apu.arcsec * v) * apu.rad
     vis_shifted = (np.cos(phase + phase_shift) + np.sin(phase + phase_shift) * 1j) * amp
 
-    # make image with centre of 5, 5 with shifted vis
+    # make image with center of 5, 5 with shifted vis
     img2 = idft_map(
         vis_shifted,
         u=u,
@@ -372,7 +372,7 @@ def test_phase_centre_equivalence():
         weights=1 / u.size,
         pixel_size=[1, 1] * apu.arcsec / apu.pix,
         shape=data.shape * apu.pix,
-        phase_centre=[5, 5] * apu.arcsec,
+        phase_center=[5, 5] * apu.arcsec,
     )
     assert np.allclose(data, img2)
 
@@ -387,16 +387,16 @@ def test_fft_equivalence():
 
     data = np.arange(np.prod(shape)).reshape(shape)
     uu = generate_uv(
-        shape[0] * apu.pix, phase_centre=center[0] * apu.arcsec, pixel_size=pixel[0] * apu.arcsec / apu.pix
+        shape[0] * apu.pix, phase_center=center[0] * apu.arcsec, pixel_size=pixel[0] * apu.arcsec / apu.pix
     )
     vv = generate_uv(
-        shape[1] * apu.pix, phase_centre=center[1] * apu.arcsec, pixel_size=pixel[1] * apu.arcsec / apu.pix
+        shape[1] * apu.pix, phase_center=center[1] * apu.arcsec, pixel_size=pixel[1] * apu.arcsec / apu.pix
     )
     u, v = np.meshgrid(uu, vv, indexing="ij")
     u = u.flatten()
     v = v.flatten()
 
-    vis = dft_map(data, u=u, v=v, pixel_size=pixel * apu.arcsec / apu.pix, phase_centre=center * apu.arcsec)
+    vis = dft_map(data, u=u, v=v, pixel_size=pixel * apu.arcsec / apu.pix, phase_center=center * apu.arcsec)
 
     ft = fft2(data)
     fts = fftshift(ft)

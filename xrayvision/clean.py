@@ -21,7 +21,7 @@ from scipy.ndimage import shift
 from sunpy.map.map_factory import Map
 
 from xrayvision.imaging import vis_psf_image, vis_to_map
-from xrayvision.visibility import Visibility
+from xrayvision.visibility import Visibilities
 
 __all__ = ["clean", "vis_clean", "ms_clean", "vis_ms_clean"]
 
@@ -98,7 +98,7 @@ def clean(
     #     raise ValueError('')
     pad = [0 if x % 2 == 0 else 1 for x in dirty_map.shape]
 
-    # Assume beam, map phase_centre is in middle
+    # Assume beam, map phase_center is in middle
     beam_center = (dirty_beam.shape[0] - 1) / 2.0, (dirty_beam.shape[1] - 1) / 2.0
     map_center = (dirty_map.shape[0] - 1) / 2.0, (dirty_map.shape[1] - 1) / 2.0
 
@@ -173,7 +173,7 @@ clean.__doc__ += __common_clean_doc__  # type: ignore
 
 @u.quantity_input
 def vis_clean(
-    vis: Visibility,
+    vis: Visibilities,
     shape: Quantity[u.pix],
     pixel_size: Quantity[u.arcsec / u.pix],
     clean_beam_width: Optional[Quantity[u.arcsec]] = 4.0,
@@ -403,7 +403,7 @@ ms_clean.__doc__ += __common_ms_clean_doc__  # type: ignore
 
 
 def vis_ms_clean(
-    vis: Visibility,
+    vis: Visibilities,
     shape: Quantity[u.pix],
     pixel_size: Quantity[u.arcsec / u.pix],
     scales: Optional[Iterable],

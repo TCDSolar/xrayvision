@@ -523,7 +523,7 @@ class Visibility:
         phase_centre:
             Phase centre of the visibility, defaults to (0,0).
         offset:
-            Offset of the phase_centre visibility, defaults to (0,0).
+            Offset of the phase_center visibility, defaults to (0,0).
 
 
         """

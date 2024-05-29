@@ -26,7 +26,7 @@ from xrayvision.mem import mem
 stix_data = pickle.load(urllib.request.urlopen("https://pub099.cs.technik.fhnw.ch/demo/stix_vis.pkl"))
 
 time_range, energy_range, offset, stix_vis = stix_data
-stix_vis.phase_centre = [0, 0] * apu.arcsec
+stix_vis.phase_center = [0, 0] * apu.arcsec
 stix_vis.offset = offset
 
 ###############################################################################

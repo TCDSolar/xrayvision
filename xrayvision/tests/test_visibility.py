@@ -3,10 +3,22 @@ import pytest
 from astropy.coordinates import get_body
 from astropy.tests.helper import assert_quantity_allclose
 from astropy.time import Time
+import numpy as np
 from numpy.testing import assert_array_equal
 
 import xrayvision.visibility as vm
-from xrayvision.visibility import Visibility
+from xrayvision.visibility import Visibility, Visibilities
+
+
+def test_visibilities():
+    visibilities = np.array([1]) * apu.ct
+    u = np.array([1]) / apu.deg
+    v = np.array([1]) / apu.deg
+    vis = Visibilities(visibilities, u, v)
+    assert vis.visibilities == 1 * apu.ct
+    assert vis.u == 1 / apu.deg
+    assert vis.v == 1 / apu.deg
+    assert_array_equal([0, 0] * apu.arcsec, vis.phase_center)
 
 
 def test_visibility():

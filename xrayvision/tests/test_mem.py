@@ -57,7 +57,7 @@ def test_mem():
     # sub_uv = np.hstack([sub_uv, np.zeros((2, 1))]) / u.arcsec
 
     vis = image_to_vis(data * u.dimensionless_unscaled, u=sub_uv[0, :], v=sub_uv[1, :], pixel_size=2 * u.arcsec / u.pix)
-    setattr(vis, "amplitude_error", np.sqrt(np.abs(vis.vis)))
+    setattr(vis, "amplitude_error", np.sqrt(np.abs(vis.visibilities)))
     setattr(vis, "label", [str(x) for x in np.sqrt(x**2 + y**2).flatten()])
 
     res = mem(

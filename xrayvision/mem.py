@@ -27,7 +27,7 @@ __all__ = [
     "mem",
 ]
 
-from xrayvision.visibility import Visibility
+from xrayvision.visibility import Visibility, Visibilities
 
 logger = get_logger(__name__, "DEBUG")
 
@@ -81,8 +81,8 @@ def _get_fourier_matrix(vis, shape=(64, 64) * apu.pix, pixel_size=(4.0312500, 4.
     The complex Fourier matrix
     """
     m, n = shape.to("pix")
-    y = generate_xy(m, phase_centre=0 * apu.arcsec, pixel_size=pixel_size[1])
-    x = generate_xy(n, phase_centre=0 * apu.arcsec, pixel_size=pixel_size[0])
+    y = generate_xy(m, phase_center=0 * apu.arcsec, pixel_size=pixel_size[1])
+    x = generate_xy(n, phase_center=0 * apu.arcsec, pixel_size=pixel_size[0])
     x, y = np.meshgrid(x, y, indexing="ij")
     uv = np.vstack([vis.u, vis.v])
     # Check apu are correct for exp need to be dimensionless and then remove apu for speed
@@ -192,8 +192,8 @@ def _prepare_for_optimise(pixel, shape, vis):
     # 'Hv' is composed by the union of its real and imaginary part
     Hv = np.concatenate([ReHv, ImHv], axis=-1)
     # Division of real and imaginary part of the visibilities
-    ReV = np.real(vis.vis)
-    ImV = np.imag(vis.vis)
+    ReV = np.real(vis.visibilities)
+    ImV = np.imag(vis.visibilities)
     # 'Visib' is composed by the real and imaginary part of the visibilities
     Visib = np.concatenate([ReV, ImV], axis=-1)
     # Standard deviation of the real and imaginary part of the visibilities
@@ -256,7 +256,7 @@ def _get_mean_visibilities(vis, shape, pixel):
     v = np.zeros(n_vis) * (1 / apu.arcsec)
     den = np.zeros(n_vis)
     weights = np.zeros_like(vis.amplitude_error**2)
-    visib = np.zeros_like(vis.vis)
+    visib = np.zeros_like(vis.visibilities)
     for ip in range(n_vis):
         # what about 0.5 pix offset
         i = ru[ip].to_value("pix").astype(int)
@@ -269,7 +269,7 @@ def _get_mean_visibilities(vis, shape, pixel):
             # we save in 'u' and 'v' the u and v coordinates of the first frequency that corresponds
             # to the position (i, j) of the discretization of the (u,v)-plane 'iuarr'
 
-            visib[count] = vis.vis[ip]
+            visib[count] = vis.visibilities[ip]
             weights[count] = vis.amplitude_error[ip] ** 2.0
             den[count] = 1.0
             iuarr[i, j] = count
@@ -277,7 +277,7 @@ def _get_mean_visibilities(vis, shape, pixel):
             count += 1
         else:
             # Save the sum of the visibilities that correspond to the same position (i, j)
-            visib[iuarr[i, j].astype(int)] += vis.vis[ip]
+            visib[iuarr[i, j].astype(int)] += vis.visibilities[ip]
             # Save the number of the visibilities that correspond to the same position (i, j)
             den[iuarr[i, j].astype(int)] += 1.0
             # Save the sum of the variances of the amplitudes of the visibilities that
@@ -296,7 +296,7 @@ def _get_mean_visibilities(vis, shape, pixel):
     # correspond to the same position in the discretization of the (u,v)-plane
     weights = np.sqrt(weights[:count]) / den
 
-    return SimpleNamespace(u=u, v=v, vis=visib, amplitude_error=weights)
+    return SimpleNamespace(u=u, v=v, visibilities=visib, amplitude_error=weights)
 
 
 def _proximal_entropy(y, m, lamba, Lip, tol=10**-10):
@@ -601,7 +601,7 @@ def _get_percent_lambda(vis):
     if ibig.size < 2:
         snr_value = -1
     else:
-        snr_value, _ = resistant_mean((np.abs(vis.vis[ibig]) / vis.amplitude_error[ibig]).flatten(), 3)
+        snr_value, _ = resistant_mean((np.abs(vis.visibilities[ibig]) / vis.amplitude_error[ibig]).flatten(), 3)
 
     # TODO magic numbers
     percent_lambda = 2 / (snr_value**2 + 90)
@@ -611,7 +611,7 @@ def _get_percent_lambda(vis):
 
 @apu.quantity_input
 def mem(
-    vis: Visibility,
+    vis: Visibilities,
     shape: Quantity[apu.pix],
     pixel_size: Quantity[apu.arcsec / apu.pix],
     *,
