@@ -574,50 +574,6 @@ def resistant_mean(data, sigma_cut):
     return mean, sigma
 
 
-# def _get_percent_lambda(vis):
-#     r"""
-#     Return 'percent_lambda' use with MEM
-#
-#     Calculate the signal-to-noise ratio (SNR) for the given visibility bag by trying to use the
-#     coarser sub-collimators adding finer ones until there are at least 2 visibilities, then use
-#     resistant mean of of abs(obsvis) / sigamp
-#
-#     Parameters
-#     ----------
-#     vis
-#
-#     Returns
-#     -------
-#
-#     """
-#     # Loop through ISCs starting with 3-10, but if we don't have at least 2 vis, lower isc_min to
-#     # include next one down, etc.
-#
-#     # TODO this start at 3 not 10?
-#     isc_min = 3
-#     nbig = 0
-#
-#     if hasattr(vis.meta, "label"):
-#         isc_sizes = np.array([float(s[:-1]) for s in vis.meta.label])
-#         while isc_min >= 0 and nbig < 2:
-#             ibig = np.argwhere(isc_sizes >= isc_min)
-#             isc_min = isc_min - 1
-#     elif hasattr(vis.meta, "isc"):
-#         ibig = np.arange(vis.meta.isc.size)
-#
-#     # If still don't have at least 2 vis, return -1, otherwise calculate mean
-#     # (but reject points > sigma away from mean)
-#     if ibig.size < 2:
-#         snr_value = -1
-#     else:
-#         snr_value, _ = resistant_mean((np.abs(vis.visibilities[ibig]) / vis.amplitude_error[ibig]).flatten(), 3)
-#
-#     # TODO magic numbers
-#     percent_lambda = 2 / (snr_value**2 + 90)
-#
-#     return percent_lambda
-
-
 @apu.quantity_input
 def mem(
     vis: Visibilities,
