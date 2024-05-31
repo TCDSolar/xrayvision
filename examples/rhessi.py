@@ -50,7 +50,7 @@ vis_data = vis_data[vis_data["obsvis"] != 0 + 0j]
 ###############################################################################
 # Now we can create the visibility object from the filtered visibilities.
 
-meta = VisMeta({'vis_labels': vis_data["isc"]})
+meta = VisMeta({"vis_labels": vis_data["isc"]})
 
 vunit = apu.Unit("photon/(cm**2 s)")
 vis = Visibilities(
@@ -58,8 +58,8 @@ vis = Visibilities(
     vis_data["u"] / apu.arcsec,
     vis_data["v"] / apu.arcsec,
     vis_data["xyoffset"][0] * apu.arcsec,
-    meta = meta,
-    amplitude_uncertainty = vis_data["sigamp"] * vunit
+    meta=meta,
+    amplitude_uncertainty=vis_data["sigamp"] * vunit,
 )
 # setattr(vis, "amplitude_error", )
 # setattr(vis, "isc", vis_data["isc"])
@@ -113,7 +113,7 @@ if nbig < 2:
 else:
     snr_value, _ = resistant_mean((np.abs(vis.visibilities[ibig]) / vis.amplitude_uncertainty[ibig]).flatten(), 3)
 
-percent_lambda = 11. / (snr_value**2 + 383.)
+percent_lambda = 11.0 / (snr_value**2 + 383.0)
 
 mem_map = mem(vis, shape=[129, 129] * apu.pixel, pixel_size=[2, 2] * apu.arcsec / apu.pix)
 mem_map.plot()

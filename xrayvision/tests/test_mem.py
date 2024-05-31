@@ -60,7 +60,5 @@ def test_mem():
     setattr(vis, "amplitude_error", np.sqrt(np.abs(vis.visibilities)))
     setattr(vis, "label", [str(x) for x in np.sqrt(x**2 + y**2).flatten()])
 
-    res = mem(
-        vis, shape=(m, n) * u.pix, pixel_size=[2, 2] * u.arcsec / u.pix, maxiter=1000, tol=1e-3
-    )
+    res = mem(vis, shape=(m, n) * u.pix, pixel_size=[2, 2] * u.arcsec / u.pix, maxiter=1000, tol=1e-3)
     assert_allclose(res.data, data, atol=1e-1)

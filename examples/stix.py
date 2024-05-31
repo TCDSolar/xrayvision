@@ -8,16 +8,14 @@ Imports
 """
 
 import pickle
-import urllib.request
 
 import astropy.units as apu
 import matplotlib.pyplot as plt
+import numpy as np
 
 from xrayvision.clean import vis_clean
 from xrayvision.imaging import vis_psf_map, vis_to_map
 from xrayvision.mem import mem, resistant_mean
-
-import numpy as np
 
 ###############################################################################
 # Create images from STIX visibility data.
@@ -25,12 +23,12 @@ import numpy as np
 # The STIX data has already been prepared and stored in python pickle format
 # the variables can be simply restored.
 
-with open('./stix_vis.pkl', 'rb') as file:
+with open("./stix_vis.pkl", "rb") as file:
     stix_data = pickle.load(file)
 
-time_range = stix_data['time_range']
-energy_range = stix_data['energy_range']
-stix_vis = stix_data['stix_visibilities']
+time_range = stix_data["time_range"]
+energy_range = stix_data["energy_range"]
+stix_vis = stix_data["stix_visibilities"]
 
 ###############################################################################
 # Lets have a look at the point spread function (PSF) or dirty beam
@@ -63,8 +61,9 @@ clean_map.plot()
 snr_value, _ = resistant_mean((np.abs(stix_vis.visibilities) / stix_vis.amplitude_uncertainty).flatten(), 3)
 percent_lambda = 2 / (snr_value**2 + 90)
 
-mem_map = mem(stix_vis, shape=[129, 129] * apu.pixel, pixel_size=[2, 2] * apu.arcsec / apu.pix,
-              percent_lambda=percent_lambda)
+mem_map = mem(
+    stix_vis, shape=[129, 129] * apu.pixel, pixel_size=[2, 2] * apu.arcsec / apu.pix, percent_lambda=percent_lambda
+)
 mem_map.plot()
 
 ###############################################################################
