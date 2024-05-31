@@ -61,8 +61,6 @@ vis = Visibilities(
     meta=meta,
     amplitude_uncertainty=vis_data["sigamp"] * vunit,
 )
-# setattr(vis, "amplitude_error", )
-# setattr(vis, "isc", vis_data["isc"])
 
 
 ###############################################################################
