@@ -197,8 +197,12 @@ def _prepare_for_optimise(pixel, shape, vis):
     # 'Visib' is composed by the real and imaginary part of the visibilities
     Visib = np.concatenate([ReV, ImV], axis=-1)
     # Standard deviation of the real and imaginary part of the visibilities
-    sigma_Re = vis.amplitude_error
-    sigma_Im = vis.amplitude_error
+    if vis.amplitude_uncertainty is None:
+        sigma_Re = np.ones_like(ReV)
+        sigma_Im = np.ones_like(ImV)
+    else:
+        sigma_Re = vis.amplitude_uncertainty
+        sigma_Im = vis.amplitude_uncertainty
     # 'sigma': standard deviation of the data contained in 'Visib'
     sigma = np.concatenate([sigma_Re, sigma_Im], axis=-1)
     # RESCALING of 'Hv' AND 'Visib'(NEEDED FOR COMPUTING THE VALUE OF THE \chi ** 2; FUNCTION)
@@ -234,6 +238,11 @@ def _get_mean_visibilities(vis, shape, pixel):
     Mean Visibilities
     """
 
+    if vis.amplitude_uncertainty is None:
+        amplitude_uncertainty = np.ones_like(vis.visibilities)
+    else:
+        amplitude_uncertainty = vis.amplitude_uncertainty
+
     imsize2 = shape[0] / 2
     pixel_size = 1 / (shape[0] * pixel[0])
 
@@ -255,7 +264,7 @@ def _get_mean_visibilities(vis, shape, pixel):
     u = np.zeros(n_vis) * (1 / apu.arcsec)
     v = np.zeros(n_vis) * (1 / apu.arcsec)
     den = np.zeros(n_vis)
-    weights = np.zeros_like(vis.amplitude_error**2)
+    weights = np.ones_like(vis.visibilities**2)
     visib = np.zeros_like(vis.visibilities)
     for ip in range(n_vis):
         # what about 0.5 pix offset
@@ -270,7 +279,7 @@ def _get_mean_visibilities(vis, shape, pixel):
             # to the position (i, j) of the discretization of the (u,v)-plane 'iuarr'
 
             visib[count] = vis.visibilities[ip]
-            weights[count] = vis.amplitude_error[ip] ** 2.0
+            weights[count] = amplitude_uncertainty[ip] ** 2.0
             den[count] = 1.0
             iuarr[i, j] = count
 
@@ -282,7 +291,7 @@ def _get_mean_visibilities(vis, shape, pixel):
             den[iuarr[i, j].astype(int)] += 1.0
             # Save the sum of the variances of the amplitudes of the visibilities that
             # correspond to the same position (i, j)
-            weights[iuarr[i, j].astype(int)] += vis.amplitude_error[ip] ** 2
+            weights[iuarr[i, j].astype(int)] += amplitude_uncertainty[ip] ** 2
 
     u = u[:count]
     v = v[:count]
@@ -296,7 +305,7 @@ def _get_mean_visibilities(vis, shape, pixel):
     # correspond to the same position in the discretization of the (u,v)-plane
     weights = np.sqrt(weights[:count]) / den
 
-    return SimpleNamespace(u=u, v=v, visibilities=visib, amplitude_error=weights)
+    return SimpleNamespace(u=u, v=v, visibilities=visib, amplitude_uncertainty=weights)
 
 
 def _proximal_entropy(y, m, lamba, Lip, tol=10**-10):
@@ -565,48 +574,48 @@ def resistant_mean(data, sigma_cut):
     return mean, sigma
 
 
-def _get_percent_lambda(vis):
-    r"""
-    Return 'percent_lambda' use with MEM
-
-    Calculate the signal-to-noise ratio (SNR) for the given visibility bag by trying to use the
-    coarser sub-collimators adding finer ones until there are at least 2 visibilities, then use
-    resistant mean of of abs(obsvis) / sigamp
-
-    Parameters
-    ----------
-    vis
-
-    Returns
-    -------
-
-    """
-    # Loop through ISCs starting with 3-10, but if we don't have at least 2 vis, lower isc_min to
-    # include next one down, etc.
-
-    # TODO this start at 3 not 10?
-    isc_min = 3
-    nbig = 0
-
-    if hasattr(vis, "label"):
-        isc_sizes = np.array([float(s[:-1]) for s in vis.label])
-        while isc_min >= 0 and nbig < 2:
-            ibig = np.argwhere(isc_sizes >= isc_min)
-            isc_min = isc_min - 1
-    elif hasattr(vis, "isc"):
-        ibig = np.arange(vis.isc.size)
-
-    # If still don't have at least 2 vis, return -1, otherwise calculate mean
-    # (but reject points > sigma away from mean)
-    if ibig.size < 2:
-        snr_value = -1
-    else:
-        snr_value, _ = resistant_mean((np.abs(vis.visibilities[ibig]) / vis.amplitude_error[ibig]).flatten(), 3)
-
-    # TODO magic numbers
-    percent_lambda = 2 / (snr_value**2 + 90)
-
-    return percent_lambda
+# def _get_percent_lambda(vis):
+#     r"""
+#     Return 'percent_lambda' use with MEM
+#
+#     Calculate the signal-to-noise ratio (SNR) for the given visibility bag by trying to use the
+#     coarser sub-collimators adding finer ones until there are at least 2 visibilities, then use
+#     resistant mean of of abs(obsvis) / sigamp
+#
+#     Parameters
+#     ----------
+#     vis
+#
+#     Returns
+#     -------
+#
+#     """
+#     # Loop through ISCs starting with 3-10, but if we don't have at least 2 vis, lower isc_min to
+#     # include next one down, etc.
+#
+#     # TODO this start at 3 not 10?
+#     isc_min = 3
+#     nbig = 0
+#
+#     if hasattr(vis.meta, "label"):
+#         isc_sizes = np.array([float(s[:-1]) for s in vis.meta.label])
+#         while isc_min >= 0 and nbig < 2:
+#             ibig = np.argwhere(isc_sizes >= isc_min)
+#             isc_min = isc_min - 1
+#     elif hasattr(vis.meta, "isc"):
+#         ibig = np.arange(vis.meta.isc.size)
+#
+#     # If still don't have at least 2 vis, return -1, otherwise calculate mean
+#     # (but reject points > sigma away from mean)
+#     if ibig.size < 2:
+#         snr_value = -1
+#     else:
+#         snr_value, _ = resistant_mean((np.abs(vis.visibilities[ibig]) / vis.amplitude_error[ibig]).flatten(), 3)
+#
+#     # TODO magic numbers
+#     percent_lambda = 2 / (snr_value**2 + 90)
+#
+#     return percent_lambda
 
 
 @apu.quantity_input
@@ -615,7 +624,7 @@ def mem(
     shape: Quantity[apu.pix],
     pixel_size: Quantity[apu.arcsec / apu.pix],
     *,
-    percent_lambda: Optional[Quantity[apu.percent]] = None,
+    percent_lambda: Optional[Quantity[apu.percent]] = 0.02 * apu.percent,
     maxiter: int = 1000,
     tol: float = 1e-3,
     map: bool = True,
@@ -645,8 +654,8 @@ def mem(
 
     """
     total_flux = _estimate_flux(vis, shape, pixel_size)
-    if percent_lambda is None:
-        percent_lambda = _get_percent_lambda(vis)
+    # if percent_lambda is None:
+    #     percent_lambda = _get_percent_lambda(vis)
 
     mean_vis = _get_mean_visibilities(vis, shape, pixel_size)
     Hv, Lip, Visib = _prepare_for_optimise(pixel_size, shape, mean_vis)

@@ -125,7 +125,7 @@ def image_to_vis(
     pixel_size = validate_and_expand_kwarg(pixel_size, "pixel_size")
     if not (apu.get_physical_type((1 / u).unit) == ANGLE and apu.get_physical_type((1 / v).unit) == ANGLE):
         raise ValueError("u and v must be inverse angle (e.g. 1/deg or 1/arcsec")
-    vis = dft_map(image, u=u, v=v, phase_center=phase_center, pixel_size=pixel_size)
+    vis = dft_map(image, u=u, v=v, phase_center=[0., 0.]*apu.arcsec, pixel_size=pixel_size) # TODO: adapt to generic map center
     return Visibilities(vis, u=u, v=v, phase_center=phase_center)
 
 
@@ -167,7 +167,7 @@ def vis_to_image(
         shape=shape,
         weights=weights,
         pixel_size=pixel_size,
-        phase_center=vis.phase_center,
+        phase_center=[0., 0.] * apu.arcsec, # TODO update to have generic image center
     )
 
     return bp_arr

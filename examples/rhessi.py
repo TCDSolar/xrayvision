@@ -13,8 +13,8 @@ from astropy.io import fits
 
 from xrayvision.clean import vis_clean
 from xrayvision.imaging import vis_psf_map, vis_to_map
-from xrayvision.mem import mem
-from xrayvision.visibility import Visibility
+from xrayvision.mem import mem, resistant_mean
+from xrayvision.visibility import Visibilities, VisMeta
 
 ###############################################################################
 # We will use `astropy.io.fits` to download and open the RHESSI visibility fits
@@ -50,15 +50,19 @@ vis_data = vis_data[vis_data["obsvis"] != 0 + 0j]
 ###############################################################################
 # Now we can create the visibility object from the filtered visibilities.
 
+meta = VisMeta({'vis_labels': vis_data["isc"]})
+
 vunit = apu.Unit("photon/(cm**2 s)")
-vis = Visibility(
-    vis=vis_data["obsvis"] * vunit,
-    u=vis_data["u"] / apu.arcsec,
-    v=vis_data["v"] / apu.arcsec,
-    offset=vis_data["xyoffset"][0] * apu.arcsec,
+vis = Visibilities(
+    vis_data["obsvis"] * vunit,
+    vis_data["u"] / apu.arcsec,
+    vis_data["v"] / apu.arcsec,
+    vis_data["xyoffset"][0] * apu.arcsec,
+    meta = meta,
+    amplitude_uncertainty = vis_data["sigamp"] * vunit
 )
-setattr(vis, "amplitude_error", vis_data["sigamp"] * vunit)
-setattr(vis, "isc", vis_data["isc"])
+# setattr(vis, "amplitude_error", )
+# setattr(vis, "isc", vis_data["isc"])
 
 
 ###############################################################################
@@ -92,6 +96,24 @@ clean_map, model_map, residual_map = vis_clean(
 
 ###############################################################################
 # MEM
+
+# Compute percent_lambda
+# Loop through ISCs starting with 6-9, but if we don't have at least 2 vis, lower isc_min to include next one down, etc.
+isc_min = 6
+nbig = 0
+
+while isc_min >= 0 and nbig < 2:
+    ibig = np.argwhere(vis.meta.vis_labels >= isc_min)
+    nbig = len(ibig)
+    isc_min = isc_min - 1
+
+# If still don't have at least 2 vis, return -1, otherwise calculate mean (but reject points > sigma away from mean)
+if nbig < 2:
+    snr_value = -1
+else:
+    snr_value, _ = resistant_mean((np.abs(vis.visibilities[ibig]) / vis.amplitude_uncertainty[ibig]).flatten(), 3)
+
+percent_lambda = 11. / (snr_value**2 + 383.)
 
 mem_map = mem(vis, shape=[129, 129] * apu.pixel, pixel_size=[2, 2] * apu.arcsec / apu.pix)
 mem_map.plot()
