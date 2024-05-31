@@ -610,8 +610,6 @@ def mem(
 
     """
     total_flux = _estimate_flux(vis, shape, pixel_size)
-    # if percent_lambda is None:
-    #     percent_lambda = _get_percent_lambda(vis)
 
     mean_vis = _get_mean_visibilities(vis, shape, pixel_size)
     Hv, Lip, Visib = _prepare_for_optimise(pixel_size, shape, mean_vis)
