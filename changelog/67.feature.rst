@@ -1,0 +1,1 @@
+Make the software compatible with :class:`~xrayvision.visibility.Visibilities`.

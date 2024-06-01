@@ -7,7 +7,7 @@ from sunpy.map import Map
 
 from xrayvision.imaging import image_to_vis, map_to_vis, vis_psf_image, vis_to_image, vis_to_map
 from xrayvision.transform import dft_map, generate_uv, idft_map
-from xrayvision.visibility import Visibility
+from xrayvision.visibility import Visibilities
 
 
 @pytest.fixture
@@ -93,7 +93,7 @@ def test_vis_to_psf(pixel_size, uv):
     weights = np.sqrt(u**2 + v**2).value
     weights /= weights.sum()
     psf_calc = idft_map(obs_vis, u=u, v=v, shape=[65, 65] * apu.pix, pixel_size=ps, weights=weights)
-    vis = Visibility(obs_vis, u=u, v=v)
+    vis = Visibilities(obs_vis, u=u, v=v)
     res = vis_psf_image(vis, shape=[65, 65] * apu.pixel, pixel_size=ps, scheme="uniform")
     assert_allclose(res, psf_calc)
 
@@ -108,7 +108,7 @@ def test_vis_to_image_against_idft(uv):
     bp_calc = idft_map(
         obs_vis, u=u, v=v, shape=[65, 65] * apu.pix, pixel_size=[2, 2] * apu.arcsec / apu.pix, weights=weights
     )
-    vis = Visibility(obs_vis, u=u, v=v)
+    vis = Visibilities(obs_vis, u, v)
     res = vis_to_image(vis, shape=[65, 65] * apu.pixel, pixel_size=2 * apu.arcsec / apu.pix, scheme="uniform")
     assert np.allclose(bp_calc, res)
 
@@ -117,7 +117,7 @@ def test_image_to_vis():
     m = n = 33
     size = m * n
     # Set up empty map
-    image = np.zeros((m, n))
+    image = np.zeros((m, n)) * apu.ct / apu.arcsec**2
 
     # Calculate full u, v coverage so will be equivalent to a discrete Fourier transform (DFT)
     u = generate_uv(m * apu.pix)
@@ -127,15 +127,15 @@ def test_image_to_vis():
 
     # For an empty map visibilities should all be zero (0+0j)
     empty_vis = image_to_vis(image, u=v, v=v)
-    assert np.array_equal(empty_vis.phase_centre, (0.0, 0.0) * apu.arcsec)
-    assert np.array_equal(empty_vis.vis, np.zeros(n * m, dtype=complex))
+    assert np.array_equal(empty_vis.phase_center, (0.0, 0.0) * apu.arcsec)
+    assert np.array_equal(empty_vis.visibilities, np.zeros(n * m, dtype=complex))
 
 
 def test_image_to_vis_center():
     m = n = 33
     size = m * n
     # Set up empty map
-    image = np.zeros((m, n))
+    image = np.zeros((m, n)) * apu.ct / apu.arcsec**2
 
     # Calculate full u, v coverage so will be equivalent to a discrete Fourier transform (DFT)
     u = generate_uv(m * apu.pix)
@@ -144,9 +144,9 @@ def test_image_to_vis_center():
     u, v = np.array([u, v]).reshape(2, size) / apu.arcsec
 
     # For an empty map visibilities should all be zero (0+0j)
-    empty_vis = image_to_vis(image, u=u, v=v, phase_centre=(2.0, -3.0) * apu.arcsec)
-    assert np.array_equal(empty_vis.offset, (2.0, -3.0) * apu.arcsec)
-    assert np.array_equal(empty_vis.vis, np.zeros(n * m, dtype=complex))
+    empty_vis = image_to_vis(image, u=u, v=v, phase_center=(2.0, -3.0) * apu.arcsec)
+    assert np.array_equal(empty_vis.phase_center, (2.0, -3.0) * apu.arcsec)
+    assert np.array_equal(empty_vis.visibilities, np.zeros(n * m, dtype=complex))
 
 
 @pytest.mark.parametrize(
@@ -161,8 +161,8 @@ def test_map_to_vis(pos, pixel):
     pixel = pixel * apu.arcsec / apu.pix
 
     # Calculate full u, v coverage so will be equivalent to a discrete Fourier transform (DFT)
-    u = generate_uv(m * apu.pix, phase_centre=pos[0], pixel_size=pixel[0])
-    v = generate_uv(n * apu.pix, phase_centre=pos[1], pixel_size=pixel[1])
+    u = generate_uv(m * apu.pix, phase_center=pos[0], pixel_size=pixel[0])
+    v = generate_uv(n * apu.pix, phase_center=pos[1], pixel_size=pixel[1])
     u, v = np.meshgrid(u, v, indexing="ij")
     u, v = np.array([u, v]).reshape(2, size) / apu.arcsec
 
@@ -173,14 +173,15 @@ def test_map_to_vis(pos, pixel):
         "cdelt2": pixel[0].value,
         "cunit1": "arcsec",
         "cunit2": "arcsec",
+        "bunit": "ct / arcsec^2",
     }
 
     # Astropy index order is opposite to that of numpy, is 1st dim is across second down
-    data = Gaussian2DKernel(6, x_size=n, y_size=m).array
+    data = Gaussian2DKernel(6, x_size=n, y_size=m).array * apu.ct / apu.arcsec**2
     mp = Map((data, header))
     vis = map_to_vis(mp, u=u, v=v)
 
-    assert np.array_equal(vis.offset, pos)
+    assert np.array_equal(vis.phase_center, pos)
 
     res = vis_to_image(vis, shape=(m, n) * apu.pixel, pixel_size=pixel)
     assert np.allclose(res, data)
@@ -198,9 +199,7 @@ def test_vis_to_image():
     u, v = uv
 
     # Astropy index order is opposite to that of numpy, is 1st dim is across second down
-    data = Gaussian2DKernel(6, x_size=n, y_size=m).array
-    data = np.zeros((m, n))
-    data[m // 2, n // 2] = 1
+    data = Gaussian2DKernel(6, x_size=n, y_size=m).array * apu.ct / apu.arcsec**2
 
     vis = image_to_vis(data, u=u, v=v)
     res = vis_to_image(vis, shape=(m, n) * apu.pixel)
@@ -219,7 +218,7 @@ def test_vis_to_image_single_pixel_size():
     uv = np.array([u, v]).reshape(2, size) / apu.arcsec
     u, v = uv
     # Astropy index order is opposite to that of numpy, is 1st dim is across second down
-    data = Gaussian2DKernel(6, x_size=n, y_size=m).array
+    data = Gaussian2DKernel(6, x_size=n, y_size=m).array * apu.ct / apu.arcsec**2
 
     vis = image_to_vis(data, u=u, v=v, pixel_size=(2.0, 2.0) * apu.arcsec / apu.pix)
     res = vis_to_image(vis, shape=(m, n) * apu.pixel, pixel_size=2.0 * apu.arcsec / apu.pix)
@@ -239,7 +238,7 @@ def test_vis_to_image_invalid_pixel_size():
     u, v = uv
 
     # Astropy index order is opposite to that of numpy, is 1st dim is across second down
-    data = Gaussian2DKernel(6, x_size=n, y_size=m).array
+    data = Gaussian2DKernel(6, x_size=n, y_size=m).array * apu.ct / apu.arcsec**2
 
     vis = image_to_vis(data, u=u, v=v)
     with pytest.raises(ValueError):
@@ -256,8 +255,8 @@ def test_vis_to_image_invalid_pixel_size():
 def test_vis_to_map(m, n, pos, pixel):
     pos = pos * apu.arcsec
     pixel = pixel * apu.arcsec / apu.pix
-    u = generate_uv(m * apu.pix, phase_centre=pos[0], pixel_size=pixel[0])
-    v = generate_uv(n * apu.pix, phase_centre=pos[1], pixel_size=pixel[1])
+    u = generate_uv(m * apu.pix, phase_center=pos[0], pixel_size=pixel[0])
+    v = generate_uv(n * apu.pix, phase_center=pos[1], pixel_size=pixel[1])
     u, v = np.meshgrid(u, v, indexing="ij")
     uv = np.array([u, v]).reshape(2, m * n) / apu.arcsec
     u, v = uv

@@ -22,17 +22,17 @@ __all__ = ["generate_xy", "generate_uv", "dft_map", "idft_map"]
 def generate_xy(
     number_pixels: Quantity[apu.pix],
     *,
-    phase_centre: Optional[Quantity[apu.arcsec]] = 0.0 * apu.arcsec,
+    phase_center: Optional[Quantity[apu.arcsec]] = 0.0 * apu.arcsec,
     pixel_size: Optional[Quantity[apu.arcsec / apu.pix]] = 1.0 * apu.arcsec / apu.pix,
 ) -> Quantity[apu.arcsec]:
     """
-    Generate the x or y coordinates given the number of pixels, phase_centre and pixel size.
+    Generate the x or y coordinates given the number of pixels, phase_center and pixel size.
 
     Parameters
     ----------
     number_pixels : `int`
         Number of pixels
-    phase_centre : `float`, optional
+    phase_center : `float`, optional
         Center coordinates
     pixel_size : `float`, optional
         Size of pixel in physical units (e.g. arcsecs, meters)
@@ -56,13 +56,13 @@ def generate_xy(
     >>> generate_xy(9*apu.pix, pixel_size=2.5 * apu.arcsec/apu.pix)
     <Quantity [-10. ,  -7.5,  -5. ,  -2.5,   0. ,   2.5,   5. ,   7.5,  10. ] arcsec>
 
-    >>> generate_xy(9*apu.pix, phase_centre=10 * apu.arcsec, pixel_size=2.5 * apu.arcsec/apu.pix)
+    >>> generate_xy(9*apu.pix, phase_center=10 * apu.arcsec, pixel_size=2.5 * apu.arcsec/apu.pix)
     <Quantity [ 0. ,  2.5,  5. ,  7.5, 10. , 12.5, 15. , 17.5, 20. ] arcsec>
 
     """
     x = (
         np.arange(number_pixels.to_value(apu.pixel)) - (number_pixels.to_value(apu.pix) / 2) + 0.5
-    ) * apu.pix * pixel_size + phase_centre
+    ) * apu.pix * pixel_size + phase_center
     return x
 
 
@@ -70,17 +70,17 @@ def generate_xy(
 def generate_uv(
     number_pixels: Quantity[apu.pix],
     *,
-    phase_centre: Optional[Quantity[apu.arcsec]] = 0.0 * apu.arcsec,
+    phase_center: Optional[Quantity[apu.arcsec]] = 0.0 * apu.arcsec,
     pixel_size: Optional[Quantity[apu.arcsec / apu.pix]] = 1.0 * apu.arcsec / apu.pix,
 ) -> Quantity[1 / apu.arcsec]:
     """
-    Generate the u or v coordinates given the number of pixels, phase_centre and pixel size.
+    Generate the u or v coordinates given the number of pixels, phase_center and pixel size.
 
     Parameters
     ----------
     number_pixels : `int`
         Number of pixels
-    phase_centre : `float`, optional
+    phase_center : `float`, optional
         Center coordinates
     pixel_size : `float`, optional
         Size of pixel in physical units (e.g. arcsecs, meters)
@@ -106,7 +106,7 @@ def generate_uv(
     <Quantity [-0.17777778, -0.13333333, -0.08888889, -0.04444444,  0.        ,
                 0.04444444,  0.08888889,  0.13333333,  0.17777778] 1 / arcsec>
 
-    >>> generate_uv(9*apu.pix, phase_centre=10 * apu.arcsec, pixel_size=2.5 * apu.arcsec/apu.pix)
+    >>> generate_uv(9*apu.pix, phase_center=10 * apu.arcsec, pixel_size=2.5 * apu.arcsec/apu.pix)
     <Quantity [-0.07777778, -0.03333333,  0.01111111,  0.05555556,  0.1       ,
                 0.14444444,  0.18888889,  0.23333333,  0.27777778] 1 / arcsec>
 
@@ -117,8 +117,8 @@ def generate_uv(
         pixel_size * number_pixels
     )
 
-    if phase_centre.value != 0.0:  # type: ignore
-        x += 1 / phase_centre  # type: ignore
+    if phase_center.value != 0.0:  # type: ignore
+        x += 1 / phase_center  # type: ignore
     return x
 
 
@@ -128,7 +128,7 @@ def dft_map(
     *,
     u: Quantity[1 / apu.arcsec],
     v: Quantity[1 / apu.arcsec],
-    phase_centre: Quantity[apu.arcsec] = (0.0, 0.0) * apu.arcsec,
+    phase_center: Quantity[apu.arcsec] = (0.0, 0.0) * apu.arcsec,
     pixel_size: Quantity[apu.arcsec / apu.pix] = (1.0, 1.0) * apu.arcsec / apu.pix,
 ) -> Union[Quantity, npt.NDArray]:
     r"""
@@ -142,8 +142,8 @@ def dft_map(
         Array of 2xN u coordinates where the visibilities are evaluated.
     v :
         Array of 2xN v coordinates where the visibilities are evaluated.
-    phase_centre :
-        Coordinates of the phase_centre of the map e.g. ``(0,0)`` or ``[5.0, -2.0]``.
+    phase_center :
+        Coordinates of the phase_center of the map e.g. ``(0,0)`` or ``[5.0, -2.0]``.
     pixel_size : `float` (dx, dy), optional
         The pixel size need not be square e.g. ``(1, 3)``.
 
@@ -154,8 +154,8 @@ def dft_map(
 
     """
     m, n = input_array.shape * apu.pix
-    x = generate_xy(m, phase_centre=phase_centre[0], pixel_size=pixel_size[0])  # type: ignore
-    y = generate_xy(n, phase_centre=phase_centre[1], pixel_size=pixel_size[1])  # type: ignore
+    x = generate_xy(m, phase_center=phase_center[0], pixel_size=pixel_size[0])  # type: ignore
+    y = generate_xy(n, phase_center=phase_center[1], pixel_size=pixel_size[1])  # type: ignore
 
     x, y = np.meshgrid(x, y, indexing="ij")
     uv = np.vstack([u, v])
@@ -190,7 +190,7 @@ def idft_map(
     v: Quantity[1 / apu.arcsec],
     shape: Quantity[apu.pix],
     weights: Optional[npt.NDArray] = None,
-    phase_centre: Quantity[apu.arcsec] = (0.0, 0.0) * apu.arcsec,
+    phase_center: Quantity[apu.arcsec] = (0.0, 0.0) * apu.arcsec,
     pixel_size: Quantity[apu.arcsec / apu.pix] = (1.0, 1.0) * apu.arcsec / apu.pix,
 ) -> Union[Quantity, npt.NDArray]:
     r"""
@@ -208,8 +208,8 @@ def idft_map(
         The shape of the output array to create.
     weights :
         Array of weights for visibilities.
-    phase_centre :
-        Coordinates of the phase_centre of the map e.g. ``(0,0)`` or ``[5.0, -2.0]``.
+    phase_center :
+        Coordinates of the phase_center of the map e.g. ``(0,0)`` or ``[5.0, -2.0]``.
     pixel_size :
         The pixel size this need not be square e.g. ``(1, 3)``.
 
@@ -220,8 +220,8 @@ def idft_map(
 
     """
     m, n = shape
-    x = generate_xy(m, phase_centre=phase_centre[0], pixel_size=pixel_size[0])  # type: ignore
-    y = generate_xy(n, phase_centre=phase_centre[1], pixel_size=pixel_size[1])  # type: ignore
+    x = generate_xy(m, phase_center=phase_center[0], pixel_size=pixel_size[0])  # type: ignore
+    y = generate_xy(n, phase_center=phase_center[1], pixel_size=pixel_size[1])  # type: ignore
 
     x, y = np.meshgrid(x, y, indexing="ij")
 

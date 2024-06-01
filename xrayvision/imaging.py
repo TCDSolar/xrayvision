@@ -6,7 +6,7 @@ from astropy.units import Quantity
 from sunpy.map import GenericMap, Map
 
 from xrayvision.transform import dft_map, idft_map
-from xrayvision.visibility import Visibility
+from xrayvision.visibility import Visibilities
 
 __all__ = [
     "get_weights",
@@ -24,7 +24,7 @@ ANGLE = apu.get_physical_type(apu.deg)
 WEIGHT_SCHEMES = ("natural", "uniform")
 
 
-def get_weights(vis: Visibility, scheme: str = "natural", norm: bool = True) -> np.ndarray:
+def get_weights(vis: Visibilities, scheme: str = "natural", norm: bool = True) -> np.ndarray:
     r"""
     Return spatial frequency weight factors for each visibility.
 
@@ -47,7 +47,7 @@ def get_weights(vis: Visibility, scheme: str = "natural", norm: bool = True) -> 
         raise ValueError(f"Invalid weighting scheme {scheme}, must be one of: {WEIGHT_SCHEMES}")
     weights = np.sqrt(vis.u**2 + vis.v**2).value
     if scheme == "natural":
-        weights = np.ones_like(vis.vis, dtype=float)
+        weights = np.ones_like(vis.visibilities, dtype=float)
 
     if norm:
         weights /= weights.sum()
@@ -97,11 +97,11 @@ def image_to_vis(
     *,
     u: Quantity[apu.arcsec**-1],
     v: Quantity[apu.arcsec**-1],
-    phase_centre: Optional[Quantity[apu.arcsec]] = (0.0, 0.0) * apu.arcsec,
+    phase_center: Optional[Quantity[apu.arcsec]] = (0.0, 0.0) * apu.arcsec,
     pixel_size: Optional[Quantity[apu.arcsec / apu.pix]] = 1.0 * apu.arcsec / apu.pix,
-) -> Visibility:
+) -> Visibilities:
     r"""
-    Return a Visibility created from the image and u, v sampling.
+    Return a Visibilities object created from the image and u, v sampling.
 
     Parameters
     ----------
@@ -111,27 +111,29 @@ def image_to_vis(
         Array of u coordinates where the visibilities will be evaluated
     v :
         Array of v coordinates where the visibilities will be evaluated
-    phase_centre :
-        The coordinates the phase_centre.
+    phase_center :
+        The coordinates the phase_center.
     pixel_size :
         Size of pixels, if only one value is passed, assume square pixels (repeating the value).
 
     Returns
     -------
     :
-        The new visibility object
+        The new Visibilities object
 
     """
     pixel_size = validate_and_expand_kwarg(pixel_size, "pixel_size")
     if not (apu.get_physical_type((1 / u).unit) == ANGLE and apu.get_physical_type((1 / v).unit) == ANGLE):
         raise ValueError("u and v must be inverse angle (e.g. 1/deg or 1/arcsec")
-    vis = dft_map(image, u=u, v=v, phase_centre=phase_centre, pixel_size=pixel_size)
-    return Visibility(vis, u=u, v=v, offset=phase_centre)
+    vis = dft_map(
+        image, u=u, v=v, phase_center=[0.0, 0.0] * apu.arcsec, pixel_size=pixel_size
+    )  # TODO: adapt to generic map center
+    return Visibilities(vis, u=u, v=v, phase_center=phase_center)
 
 
 @apu.quantity_input()
 def vis_to_image(
-    vis: Visibility,
+    vis: Visibilities,
     shape: Quantity[apu.pix] = (65, 65) * apu.pixel,
     pixel_size: Optional[Quantity[apu.arcsec / apu.pix]] = 1 * apu.arcsec / apu.pix,
     scheme: str = "natural",
@@ -161,7 +163,13 @@ def vis_to_image(
     shape = shape.to(apu.pixel)
     weights = get_weights(vis, scheme=scheme)
     bp_arr = idft_map(
-        vis.vis, u=vis.u, v=vis.v, shape=shape, weights=weights, pixel_size=pixel_size, phase_centre=vis.phase_centre
+        vis.visibilities,
+        u=vis.u,
+        v=vis.v,
+        shape=shape,
+        weights=weights,
+        pixel_size=pixel_size,
+        phase_center=[0.0, 0.0] * apu.arcsec,  # TODO update to have generic image center
     )
 
     return bp_arr
@@ -169,7 +177,7 @@ def vis_to_image(
 
 @apu.quantity_input
 def vis_psf_map(
-    vis: Visibility,
+    vis: Visibilities,
     *,
     shape: Quantity[apu.pix] = (65, 65) * apu.pixel,
     pixel_size: Optional[Quantity[apu.arcsec / apu.pix]] = 1 * apu.arcsec / apu.pix,
@@ -203,7 +211,7 @@ def vis_psf_map(
 
 @apu.quantity_input()
 def vis_psf_image(
-    vis: Visibility,
+    vis: Visibilities,
     *,
     shape: Quantity[apu.pix] = (65, 65) * apu.pixel,
     pixel_size: Quantity[apu.arcsec / apu.pix] = 1 * apu.arcsec / apu.pix,
@@ -237,14 +245,19 @@ def vis_psf_image(
     # Make sure psf is always odd so power is in exactly one pixel
     shape = [s // 2 * 2 + 1 for s in shape.to_value(apu.pix)] * shape.unit
     psf_arr = idft_map(
-        np.ones(vis.vis.shape) * vis.vis.unit, u=vis.u, v=vis.v, shape=shape, weights=weights, pixel_size=pixel_size
+        np.ones(vis.visibilities.shape) * vis.visibilities.unit,
+        u=vis.u,
+        v=vis.v,
+        shape=shape,
+        weights=weights,
+        pixel_size=pixel_size,
     )
     return psf_arr
 
 
 @apu.quantity_input()
 def vis_to_map(
-    vis: Visibility,
+    vis: Visibilities,
     shape: Quantity[apu.pix] = (65, 65) * apu.pixel,
     pixel_size: Optional[Quantity[apu.arcsec / apu.pix]] = 1 * apu.arcsec / apu.pixel,
     scheme: Optional[str] = "natural",
@@ -278,7 +291,7 @@ def vis_to_map(
 
 
 @apu.quantity_input()
-def generate_header(vis: Visibility, *, shape: Quantity[apu.pix], pixel_size: Quantity[apu.arcsec / apu.pix]) -> dict:
+def generate_header(vis: Visibilities, *, shape: Quantity[apu.pix], pixel_size: Quantity[apu.arcsec / apu.pix]) -> dict:
     r"""
     Generate a map head given the visibilities, pixel size and shape
 
@@ -296,8 +309,8 @@ def generate_header(vis: Visibility, *, shape: Quantity[apu.pix], pixel_size: Qu
     :
     """
     header = {
-        "crval1": (vis.offset[1]).to_value(apu.arcsec),
-        "crval2": (vis.offset[0]).to_value(apu.arcsec),
+        "crval1": (vis.phase_center[1]).to_value(apu.arcsec),
+        "crval2": (vis.phase_center[0]).to_value(apu.arcsec),
         "cdelt1": (pixel_size[1] * apu.pix).to_value(apu.arcsec),
         "cdelt2": (pixel_size[0] * apu.pix).to_value(apu.arcsec),
         "ctype1": "HPLN-TAN",
@@ -312,9 +325,9 @@ def generate_header(vis: Visibility, *, shape: Quantity[apu.pix], pixel_size: Qu
 
 
 @apu.quantity_input()
-def map_to_vis(amap: GenericMap, *, u: Quantity[1 / apu.arcsec], v: Quantity[1 / apu.arcsec]) -> Visibility:
+def map_to_vis(amap: GenericMap, *, u: Quantity[1 / apu.arcsec], v: Quantity[1 / apu.arcsec]) -> Visibilities:
     r"""
-    Return a Visibility object created from the map, sampling it at give `u`, `v` coordinates.
+    Return a Visibilities object created from the map, sampling it at give `u`, `v` coordinates.
 
     Parameters
     ----------
@@ -328,7 +341,7 @@ def map_to_vis(amap: GenericMap, *, u: Quantity[1 / apu.arcsec], v: Quantity[1 /
     Returns
     -------
     :
-        The new visibility object
+        The new Visibilities object
 
     """
     if not apu.get_physical_type(1 / u) == ANGLE and apu.get_physical_type(1 / v) == ANGLE:
@@ -346,6 +359,8 @@ def map_to_vis(amap: GenericMap, *, u: Quantity[1 / apu.arcsec], v: Quantity[1 /
     if "cdelt2" in meta:
         new_psize[0] = float(meta["cdelt2"])
 
-    vis = image_to_vis(amap.data, u=u, v=v, pixel_size=new_psize * apu.arcsec / apu.pix)
-    vis.offset = new_pos * apu.arcsec
+    vis = image_to_vis(
+        amap.quantity, u=u, v=v, pixel_size=new_psize * apu.arcsec / apu.pix, phase_center=new_pos * apu.arcsec
+    )
+
     return vis
