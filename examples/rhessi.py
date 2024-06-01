@@ -54,10 +54,10 @@ meta = VisMeta({"vis_labels": vis_data["isc"]})
 
 vunit = apu.Unit("photon/(cm**2 s)")
 vis = Visibilities(
-    vis_data["obsvis"] * vunit,
-    vis_data["u"] / apu.arcsec,
-    vis_data["v"] / apu.arcsec,
-    vis_data["xyoffset"][0] * apu.arcsec,
+    visibilities=vis_data["obsvis"] * vunit,
+    u=vis_data["u"] / apu.arcsec,
+    v=vis_data["v"] / apu.arcsec,
+    phase_center=vis_data["xyoffset"][0] * apu.arcsec,
     meta=meta,
     amplitude_uncertainty=vis_data["sigamp"] * vunit,
 )

@@ -93,7 +93,7 @@ def test_vis_to_psf(pixel_size, uv):
     weights = np.sqrt(u**2 + v**2).value
     weights /= weights.sum()
     psf_calc = idft_map(obs_vis, u=u, v=v, shape=[65, 65] * apu.pix, pixel_size=ps, weights=weights)
-    vis = Visibilities(obs_vis, u, v)
+    vis = Visibilities(obs_vis, u=u, v=v)
     res = vis_psf_image(vis, shape=[65, 65] * apu.pixel, pixel_size=ps, scheme="uniform")
     assert_allclose(res, psf_calc)
 
