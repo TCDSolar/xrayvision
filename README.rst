@@ -28,9 +28,8 @@ Installation
 
 It is strongly advised that you use and isolated environment through python's venv, virturalenv, anaconda or similar.
 
-.. note::
 
-The name 'xrayvision' was already taken on PyPi so the package name is 'xrayvisim' e.g.
+**The name 'xrayvision' was already taken on PyPi so the package name is 'xrayvisim' e.g.**
 
 .. code-block::
 
