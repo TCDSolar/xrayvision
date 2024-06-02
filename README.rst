@@ -28,15 +28,22 @@ Installation
 
 It is strongly advised that you use and isolated environment through python's venv, virturalenv, anaconda or similar.
 
+
+**The name 'xrayvision' was already taken on PyPi so the package name is 'xrayvisim' e.g.**
+
 .. code-block::
 
-    pip install xrayvision
+    pip install xrayvisim
 
 Usage
 -----
 
+See the `example gallery`_.
+
 Getting Help
 ------------
+
+See the `issue tracker`_.
 
 Contributing
 ------------
@@ -44,3 +51,5 @@ When you are interacting with the community you are asked to
 follow the `Code of Conduct`_.
 
 .. _Code of Conduct: http://docs.sunpy.org/en/stable/coc.html
+.. _example gallery: https://xrayvision.readthedocs.io/en/latest/generated/gallery/index.html
+.. _issue tracker: https://github.com/TCDSolar/xrayvision/issues
