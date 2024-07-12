@@ -113,10 +113,10 @@ def test_generate_uv_offset_size(phase_center, pixel_size):
 @pytest.mark.parametrize("center", [(0, 0), (-1, 1), (1, -1), (1, 1)])
 def test_dft_idft(shape, pixel_size, center):
     data = np.arange(np.prod(shape)).reshape(shape)
-    uu = generate_uv(
+    vv = generate_uv(
         shape[0] * apu.pix, phase_center=center[0] * apu.arcsec, pixel_size=pixel_size[0] * apu.arcsec / apu.pix
     )
-    vv = generate_uv(
+    uu = generate_uv(
         shape[1] * apu.pix, phase_center=center[1] * apu.arcsec, pixel_size=pixel_size[1] * apu.arcsec / apu.pix
     )
     u, v = np.meshgrid(uu, vv, indexing="ij")
@@ -386,13 +386,13 @@ def test_fft_equivalence():
     center = (1, 1)
 
     data = np.arange(np.prod(shape)).reshape(shape)
-    uu = generate_uv(
+    vv = generate_uv(
         shape[0] * apu.pix, phase_center=center[0] * apu.arcsec, pixel_size=pixel[0] * apu.arcsec / apu.pix
     )
-    vv = generate_uv(
+    uu = generate_uv(
         shape[1] * apu.pix, phase_center=center[1] * apu.arcsec, pixel_size=pixel[1] * apu.arcsec / apu.pix
     )
-    u, v = np.meshgrid(uu, vv, indexing="ij")
+    u, v = np.meshgrid(uu, vv)
     u = u.flatten()
     v = v.flatten()
 
