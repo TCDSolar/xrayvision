@@ -1,0 +1,1 @@
+Update RHESSI example to use the same image dimensions and pixel size throughout.

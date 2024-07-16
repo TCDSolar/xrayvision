@@ -113,7 +113,7 @@ else:
 
 percent_lambda = 11.0 / (snr_value**2 + 383.0)
 
-mem_map = mem(vis, shape=[129, 129] * apu.pixel, pixel_size=[2, 2] * apu.arcsec / apu.pix)
+mem_map = mem(vis, shape=[101, 101] * apu.pixel, pixel_size=[1.5, 1.5] * apu.arcsec / apu.pix)
 mem_map.plot()
 
 

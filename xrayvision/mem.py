@@ -15,6 +15,7 @@ from sunpy.map import Map
 from xrayvision.imaging import generate_header
 from xrayvision.transform import generate_xy
 from xrayvision.utils import get_logger
+from xrayvision.visibility import Visibilities
 
 __all__ = [
     "_get_entropy",
@@ -27,7 +28,6 @@ __all__ = [
     "mem",
 ]
 
-from xrayvision.visibility import Visibilities
 
 logger = get_logger(__name__, "DEBUG")
 
@@ -625,8 +625,8 @@ def mem(
 
     im = _optimise_fb(Hv, Visib, Lip, total_flux, lambd, shape, pixel_size, maxiter, tol)
 
-    # This is needed to match IDL output
-    # im = np.rot90(im, -1)
+    # This is needed to match IDL output - prob array vs cartesian indexing
+    im = im.T
 
     if map:
         header = generate_header(vis, shape=shape, pixel_size=pixel_size)

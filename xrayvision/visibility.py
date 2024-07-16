@@ -16,10 +16,10 @@ import numpy as np
 import xarray
 from astropy.coordinates import SkyCoord
 from astropy.time import Time
+from astropy.units import Quantity
 
 __all__ = ["Visibility", "Visibilities", "VisMeta", "VisibilitiesABC", "VisMetaABC"]
 
-from astropy.units import Quantity
 
 _E_RANGE_KEY = "spectral_range"
 _T_RANGE_KEY = "time_range"
