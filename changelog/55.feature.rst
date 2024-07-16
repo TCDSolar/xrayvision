@@ -1,1 +1,0 @@
-Introduce new API for handling visibilities: `~xrayvision.visibility.VisibilitiesABC` and `~xrayvision.visibility.VisMetaABC`, along with implemented versions of the classes `~xrayvision.visibility.Visibilities` and `~xrayvision.visibility.VisMeta`.

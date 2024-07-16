@@ -1,1 +1,0 @@
-Change typing of meta input to `~xrayvision.visibility.Visibilities` to be a `~xrayvision.visibilities.VisMeta`.

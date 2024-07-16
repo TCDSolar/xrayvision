@@ -1,1 +1,0 @@
-Add equality operator to `~xrayvision.visibility.Visibilities` and `~xrayvision.visibility.VisMeta`.
