@@ -2,7 +2,7 @@ import astropy.units as apu
 import numpy as np
 import pytest
 from astropy.convolution.kernels import Gaussian2DKernel
-from numpy.testing import assert_allclose
+from numpy.testing import assert_allclose, assert_array_equal
 from sunpy.map import Map
 
 from xrayvision.imaging import image_to_vis, map_to_vis, vis_psf_image, vis_to_image, vis_to_map
@@ -161,8 +161,8 @@ def test_map_to_vis(pos, pixel):
     pixel = pixel * apu.arcsec / apu.pix
 
     # Calculate full u, v coverage so will be equivalent to a discrete Fourier transform (DFT)
-    u = generate_uv(m * apu.pix, phase_center=pos[0], pixel_size=pixel[0])
-    v = generate_uv(n * apu.pix, phase_center=pos[1], pixel_size=pixel[1])
+    v = generate_uv(m * apu.pix, phase_center=pos[0], pixel_size=pixel[0])
+    u = generate_uv(n * apu.pix, phase_center=pos[1], pixel_size=pixel[1])
     u, v = np.meshgrid(u, v, indexing="ij")
     u, v = np.array([u, v]).reshape(2, size) / apu.arcsec
 
@@ -181,10 +181,10 @@ def test_map_to_vis(pos, pixel):
     mp = Map((data, header))
     vis = map_to_vis(mp, u=u, v=v)
 
-    assert np.array_equal(vis.phase_center, pos)
+    assert_array_equal(vis.phase_center, pos)
 
     res = vis_to_image(vis, shape=(m, n) * apu.pixel, pixel_size=pixel)
-    assert np.allclose(res, data)
+    assert_allclose(res, data)
 
 
 def test_vis_to_image():
@@ -255,8 +255,8 @@ def test_vis_to_image_invalid_pixel_size():
 def test_vis_to_map(m, n, pos, pixel):
     pos = pos * apu.arcsec
     pixel = pixel * apu.arcsec / apu.pix
-    u = generate_uv(m * apu.pix, phase_center=pos[0], pixel_size=pixel[0])
-    v = generate_uv(n * apu.pix, phase_center=pos[1], pixel_size=pixel[1])
+    v = generate_uv(m * apu.pix, phase_center=pos[0], pixel_size=pixel[0])
+    u = generate_uv(n * apu.pix, phase_center=pos[1], pixel_size=pixel[1])
     u, v = np.meshgrid(u, v, indexing="ij")
     uv = np.array([u, v]).reshape(2, m * n) / apu.arcsec
     u, v = uv

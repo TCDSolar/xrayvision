@@ -154,10 +154,11 @@ def dft_map(
 
     """
     m, n = input_array.shape * apu.pix
-    x = generate_xy(m, phase_center=phase_center[0], pixel_size=pixel_size[0])  # type: ignore
-    y = generate_xy(n, phase_center=phase_center[1], pixel_size=pixel_size[1])  # type: ignore
+    # python array index in row, column hence y, x
+    y = generate_xy(m, phase_center=phase_center[0], pixel_size=pixel_size[0])  # type: ignore
+    x = generate_xy(n, phase_center=phase_center[1], pixel_size=pixel_size[1])  # type: ignore
 
-    x, y = np.meshgrid(x, y, indexing="ij")
+    x, y = np.meshgrid(x, y)
     uv = np.vstack([u, v])
     # Check units are correct for exp need to be dimensionless and then remove units for speed
     if (uv[0, :] * x[0, 0]).unit == apu.dimensionless_unscaled and (
@@ -220,10 +221,11 @@ def idft_map(
 
     """
     m, n = shape
-    x = generate_xy(m, phase_center=phase_center[0], pixel_size=pixel_size[0])  # type: ignore
-    y = generate_xy(n, phase_center=phase_center[1], pixel_size=pixel_size[1])  # type: ignore
+    # python array index in row, column hence y, x
+    y = generate_xy(m, phase_center=phase_center[0], pixel_size=pixel_size[0])  # type: ignore
+    x = generate_xy(n, phase_center=phase_center[1], pixel_size=pixel_size[1])  # type: ignore
 
-    x, y = np.meshgrid(x, y, indexing="ij")
+    x, y = np.meshgrid(x, y)
 
     if weights is None:
         weights = np.ones(input_vis.shape)
