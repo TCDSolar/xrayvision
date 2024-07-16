@@ -7,7 +7,6 @@ appropriate component shapes at different scales.
 
 """
 
-import logging
 from typing import Union, Optional
 from collections.abc import Iterable
 
@@ -21,13 +20,14 @@ from scipy.ndimage import shift
 from sunpy.map.map_factory import Map
 
 from xrayvision.imaging import vis_psf_image, vis_to_map
+from xrayvision.utils import get_logger
 from xrayvision.visibility import Visibilities
 
 __all__ = ["clean", "vis_clean", "ms_clean", "vis_ms_clean"]
 
 
-logger = logging.getLogger(__name__)
-logger.setLevel("DEBUG")
+logger = get_logger(__name__, "DEBUG")
+
 
 __common_clean_doc__ = r"""
     clean_beam_width :
@@ -121,7 +121,7 @@ def clean(
         model[mx, my] += gain * imax
 
         if i % 25 == 0:
-            logger.debug(f"Iter: {i}, strength: {imax}, location: {mx, my}")
+            logger.info(f"Iter: {i}, strength: {imax}, location: {mx, my}")
 
         offset = map_center[0] - mx, map_center[1] - my
         shifted_beam_center = int(beam_center[0] + offset[0]), int(beam_center[1] + offset[1])
