@@ -93,7 +93,6 @@ def validate_and_expand_kwarg(q: Quantity, name: Optional[str] = "") -> Quantity
     return q
 
 
-@apu.quantity_input
 def image_to_vis(
     image: Quantity,
     *,
