@@ -199,7 +199,9 @@ class Visibilities(VisibilitiesABC):
         visibilities: apu.Quantity,
         u: apu.Quantity[1 / apu.deg],
         v: apu.Quantity[1 / apu.deg],
-        phase_center: Optional[Union[SkyCoord, apu.Quantity[apu.arcsec]]] = SkyCoord(Tx=0*apu.arcsec, Ty=0*apu.arcsec, frame=Projective),
+        phase_center: Optional[Union[SkyCoord, apu.Quantity[apu.arcsec]]] = SkyCoord(
+            Tx=0 * apu.arcsec, Ty=0 * apu.arcsec, frame=Projective
+        ),
         meta: Optional[VisMetaABC] = None,
         uncertainty: Optional[apu.Quantity] = None,
         amplitude: Optional[apu.Quantity] = None,

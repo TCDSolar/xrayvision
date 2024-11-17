@@ -130,7 +130,9 @@ def dft_map(
     *,
     u: Quantity[1 / apu.arcsec],
     v: Quantity[1 / apu.arcsec],
-    phase_center: [SkyCoord, Quantity[apu.arcsec]] = SkyCoord(Tx=0.0 * apu.arcsec, Ty=0.0 * apu.arcsec, frame=Projective),
+    phase_center: Union[SkyCoord, Quantity[apu.arcsec]] = SkyCoord(
+        Tx=0.0 * apu.arcsec, Ty=0.0 * apu.arcsec, frame=Projective
+    ),
     pixel_size: Quantity[apu.arcsec / apu.pix] = (1.0, 1.0) * apu.arcsec / apu.pix,
 ) -> Union[Quantity, npt.NDArray]:
     r"""
@@ -194,7 +196,9 @@ def idft_map(
     v: Quantity[1 / apu.arcsec],
     shape: Quantity[apu.pix],
     weights: Optional[npt.NDArray] = None,
-    phase_center: [SkyCoord, Quantity[apu.arcsec]] = SkyCoord(Tx=0.0 * apu.arcsec, Ty=0.0 * apu.arcsec, frame=Projective),
+    phase_center: Union[SkyCoord, Quantity[apu.arcsec]] = SkyCoord(
+        Tx=0.0 * apu.arcsec, Ty=0.0 * apu.arcsec, frame=Projective
+    ),
     pixel_size: Quantity[apu.arcsec / apu.pix] = (1.0, 1.0) * apu.arcsec / apu.pix,
 ) -> Union[Quantity, npt.NDArray]:
     r"""

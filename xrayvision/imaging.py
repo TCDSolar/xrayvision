@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Union, Optional
 
 import astropy.units as apu
 import numpy as np
@@ -99,7 +99,9 @@ def image_to_vis(
     *,
     u: Quantity[apu.arcsec**-1],
     v: Quantity[apu.arcsec**-1],
-    phase_center: [SkyCoord, Quantity[apu.arcsec]] = SkyCoord(Tx=0.0 * apu.arcsec, Ty=0.0 * apu.arcsec, frame=Projective),
+    phase_center: Union[SkyCoord, Quantity[apu.arcsec]] = SkyCoord(
+        Tx=0.0 * apu.arcsec, Ty=0.0 * apu.arcsec, frame=Projective
+    ),
     pixel_size: Optional[Quantity[apu.arcsec / apu.pix]] = 1.0 * apu.arcsec / apu.pix,
 ) -> Visibilities:
     r"""
@@ -128,7 +130,11 @@ def image_to_vis(
     if not (apu.get_physical_type((1 / u).unit) == ANGLE and apu.get_physical_type((1 / v).unit) == ANGLE):
         raise ValueError("u and v must be inverse angle (e.g. 1/deg or 1/arcsec")
     vis = dft_map(
-        image, u=u, v=v, phase_center=SkyCoord(Tx=0.0 * apu.arcsec, Ty=0.0 * apu.arcsec, frame=Projective), pixel_size=pixel_size
+        image,
+        u=u,
+        v=v,
+        phase_center=SkyCoord(Tx=0.0 * apu.arcsec, Ty=0.0 * apu.arcsec, frame=Projective),
+        pixel_size=pixel_size,
     )  # TODO: adapt to generic map center
     return Visibilities(vis, u=u, v=v, phase_center=phase_center)
 
@@ -171,7 +177,9 @@ def vis_to_image(
         shape=shape,
         weights=weights,
         pixel_size=pixel_size,
-        phase_center=SkyCoord(Tx=0.0 * apu.arcsec, Ty=0.0 * apu.arcsec, frame=Projective),  # TODO update to have generic image center
+        phase_center=SkyCoord(
+            Tx=0.0 * apu.arcsec, Ty=0.0 * apu.arcsec, frame=Projective
+        ),  # TODO update to have generic image center
     )
 
     return bp_arr
@@ -362,8 +370,6 @@ def map_to_vis(amap: GenericMap, *, u: Quantity[1 / apu.arcsec], v: Quantity[1 /
     if "cdelt2" in meta:
         new_psize[0] = float(meta["cdelt2"])
 
-    vis = image_to_vis(
-        amap.quantity, u=u, v=v, pixel_size=new_psize * apu.arcsec / apu.pix, phase_center=new_pos
-    )
+    vis = image_to_vis(amap.quantity, u=u, v=v, pixel_size=new_psize * apu.arcsec / apu.pix, phase_center=new_pos)
 
     return vis
