@@ -1,8 +1,10 @@
 from typing import Union, Optional
 
 import astropy.units as apu
+import astropy.wcs.wcsapi
 import numpy as np
 from astropy.coordinates import SkyCoord
+from astropy.wcs.utils import celestial_frame_to_wcs
 from astropy.units import Quantity
 from sunpy.map import GenericMap, Map
 
@@ -317,19 +319,19 @@ def generate_header(vis: Visibilities, *, shape: Quantity[apu.pix], pixel_size: 
     -------
     :
     """
-    header = {
-        "crval1": (vis.phase_center.Tx).to_value(apu.arcsec),
-        "crval2": (vis.phase_center.Ty).to_value(apu.arcsec),
-        "cdelt1": (pixel_size[1] * apu.pix).to_value(apu.arcsec),
-        "cdelt2": (pixel_size[0] * apu.pix).to_value(apu.arcsec),
-        "ctype1": "HPLN-TAN",
-        "ctype2": "HPLT-TAN",
-        "naxis": 2,
-        "naxis1": shape[1].value,
-        "naxis2": shape[0].value,
-        "cunit1": "arcsec",
-        "cunit2": "arcsec",
-    }
+    cunit = apu.arcsec
+    phase_center = vis.phase_center
+    header = celestial_frame_to_wcs(phase_center.frame).to_header()
+    header["crval1"] = (phase_center.Tx).to_value(cunit)
+    header["crval2"] = (phase_center.Ty).to_value(cunit)
+    header["crpix1"] = shape[1].to_value(apu.pix) / 2
+    header["crpix2"] = shape[0].to_value(apu.pix) / 2
+    header["cdelt1"] = (pixel_size[1] * apu.pix).to_value(cunit)
+    header["cdelt2"] = (pixel_size[0] * apu.pix).to_value(cunit)
+    header["naxis1"] = shape[1].value
+    header["naxis2"] = shape[0].value
+    header["cunit1"] = str(cunit)
+    header["cunit2"] = str(cunit)
     return header
 
 
