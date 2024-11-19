@@ -97,11 +97,13 @@ def projective_frame_to_wcs(frame, projection="TAN"):
     if hasattr(obs_frame, "frame"):
         obs_frame = frame.observer.frame
 
-    wcs.wcs.aux.hgln_obs = obs_frame.lon.to_value(u.deg)
-    wcs.wcs.aux.hglt_obs = obs_frame.lat.to_value(u.deg)
-    wcs.wcs.aux.dsun_obs = obs_frame.radius.to_value(u.m)
+    if obs_frame:
+        wcs.wcs.aux.hgln_obs = obs_frame.lon.to_value(u.deg)
+        wcs.wcs.aux.hglt_obs = obs_frame.lat.to_value(u.deg)
+        wcs.wcs.aux.dsun_obs = obs_frame.radius.to_value(u.m)
 
-    wcs.wcs.dateobs = frame.obstime.utc.iso
+    if frame.obstime:
+        wcs.wcs.dateobs = frame.obstime.utc.iso
     wcs.wcs.cunit = ["arcsec", "arcsec"]
     wcs.wcs.ctype = [X_CTYPE, Y_CTYPE]
 
@@ -109,12 +111,12 @@ def projective_frame_to_wcs(frame, projection="TAN"):
 
 
 # Remove once min version of sunpy has https://github.com/sunpy/sunpy/pull/7594
-astropy.wcs.utils.WCS_FRAME_MAPPINGS.insert(1, [projective_wcs_to_frame])
-astropy.wcs.utils.FRAME_WCS_MAPPINGS.insert(1, [projective_frame_to_wcs])
+astropy.wcs.utils.WCS_FRAME_MAPPINGS.insert(-1, [projective_wcs_to_frame])
+astropy.wcs.utils.FRAME_WCS_MAPPINGS.insert(-1, [projective_frame_to_wcs])
 
 PROJECTIVE_CTYPE_TO_UCD1 = {
-    "SXLT": "custom:pos.projective.lat",
-    "SXLN": "custom:pos.projective.lon",
-    "SXRZ": "custom:pos.projective.z",
+    "PJLT": "custom:pos.projective.lat",
+    "PJLN": "custom:pos.projective.lon",
+    "PJRZ": "custom:pos.projective.z",
 }
 astropy.wcs.wcsapi.fitswcs.CTYPE_TO_UCD1.update(PROJECTIVE_CTYPE_TO_UCD1)
