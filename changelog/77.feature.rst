@@ -1,0 +1,1 @@
+Enable ``phase_center`` inputs to functions that calculate visibilities to be given as `astropy.coordinates.SkyCoord`.

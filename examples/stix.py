@@ -12,7 +12,9 @@ import pickle
 import astropy.units as apu
 import matplotlib.pyplot as plt
 import numpy as np
+from astropy.coordinates import SkyCoord
 
+from xrayvision.coordinates.frames import Projective
 from xrayvision.clean import vis_clean
 from xrayvision.imaging import vis_psf_map, vis_to_map
 from xrayvision.mem import mem, resistant_mean
@@ -29,6 +31,7 @@ with open("./stix_vis.pkl", "rb") as file:
 time_range = stix_data["time_range"]
 energy_range = stix_data["energy_range"]
 stix_vis = stix_data["stix_visibilities"]
+stix_vis.phase_center = SkyCoord(Tx=stix_vis.phase_center[1], Ty=stix_vis.phase_center[0], frame=Projective)
 
 ###############################################################################
 # Lets have a look at the point spread function (PSF) or dirty beam
