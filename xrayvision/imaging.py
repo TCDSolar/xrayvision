@@ -1,11 +1,10 @@
 from typing import Union, Optional
 
 import astropy.units as apu
-import astropy.wcs.wcsapi
 import numpy as np
 from astropy.coordinates import SkyCoord
-from astropy.wcs.utils import celestial_frame_to_wcs
 from astropy.units import Quantity
+from astropy.wcs.utils import celestial_frame_to_wcs
 from sunpy.map import GenericMap, Map
 
 from xrayvision.coordinates.frames import Projective

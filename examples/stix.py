@@ -14,8 +14,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 from astropy.coordinates import SkyCoord
 
-from xrayvision.coordinates.frames import Projective
 from xrayvision.clean import vis_clean
+from xrayvision.coordinates.frames import Projective
 from xrayvision.imaging import vis_psf_map, vis_to_map
 from xrayvision.mem import mem, resistant_mean
 
