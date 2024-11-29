@@ -8,24 +8,24 @@ from sunpy.sun.constants import radius as _RSUN
 __all__ = ["Projective"]
 
 
-X_CTYPE = "PJLN-TAN"
-Y_CTYPE = "PJLT-TAN"
+X_CTYPE = "PJLN"
+Y_CTYPE = "PJLT"
 
 
 class Projective(SunPyBaseCoordinateFrame):
-    """A generic projective coordinate frame for a imaging taken by an arbitrary imager."""
+    """A generic projective coordinate frame for an image taken by an arbitrary imager."""
 
     observer = ObserverCoordinateAttribute(HeliographicStonyhurst)
     rsun = astropy.coordinates.QuantityAttribute(default=_RSUN, unit=u.km)
     frame_specific_representation_info = {
         astropy.coordinates.SphericalRepresentation: [
-            astropy.coordinates.RepresentationMapping("lon", "Tx", u.arcsec),
-            astropy.coordinates.RepresentationMapping("lat", "Ty", u.arcsec),
+            astropy.coordinates.RepresentationMapping("lon", u.arcsec),
+            astropy.coordinates.RepresentationMapping("lat", u.arcsec),
             astropy.coordinates.RepresentationMapping("distance", "distance"),
         ],
         astropy.coordinates.UnitSphericalRepresentation: [
-            astropy.coordinates.RepresentationMapping("lon", "Tx", u.arcsec),
-            astropy.coordinates.RepresentationMapping("lat", "Ty", u.arcsec),
+            astropy.coordinates.RepresentationMapping("lon", u.arcsec),
+            astropy.coordinates.RepresentationMapping("lat", u.arcsec),
         ],
     }
 
