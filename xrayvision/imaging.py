@@ -1,10 +1,13 @@
-from typing import Optional
+from typing import Union, Optional
 
 import astropy.units as apu
 import numpy as np
+from astropy.coordinates import SkyCoord
 from astropy.units import Quantity
+from astropy.wcs.utils import celestial_frame_to_wcs
 from sunpy.map import GenericMap, Map
 
+from xrayvision.coordinates.frames import Projective
 from xrayvision.transform import dft_map, idft_map
 from xrayvision.visibility import Visibilities
 
@@ -91,13 +94,14 @@ def validate_and_expand_kwarg(q: Quantity, name: Optional[str] = "") -> Quantity
     return q
 
 
-@apu.quantity_input
 def image_to_vis(
     image: Quantity,
     *,
     u: Quantity[apu.arcsec**-1],
     v: Quantity[apu.arcsec**-1],
-    phase_center: Optional[Quantity[apu.arcsec]] = (0.0, 0.0) * apu.arcsec,
+    phase_center: Union[SkyCoord, Quantity[apu.arcsec]] = SkyCoord(
+        Tx=0.0 * apu.arcsec, Ty=0.0 * apu.arcsec, frame=Projective
+    ),
     pixel_size: Optional[Quantity[apu.arcsec / apu.pix]] = 1.0 * apu.arcsec / apu.pix,
 ) -> Visibilities:
     r"""
@@ -111,7 +115,7 @@ def image_to_vis(
         Array of u coordinates where the visibilities will be evaluated
     v :
         Array of v coordinates where the visibilities will be evaluated
-    phase_center :
+    phase_center : `astropy.coordinates.SkyCoord`
         The coordinates the phase_center.
     pixel_size :
         Size of pixels, if only one value is passed, assume square pixels (repeating the value).
@@ -126,7 +130,11 @@ def image_to_vis(
     if not (apu.get_physical_type((1 / u).unit) == ANGLE and apu.get_physical_type((1 / v).unit) == ANGLE):
         raise ValueError("u and v must be inverse angle (e.g. 1/deg or 1/arcsec")
     vis = dft_map(
-        image, u=u, v=v, phase_center=[0.0, 0.0] * apu.arcsec, pixel_size=pixel_size
+        image,
+        u=u,
+        v=v,
+        phase_center=SkyCoord(Tx=0.0 * apu.arcsec, Ty=0.0 * apu.arcsec, frame=Projective),
+        pixel_size=pixel_size,
     )  # TODO: adapt to generic map center
     return Visibilities(vis, u=u, v=v, phase_center=phase_center)
 
@@ -169,7 +177,9 @@ def vis_to_image(
         shape=shape,
         weights=weights,
         pixel_size=pixel_size,
-        phase_center=[0.0, 0.0] * apu.arcsec,  # TODO update to have generic image center
+        phase_center=SkyCoord(
+            Tx=0.0 * apu.arcsec, Ty=0.0 * apu.arcsec, frame=Projective
+        ),  # TODO update to have generic image center
     )
 
     return bp_arr
@@ -308,19 +318,19 @@ def generate_header(vis: Visibilities, *, shape: Quantity[apu.pix], pixel_size: 
     -------
     :
     """
-    header = {
-        "crval1": (vis.phase_center[1]).to_value(apu.arcsec),
-        "crval2": (vis.phase_center[0]).to_value(apu.arcsec),
-        "cdelt1": (pixel_size[1] * apu.pix).to_value(apu.arcsec),
-        "cdelt2": (pixel_size[0] * apu.pix).to_value(apu.arcsec),
-        "ctype1": "HPLN-TAN",
-        "ctype2": "HPLT-TAN",
-        "naxis": 2,
-        "naxis1": shape[1].value,
-        "naxis2": shape[0].value,
-        "cunit1": "arcsec",
-        "cunit2": "arcsec",
-    }
+    cunit = apu.arcsec
+    phase_center = vis.phase_center
+    header = celestial_frame_to_wcs(phase_center.frame).to_header()
+    header["crval1"] = (phase_center.Tx).to_value(cunit)
+    header["crval2"] = (phase_center.Ty).to_value(cunit)
+    header["crpix1"] = shape[1].to_value(apu.pix) / 2
+    header["crpix2"] = shape[0].to_value(apu.pix) / 2
+    header["cdelt1"] = (pixel_size[1] * apu.pix).to_value(cunit)
+    header["cdelt2"] = (pixel_size[0] * apu.pix).to_value(cunit)
+    header["naxis1"] = shape[1].value
+    header["naxis2"] = shape[0].value
+    header["cunit1"] = str(cunit)
+    header["cunit2"] = str(cunit)
     return header
 
 
@@ -352,6 +362,7 @@ def map_to_vis(amap: GenericMap, *, u: Quantity[1 / apu.arcsec], v: Quantity[1 /
         new_pos[1] = float(meta["crval1"])
     if "crval2" in meta:
         new_pos[0] = float(meta["crval2"])
+    new_pos = SkyCoord(Tx=new_pos[1] * apu.arcsec, Ty=new_pos[0] * apu.arcsec, frame=Projective)
 
     new_psize = np.array([1.0, 1.0])
     if "cdelt1" in meta:
@@ -359,8 +370,6 @@ def map_to_vis(amap: GenericMap, *, u: Quantity[1 / apu.arcsec], v: Quantity[1 /
     if "cdelt2" in meta:
         new_psize[0] = float(meta["cdelt2"])
 
-    vis = image_to_vis(
-        amap.quantity, u=u, v=v, pixel_size=new_psize * apu.arcsec / apu.pix, phase_center=new_pos * apu.arcsec
-    )
+    vis = image_to_vis(amap.quantity, u=u, v=v, pixel_size=new_psize * apu.arcsec / apu.pix, phase_center=new_pos)
 
     return vis

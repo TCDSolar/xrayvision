@@ -12,8 +12,11 @@ from typing import Union, Optional
 import astropy.units as apu
 import numpy as np
 import numpy.typing as npt
+from astropy.coordinates import SkyCoord
 from astropy.units import Quantity
 from astropy.units.core import UnitsError
+
+from xrayvision.coordinates.frames import Projective
 
 __all__ = ["generate_xy", "generate_uv", "dft_map", "idft_map"]
 
@@ -122,13 +125,14 @@ def generate_uv(
     return x
 
 
-@apu.quantity_input()
 def dft_map(
     input_array: Union[Quantity, npt.NDArray],
     *,
     u: Quantity[1 / apu.arcsec],
     v: Quantity[1 / apu.arcsec],
-    phase_center: Quantity[apu.arcsec] = (0.0, 0.0) * apu.arcsec,
+    phase_center: Union[SkyCoord, Quantity[apu.arcsec]] = SkyCoord(
+        Tx=0.0 * apu.arcsec, Ty=0.0 * apu.arcsec, frame=Projective
+    ),
     pixel_size: Quantity[apu.arcsec / apu.pix] = (1.0, 1.0) * apu.arcsec / apu.pix,
 ) -> Union[Quantity, npt.NDArray]:
     r"""
@@ -142,8 +146,8 @@ def dft_map(
         Array of 2xN u coordinates where the visibilities are evaluated.
     v :
         Array of 2xN v coordinates where the visibilities are evaluated.
-    phase_center :
-        Coordinates of the phase_center of the map e.g. ``(0,0)`` or ``[5.0, -2.0]``.
+    phase_center : `astropy.coordinates.SkyCoord`
+        Coordinates of the phase_center of the map.
     pixel_size : `float` (dx, dy), optional
         The pixel size need not be square e.g. ``(1, 3)``.
 
@@ -153,10 +157,12 @@ def dft_map(
         Array of N `complex` visibilities evaluated at the given `u`, `v` coordinates.
 
     """
+    if isinstance(phase_center, apu.Quantity):
+        phase_center = SkyCoord(Tx=phase_center[1], Ty=phase_center[0], frame=Projective)
     m, n = input_array.shape * apu.pix
     # python array index in row, column hence y, x
-    y = generate_xy(m, phase_center=phase_center[0], pixel_size=pixel_size[0])  # type: ignore
-    x = generate_xy(n, phase_center=phase_center[1], pixel_size=pixel_size[1])  # type: ignore
+    y = generate_xy(m, phase_center=phase_center.Ty, pixel_size=pixel_size[0])  # type: ignore
+    x = generate_xy(n, phase_center=phase_center.Tx, pixel_size=pixel_size[1])  # type: ignore
 
     x, y = np.meshgrid(x, y)
     uv = np.vstack([u, v])
@@ -183,7 +189,6 @@ def dft_map(
         )
 
 
-@apu.quantity_input
 def idft_map(
     input_vis: Union[Quantity, npt.NDArray],
     *,
@@ -191,7 +196,9 @@ def idft_map(
     v: Quantity[1 / apu.arcsec],
     shape: Quantity[apu.pix],
     weights: Optional[npt.NDArray] = None,
-    phase_center: Quantity[apu.arcsec] = (0.0, 0.0) * apu.arcsec,
+    phase_center: Union[SkyCoord, Quantity[apu.arcsec]] = SkyCoord(
+        Tx=0.0 * apu.arcsec, Ty=0.0 * apu.arcsec, frame=Projective
+    ),
     pixel_size: Quantity[apu.arcsec / apu.pix] = (1.0, 1.0) * apu.arcsec / apu.pix,
 ) -> Union[Quantity, npt.NDArray]:
     r"""
@@ -209,8 +216,8 @@ def idft_map(
         The shape of the output array to create.
     weights :
         Array of weights for visibilities.
-    phase_center :
-        Coordinates of the phase_center of the map e.g. ``(0,0)`` or ``[5.0, -2.0]``.
+    phase_center : `astropy.coordinates.SkyCoord`
+        Coordinates of the phase_center of the map.
     pixel_size :
         The pixel size this need not be square e.g. ``(1, 3)``.
 
@@ -220,10 +227,12 @@ def idft_map(
         2D image obtained from the visibilities evaluated at the given `u`, `v` coordinates.
 
     """
+    if isinstance(phase_center, apu.Quantity):
+        phase_center = SkyCoord(Tx=phase_center[1], Ty=phase_center[0], frame=Projective)
     m, n = shape
     # python array index in row, column hence y, x
-    y = generate_xy(m, phase_center=phase_center[0], pixel_size=pixel_size[0])  # type: ignore
-    x = generate_xy(n, phase_center=phase_center[1], pixel_size=pixel_size[1])  # type: ignore
+    y = generate_xy(m, phase_center=phase_center.Ty, pixel_size=pixel_size[0])  # type: ignore
+    x = generate_xy(n, phase_center=phase_center.Tx, pixel_size=pixel_size[1])  # type: ignore
 
     x, y = np.meshgrid(x, y)
 

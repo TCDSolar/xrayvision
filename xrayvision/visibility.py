@@ -18,6 +18,8 @@ from astropy.coordinates import SkyCoord
 from astropy.time import Time
 from astropy.units import Quantity
 
+from xrayvision.coordinates.frames import Projective
+
 __all__ = ["Visibility", "Visibilities", "VisMeta", "VisibilitiesABC", "VisMetaABC"]
 
 
@@ -89,7 +91,7 @@ class VisibilitiesABC(abc.ABC):
 
     @property
     @abc.abstractmethod
-    def phase_center(self) -> apu.Quantity[apu.deg]:
+    def phase_center(self) -> SkyCoord:
         """
         The position of the phase center of the visibilities.
         """
@@ -192,13 +194,14 @@ class VisMeta(VisMetaABC, dict):
 
 
 class Visibilities(VisibilitiesABC):
-    @apu.quantity_input()
     def __init__(
         self,
         visibilities: apu.Quantity,
         u: apu.Quantity[1 / apu.deg],
         v: apu.Quantity[1 / apu.deg],
-        phase_center: apu.Quantity[apu.arcsec] = [0, 0] * apu.arcsec,
+        phase_center: Optional[Union[SkyCoord, apu.Quantity[apu.arcsec]]] = SkyCoord(
+            Tx=0 * apu.arcsec, Ty=0 * apu.arcsec, frame=Projective
+        ),
         meta: Optional[VisMetaABC] = None,
         uncertainty: Optional[apu.Quantity] = None,
         amplitude: Optional[apu.Quantity] = None,
@@ -217,9 +220,13 @@ class Visibilities(VisibilitiesABC):
             Array of `u` coordinates where visibilities will be evaluated.
         v :
             Array of `v` coordinates where visibilities will be evaluated.
-        phase_center : `astropy.units.Quantity` with angular unit.
-            The location of the phase center of the visibilities.
-            Default = [0, 0] arcsec
+        phase_center : `astropy.coordinates.SkyCoord` or `astropy.units.Quantity`.
+            The location of the phase center of the visibilities. If Quantity,
+            must be length-2 and in angular units.  Assumed to represent the
+            (lat, lon) coordinates of a projective coordinate system and is
+            converted to a SkyCoord in the
+            `xrayvision.coordinates.frames.Projective` frame.
+            Default = SkyCoord(Tx=0*u.arcsec, Ty=0*u.arcsec, frame=Projective)
         meta :
             Metadata associated with the visibilities.
             In order to use this Visibilities object to make a Map, ``meta``
@@ -261,6 +268,18 @@ class Visibilities(VisibilitiesABC):
             raise ValueError("u must be the same length as visibilities.")
         if len(v) != nvis:
             raise ValueError("v must be the same length as visibilities.")
+        if isinstance(phase_center, apu.Quantity):
+            if len(phase_center) != 2:
+                raise ValueError("If phase_center is a Quantity, it must be of length 2.")
+            phase_center = SkyCoord(Tx=phase_center[1], Ty=phase_center[0], frame=Projective)
+        elif isinstance(phase_center, SkyCoord):
+            if not phase_center.isscalar:
+                if len(phase_center) == 1:
+                    phase_center = phase_center[0]
+                else:
+                    raise TypeError("phase_center must be a scalar SkyCoord.")
+        else:
+            raise TypeError("phase_center must be a scalar SkyCoord.")
         if uncertainty is not None and uncertainty.shape != visibilities.shape:
             raise TypeError("uncertainty must be same shape as visibilities.")
         if amplitude is not None and amplitude.shape != visibilities.shape:
@@ -336,7 +355,7 @@ class Visibilities(VisibilitiesABC):
         return self._phase_center
 
     @phase_center.setter
-    def phase_center(self, value: apu.Quantity[apu.deg]):
+    def phase_center(self, value: SkyCoord):
         self._phase_center = value
 
     @property
@@ -462,7 +481,7 @@ class Visibilities(VisibilitiesABC):
             return False
         if not apu.quantity.allclose(self.v, other.v):
             return False
-        if not apu.quantity.allclose(self.phase_center, other.phase_center):
+        if self.phase_center != other.phase_center:
             return False
         if not apu.quantity.allclose(self.amplitude, other.amplitude):
             return False

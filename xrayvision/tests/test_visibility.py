@@ -1,12 +1,13 @@
 import astropy.units as apu
 import numpy as np
 import pytest
-from astropy.coordinates import get_body
+from astropy.coordinates import SkyCoord, get_body
 from astropy.tests.helper import assert_quantity_allclose
 from astropy.time import Time
 from numpy.testing import assert_array_equal
 
 import xrayvision.visibility as vm
+from xrayvision.coordinates.frames import Projective
 from xrayvision.visibility import Visibilities, Visibility
 
 
@@ -18,7 +19,7 @@ def test_visibilities():
     assert vis.visibilities == 1 * apu.ct
     assert vis.u == 1 / apu.deg
     assert vis.v == 1 / apu.deg
-    assert_array_equal([0, 0] * apu.arcsec, vis.phase_center)
+    assert vis.phase_center == SkyCoord(Tx=0 * apu.arcsec, Ty=0 * apu.arcsec, frame=Projective)
 
 
 def test_visibility():
@@ -48,7 +49,7 @@ def visibilities(vis_meta):
     visibilities = [1 + 2 * 1j, 3 + 3 * 1j] * apu.ct
     u = [0.023, -0.08] * 1 / apu.arcsec
     v = [-0.0013, 0.013] * 1 / apu.arcsec
-    phase_center = [0, 0] * apu.arcsec
+    phase_center = SkyCoord(Tx=0 * apu.arcsec, Ty=0 * apu.arcsec, frame=Projective)
     unc = [0.01, 0.15] * apu.ct
     return vm.Visibilities(visibilities, u, v, phase_center, uncertainty=unc, meta=vis_meta)
 

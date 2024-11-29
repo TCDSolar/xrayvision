@@ -1,0 +1,1 @@
+Add `~xrayvision.coordinates.frames.Projective` coordinate frame. This is intended to represent the projective coordinate system of images with unknown pointing.

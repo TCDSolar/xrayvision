@@ -2,9 +2,11 @@ import astropy.units as apu
 import numpy as np
 import pytest
 from astropy.convolution.kernels import Gaussian2DKernel
-from numpy.testing import assert_allclose, assert_array_equal
+from astropy.coordinates import SkyCoord
+from numpy.testing import assert_allclose
 from sunpy.map import Map
 
+from xrayvision.coordinates.frames import Projective
 from xrayvision.imaging import image_to_vis, map_to_vis, vis_psf_image, vis_to_image, vis_to_map
 from xrayvision.transform import dft_map, generate_uv, idft_map
 from xrayvision.visibility import Visibilities
@@ -127,7 +129,7 @@ def test_image_to_vis():
 
     # For an empty map visibilities should all be zero (0+0j)
     empty_vis = image_to_vis(image, u=v, v=v)
-    assert np.array_equal(empty_vis.phase_center, (0.0, 0.0) * apu.arcsec)
+    assert empty_vis.phase_center == SkyCoord(Tx=0.0 * apu.arcsec, Ty=0.0 * apu.arcsec, frame=Projective)
     assert np.array_equal(empty_vis.visibilities, np.zeros(n * m, dtype=complex))
 
 
@@ -144,8 +146,9 @@ def test_image_to_vis_center():
     u, v = np.array([u, v]).reshape(2, size) / apu.arcsec
 
     # For an empty map visibilities should all be zero (0+0j)
-    empty_vis = image_to_vis(image, u=u, v=v, phase_center=(2.0, -3.0) * apu.arcsec)
-    assert np.array_equal(empty_vis.phase_center, (2.0, -3.0) * apu.arcsec)
+    phase_center = SkyCoord(Tx=2 * apu.arcsec, Ty=-3.0 * apu.arcsec, frame=Projective)
+    empty_vis = image_to_vis(image, u=u, v=v, phase_center=phase_center)
+    assert empty_vis.phase_center == phase_center
     assert np.array_equal(empty_vis.visibilities, np.zeros(n * m, dtype=complex))
 
 
@@ -181,7 +184,7 @@ def test_map_to_vis(pos, pixel):
     mp = Map((data, header))
     vis = map_to_vis(mp, u=u, v=v)
 
-    assert_array_equal(vis.phase_center, pos)
+    assert vis.phase_center == SkyCoord(Tx=pos[1], Ty=pos[0], frame=Projective)
 
     res = vis_to_image(vis, shape=(m, n) * apu.pixel, pixel_size=pixel)
     assert_allclose(res, data)
