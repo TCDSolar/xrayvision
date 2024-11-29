@@ -584,6 +584,7 @@ def mem(
     maxiter: int = 1000,
     tol: float = 1e-3,
     map: bool = True,
+    total_flux: Optional[Quantity] = None,
 ) -> Union[Quantity, NDArray[np.float64]]:
     r"""
     Maximum Entropy Method visibility based image reconstruction
@@ -605,11 +606,16 @@ def mem(
         tolerance value used in the stopping rule ( || x - x_old || <= tol || x_old ||)
     map :
         Return a sunpy map or bare array
+    total_flux :
+        The total flux/counts contained in the image.
+        If not set, total_flux is estimated using `_estimate_flux`.
+
     Returns
     -------
 
     """
-    total_flux = _estimate_flux(vis, shape, pixel_size)
+    if total_flux is None:
+        total_flux = _estimate_flux(vis, shape, pixel_size)
 
     mean_vis = _get_mean_visibilities(vis, shape, pixel_size)
     Hv, Lip, Visib = _prepare_for_optimise(pixel_size, shape, mean_vis)
