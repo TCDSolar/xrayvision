@@ -8,24 +8,24 @@ from sunpy.sun.constants import radius as _RSUN
 __all__ = ["Projective"]
 
 
-X_CTYPE = "PJLN-TAN"
-Y_CTYPE = "PJLT-TAN"
+X_CTYPE = "PJLN"
+Y_CTYPE = "PJLT"
 
 
 class Projective(SunPyBaseCoordinateFrame):
-    """A generic projective coordinate frame for a imaging taken by an arbitrary imager."""
+    """A generic projective coordinate frame for an image taken by an arbitrary imager."""
 
     observer = ObserverCoordinateAttribute(HeliographicStonyhurst)
     rsun = astropy.coordinates.QuantityAttribute(default=_RSUN, unit=u.km)
     frame_specific_representation_info = {
         astropy.coordinates.SphericalRepresentation: [
-            astropy.coordinates.RepresentationMapping("lon", "Tx", u.arcsec),
-            astropy.coordinates.RepresentationMapping("lat", "Ty", u.arcsec),
+            astropy.coordinates.RepresentationMapping("lon", u.arcsec),
+            astropy.coordinates.RepresentationMapping("lat", u.arcsec),
             astropy.coordinates.RepresentationMapping("distance", "distance"),
         ],
         astropy.coordinates.UnitSphericalRepresentation: [
-            astropy.coordinates.RepresentationMapping("lon", "Tx", u.arcsec),
-            astropy.coordinates.RepresentationMapping("lat", "Ty", u.arcsec),
+            astropy.coordinates.RepresentationMapping("lon", u.arcsec),
+            astropy.coordinates.RepresentationMapping("lat", u.arcsec),
         ],
     }
 
@@ -113,8 +113,8 @@ astropy.wcs.utils.WCS_FRAME_MAPPINGS.insert(1, [projective_wcs_to_frame])
 astropy.wcs.utils.FRAME_WCS_MAPPINGS.insert(1, [projective_frame_to_wcs])
 
 PROJECTIVE_CTYPE_TO_UCD1 = {
-    "SXLT": "custom:pos.projective.lat",
-    "SXLN": "custom:pos.projective.lon",
-    "SXRZ": "custom:pos.projective.z",
+    "PJLT": "custom:pos.projective.lat",
+    "PJLN": "custom:pos.projective.lon",
+    "PJRZ": "custom:pos.projective.z",
 }
 astropy.wcs.wcsapi.fitswcs.CTYPE_TO_UCD1.update(PROJECTIVE_CTYPE_TO_UCD1)
