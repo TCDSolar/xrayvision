@@ -606,7 +606,7 @@ def mem(
         tolerance value used in the stopping rule ( || x - x_old || <= tol || x_old ||)
     map :
         Return a sunpy map or bare array
-    total_flux : `astropy.units.Quantity` (optional)
+    total_flux :
         The total flux/counts contained in the image.
         If not set, total_flux is estimated using `_estimate_flux`.
 
