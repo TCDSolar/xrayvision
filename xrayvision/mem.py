@@ -584,7 +584,7 @@ def mem(
     maxiter: int = 1000,
     tol: float = 1e-3,
     map: bool = True,
-    total_flux=None,
+    total_flux=Optional[Quantity]
 ) -> Union[Quantity, NDArray[np.float64]]:
     r"""
     Maximum Entropy Method visibility based image reconstruction
