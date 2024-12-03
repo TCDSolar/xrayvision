@@ -47,7 +47,7 @@ def projective_wcs_to_frame(wcs):
         return wcs.coordinate_frame
 
     # Not a lat,lon coordinate system bail out early
-    if set(wcs.wcs.ctype) != {X_CTYPE, Y_CTYPE}:
+    if X_CTYPE not in wcs.wcs.ctype[0] or Y_CTYPE not in wcs.wcs.ctype[1]:
         return None
 
     dateavg = wcs.wcs.dateobs
