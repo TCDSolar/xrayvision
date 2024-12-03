@@ -85,9 +85,13 @@ def projective_frame_to_wcs(frame, projection="TAN"):
     -------
     `astropy.wcs.WCS`
     """
-    # Bail out early if not STIXImaging frame
+    # Bail out early if not Projective frame
     if not isinstance(frame, Projective):
         return None
+    else:
+        conjunction = "-"
+        ctype = [conjunction.join([X_CTYPE, projection]), conjunction.join([Y_CTYPE, projection])]
+        cunit = ["arcsec"] * 2
 
     wcs = WCS(naxis=2)
     wcs.wcs.aux.rsun_ref = frame.rsun.to_value(u.m)
@@ -102,8 +106,8 @@ def projective_frame_to_wcs(frame, projection="TAN"):
     wcs.wcs.aux.dsun_obs = obs_frame.radius.to_value(u.m)
 
     wcs.wcs.dateobs = frame.obstime.utc.iso
-    wcs.wcs.cunit = ["arcsec", "arcsec"]
-    wcs.wcs.ctype = [X_CTYPE, Y_CTYPE]
+    wcs.wcs.cunit = cunit
+    wcs.wcs.ctype = ctype
 
     return wcs
 

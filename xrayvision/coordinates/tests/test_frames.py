@@ -15,7 +15,7 @@ def projective_wcs():
     w.wcs.crpix = [10, 20]
     w.wcs.cdelt = np.array([2, 2])
     w.wcs.crval = [0, 0]
-    w.wcs.ctype = ["PJLN", "PJLT"]
+    w.wcs.ctype = ["PJLN-TAN", "PJLT-TAN"]
 
     w.wcs.aux.hgln_obs = 10
     w.wcs.aux.hglt_obs = 20
@@ -58,7 +58,7 @@ def test_projective_frame_to_wcs(projective_frame):
     wcs = projective_frame_to_wcs(projective_frame)
 
     assert isinstance(wcs, WCS)
-    assert wcs.wcs.ctype[0] == "PJLN"
+    assert wcs.wcs.ctype[0] == "PJLN-TAN"
     assert wcs.wcs.cunit[0] == "arcsec"
     assert wcs.wcs.dateobs == "2024-01-01 00:00:00.000"
 
