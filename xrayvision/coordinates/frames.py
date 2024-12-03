@@ -19,13 +19,13 @@ class Projective(SunPyBaseCoordinateFrame):
     rsun = astropy.coordinates.QuantityAttribute(default=_RSUN, unit=u.km)
     frame_specific_representation_info = {
         astropy.coordinates.SphericalRepresentation: [
-            astropy.coordinates.RepresentationMapping("lon", u.arcsec),
-            astropy.coordinates.RepresentationMapping("lat", u.arcsec),
+            astropy.coordinates.RepresentationMapping("lon", "Tx", u.arcsec),
+            astropy.coordinates.RepresentationMapping("lat", "Ty", u.arcsec),
             astropy.coordinates.RepresentationMapping("distance", "distance"),
         ],
         astropy.coordinates.UnitSphericalRepresentation: [
-            astropy.coordinates.RepresentationMapping("lon", u.arcsec),
-            astropy.coordinates.RepresentationMapping("lat", u.arcsec),
+            astropy.coordinates.RepresentationMapping("lon", "Tx", u.arcsec),
+            astropy.coordinates.RepresentationMapping("lat", "Ty", u.arcsec),
         ],
     }
 
