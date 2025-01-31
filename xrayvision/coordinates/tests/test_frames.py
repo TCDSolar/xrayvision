@@ -25,12 +25,33 @@ def projective_wcs():
 
 
 @pytest.fixture
+def projective_wcs_no_observer():
+    w = WCS(naxis=2)
+
+    w.wcs.dateobs = "2024-01-01 00:00:00.000"
+    w.wcs.crpix = [10, 20]
+    w.wcs.cdelt = np.array([2, 2])
+    w.wcs.crval = [0, 0]
+    w.wcs.ctype = ["PJLN-TAN", "PJLT-TAN"]
+
+    return w
+
+
+@pytest.fixture
 def projective_frame():
     obstime = "2024-01-01"
     observer = HeliographicStonyhurst(10 * u.deg, 20 * u.deg, 1.5e11 * u.m, obstime=obstime)
 
     frame_args = {"obstime": obstime, "observer": observer, "rsun": 695_700_000 * u.m}
 
+    frame = Projective(**frame_args)
+    return frame
+
+
+@pytest.fixture
+def projective_frame_no_obsever():
+    obstime = "2024-01-01"
+    frame_args = {"obstime": obstime, "rsun": 695_700_000 * u.m}
     frame = Projective(**frame_args)
     return frame
 
@@ -44,6 +65,15 @@ def test_projective_wcs_to_frame(projective_wcs):
     assert frame.observer == HeliographicStonyhurst(
         10 * u.deg, 20 * u.deg, 1.5e11 * u.m, obstime="2024-01-01T00:00:00.000"
     )
+
+
+def test_projective_wcs_no_observer_to_frame(projective_wcs_no_observer):
+    frame = projective_wcs_to_frame(projective_wcs_no_observer)
+    assert isinstance(frame, Projective)
+
+    assert frame.obstime.isot == "2024-01-01T00:00:00.000"
+    assert frame.rsun == 695700 * u.km
+    assert frame.observer is None
 
 
 def test_projective_wcs_to_frame_none():
@@ -66,6 +96,15 @@ def test_projective_frame_to_wcs(projective_frame):
     assert wcs.wcs.aux.dsun_obs == 1.5e11
     assert wcs.wcs.aux.hgln_obs == 10
     assert wcs.wcs.aux.hglt_obs == 20
+
+
+def test_projective_frame_no_oberver(projective_frame_no_obsever):
+    wcs = projective_frame_to_wcs(projective_frame_no_obsever)
+
+    assert isinstance(wcs, WCS)
+    assert wcs.wcs.ctype[0] == "PJLN-TAN"
+    assert wcs.wcs.cunit[0] == "arcsec"
+    assert wcs.wcs.dateobs == "2024-01-01 00:00:00.000"
 
 
 def test_projective_frame_to_wcs_none():

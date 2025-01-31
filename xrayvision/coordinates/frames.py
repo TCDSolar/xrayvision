@@ -1,8 +1,9 @@
 import astropy.coordinates
 import astropy.units as u
+from astropy.coordinates import QuantityAttribute
 from astropy.wcs import WCS
 from sunpy.coordinates.frameattributes import ObserverCoordinateAttribute
-from sunpy.coordinates.frames import HeliographicStonyhurst, SunPyBaseCoordinateFrame
+from sunpy.coordinates.frames import HeliographicCarrington, HeliographicStonyhurst, SunPyBaseCoordinateFrame
 from sunpy.sun.constants import radius as _RSUN
 
 __all__ = ["Projective"]
@@ -13,10 +14,10 @@ Y_CTYPE = "PJLT"
 
 
 class Projective(SunPyBaseCoordinateFrame):
-    """A generic projective coordinate frame for an image taken by an arbitrary imager."""
+    """A generic projective coordinate frame for an arbitrary observer."""
 
     observer = ObserverCoordinateAttribute(HeliographicStonyhurst)
-    rsun = astropy.coordinates.QuantityAttribute(default=_RSUN, unit=u.km)
+    rsun = QuantityAttribute(default=_RSUN, unit=u.km)
     frame_specific_representation_info = {
         astropy.coordinates.SphericalRepresentation: [
             astropy.coordinates.RepresentationMapping("lon", "Tx", u.arcsec),
@@ -52,17 +53,33 @@ def projective_wcs_to_frame(wcs):
 
     dateavg = wcs.wcs.dateobs
 
+    # Get observer coordinate from the WCS auxiliary information
+    # Note: the order of the entries is important, as it determines which set
+    # of header keys is given priority below. Stonyhurst should usually be
+    # prioritized, as it is defined more consistently across implementations,
+    # and so it should occur before Carrington here.
+    required_attrs = {
+        HeliographicStonyhurst: ["hgln_obs", "hglt_obs", "dsun_obs"],
+        HeliographicCarrington: ["crln_obs", "hglt_obs", "dsun_obs"],
+    }
+
+    # Get rsun from the WCS auxiliary information
     rsun = wcs.wcs.aux.rsun_ref
     if rsun is not None:
         rsun *= u.m
 
-    hgs_longitude = wcs.wcs.aux.hgln_obs
-    hgs_latitude = wcs.wcs.aux.hglt_obs
-    hgs_distance = wcs.wcs.aux.dsun_obs
+    observer = None
+    for frame, attr_names in required_attrs.items():
+        attrs = [getattr(wcs.wcs.aux, attr_name) for attr_name in attr_names]
+        if all([attr is not None for attr in attrs]):
+            kwargs = {"obstime": dateavg}
+            if rsun is not None:
+                kwargs["rsun"] = rsun
+            if issubclass(frame, HeliographicCarrington):
+                kwargs["observer"] = "self"
 
-    observer = HeliographicStonyhurst(
-        lat=hgs_latitude * u.deg, lon=hgs_longitude * u.deg, radius=hgs_distance * u.m, obstime=dateavg, rsun=rsun
-    )
+            observer = frame(attrs[0] * u.deg, attrs[1] * u.deg, attrs[2] * u.m, **kwargs)
+            break
 
     frame_args = {"obstime": dateavg, "observer": observer, "rsun": rsun}
 
@@ -101,9 +118,10 @@ def projective_frame_to_wcs(frame, projection="TAN"):
     if hasattr(obs_frame, "frame"):
         obs_frame = frame.observer.frame
 
-    wcs.wcs.aux.hgln_obs = obs_frame.lon.to_value(u.deg)
-    wcs.wcs.aux.hglt_obs = obs_frame.lat.to_value(u.deg)
-    wcs.wcs.aux.dsun_obs = obs_frame.radius.to_value(u.m)
+    if obs_frame is not None:
+        wcs.wcs.aux.hgln_obs = obs_frame.lon.to_value(u.deg)
+        wcs.wcs.aux.hglt_obs = obs_frame.lat.to_value(u.deg)
+        wcs.wcs.aux.dsun_obs = obs_frame.radius.to_value(u.m)
 
     wcs.wcs.dateobs = frame.obstime.utc.iso
     wcs.wcs.cunit = cunit
