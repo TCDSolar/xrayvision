@@ -300,7 +300,7 @@ class Visibilities(VisibilitiesABC):
         if phase is not None:
             data[self._phase_key] = (dims, phase.value.to_value(visibilities.unit))
             units[self._phase_key] = phase.unit
-        if phase_uncertainty is not None:
+        if phase_uncertainty is not None and phase is not None:
             data[self._phase_uncert_key] = (dims, phase_uncertainty.to_value(phase.unit))
         if meta is None:
             meta = VisMeta()
