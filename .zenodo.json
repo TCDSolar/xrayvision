@@ -1,0 +1,39 @@
+{
+    "description": "xrayvision is a software library that provides image reconstruction methods for indirect or Fourier based instruments in Python",
+    "license": "BSD-3-Clause",
+    "title": "xrayvision",
+    "upload_type": "software",
+    "creators": [
+        {
+            "name": "Shane Maloney",
+            "orcid": "0000-0002-4715-1805",
+            "affiliation": "Dublin Institute for Advanced Studies"
+        },
+        {
+            "name": "Gábor Péterffy",
+            "orcid": "",
+            "affiliation": ""
+        },
+        {
+            "name": "Daniel F. Ryan",
+            "orcid": "0000-0001-8661-3825",
+            "affiliation": "University College London, Mullard Space Science Laboratory (UCL/MSSL)"
+        },
+        {
+            "name": "David Pérez-Suárez",
+            "orcid": "0000-0003-0784-6909",
+            "affiliation": "University College London"
+        },
+        {
+            "name": "Paolo Massa",
+            "orcid": "",
+            "affiliation": ""
+        },
+        {
+            "name": "Volpara, Anna",
+            "orcid": "",
+            "affiliation": ""
+        }
+    ],
+    "access_right": "open"
+}
