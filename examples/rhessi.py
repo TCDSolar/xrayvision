@@ -21,8 +21,7 @@ from xrayvision.visibility import Visibilities, VisMeta
 # file
 
 hdul = fits.open(
-    "https://hesperia.gsfc.nasa.gov/rhessi_extras/visibility_fits_v2/"
-    "2002/02/21/hsi_vis_20020221_2357_0054_46tx3e.fits"
+    "https://hesperia.gsfc.nasa.gov/rhessi_extras/visibility_fits_v2/2002/02/21/hsi_vis_20020221_2357_0054_46tx3e.fits"
 )
 
 ###############################################################################

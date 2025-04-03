@@ -178,9 +178,7 @@ def dft_map(
 
         return vis
     else:
-        raise UnitsError(
-            "Incompatible units on uv {uv.unit} should cancel with xy " "to leave a dimensionless quantity"
-        )
+        raise UnitsError("Incompatible units on uv {uv.unit} should cancel with xy to leave a dimensionless quantity")
 
 
 @apu.quantity_input
@@ -249,9 +247,7 @@ def idft_map(
 
         return np.real(image)
     else:
-        raise UnitsError(
-            "Incompatible units on uv {uv.unit} should cancel with xy " "to leave a dimensionless quantity"
-        )
+        raise UnitsError("Incompatible units on uv {uv.unit} should cancel with xy to leave a dimensionless quantity")
 
 
 # def dft(im, uv):

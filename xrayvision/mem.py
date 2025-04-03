@@ -493,7 +493,7 @@ def _optimise_fb(Hv, Visib, Lip, flux, lambd, shape, pixel, maxiter, tol):
             check = False
             n_iterations += pi
         else:
-            x[:] = p
+            x[:] = p.real
             J = Jp
             n_iterations = 0
 
