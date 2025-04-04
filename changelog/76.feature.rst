@@ -1,1 +1,0 @@
-Add `~xrayvision.coordinates.frames.Projective` coordinate frame to represent generic observer based projective coordinate system.

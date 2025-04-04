@@ -1,1 +1,0 @@
-Fix a bug where the x, y dimensions were not being treated consistently in :mod:`xrayvision.transform`.

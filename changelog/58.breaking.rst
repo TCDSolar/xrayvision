@@ -1,2 +1,0 @@
-Optional parameters are now keyword only for the :mod:`xrayvision.transform`, :mod:`xrayvision.imaging` and :mod:`xrayvision.visibility` modules.
-Remove ``natural`` keyword in favour of ``scheme`` keyword which can be either 'natural' or 'uniform'.

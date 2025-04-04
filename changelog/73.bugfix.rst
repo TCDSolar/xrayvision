@@ -1,1 +1,0 @@
-Fix bug introduced in recent refactor where images were transposed due to array vs cartesian array indexing.
