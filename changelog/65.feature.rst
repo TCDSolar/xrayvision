@@ -1,1 +1,0 @@
-Add ``__getitem__`` and `~xrayvision.visibility.Visibilities.index_by_label` methods to slice visibilities by index or based on their label.
