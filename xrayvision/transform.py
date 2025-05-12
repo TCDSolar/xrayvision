@@ -161,10 +161,8 @@ def dft_map(
     x, y = np.meshgrid(x, y)
     uv = np.vstack([u, v])
     # Check units are correct for exp need to be dimensionless and then remove units for speed
-    if (uv[0, :] * x[0, 0]).unit == apu.dimensionless_unscaled and (
-        uv[1, :] * y[0, 0]
-    ).unit == apu.dimensionless_unscaled:
-        uv = uv.value  # type: ignore
+    if (uv.unit * x.unit) == apu.dimensionless_unscaled and (uv.unit * y.unit) == apu.dimensionless_unscaled:
+        uv = uv.value  # src_type: ignore
         x = x.value
         y = y.value
 

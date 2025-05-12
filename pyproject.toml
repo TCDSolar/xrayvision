@@ -91,7 +91,7 @@ version_file = "xrayvision/_version.py"
 
 [tool.mypy]
 disable_error_code = "import-untyped"
-python_version = "py39"
+python_version = "3.9"
 
 [ tool.gilesbot ]
 
