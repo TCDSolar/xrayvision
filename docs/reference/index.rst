@@ -14,5 +14,6 @@ Reference
    visibility
    uv-smooth
    bibliography
+   forward_fit
 
    ../whatsnew/index

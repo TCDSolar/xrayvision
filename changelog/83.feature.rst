@@ -1,0 +1,1 @@
+Add analytical circular and elliptical Gaussian sources and a Gaussian-component loop model, with visibility forward fitting using SciPy or particle swarm optimisation. Support source composition, per-source bounds, and angular quantity inputs through `~xrayvision.vis_forward_fit.forward_fit.vis_forward_fit`.
