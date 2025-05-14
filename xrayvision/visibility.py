@@ -162,7 +162,7 @@ class VisMeta(VisMetaABC, dict):
 
     def _check_input_type_and_unit(self, key, key_type, unit=None, equivalencies=None):
         value = self.get(key, None)
-        if not isinstance(value, (key_type, type(None))):
+        if not isinstance(value, (key_type | type(None))):
             raise KeyError(f"Inputs must include a key, '{key}', that gives a {key_type}.")
         if unit is not None and value is not None and not value.unit.is_equivalent(unit, equivalencies=equivalencies):
             raise ValueError(f"'{key}' must have angular units.")
