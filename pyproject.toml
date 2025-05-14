@@ -185,4 +185,3 @@ ignore = [
   directory = "trivial"
   name = "Internal Changes"
   showcontent = true
-
