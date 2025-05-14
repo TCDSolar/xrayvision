@@ -196,4 +196,3 @@ MY = "No SunPy projects make heavy use of types"
   directory = "trivial"
   name = "Internal Changes"
   showcontent = true
-

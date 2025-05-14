@@ -221,8 +221,8 @@ def idft_map(
     """
     m, n = shape
     # python array index in row, column hence y, x
-    y = generate_xy(m, phase_center=phase_center[0], pixel_size=pixel_size[0])
-    x = generate_xy(n, phase_center=phase_center[1], pixel_size=pixel_size[1])
+    y = generate_xy(m, phase_center=phase_center[0], pixel_size=pixel_size[0])  # type: ignore
+    x = generate_xy(n, phase_center=phase_center[1], pixel_size=pixel_size[1])  # type: ignore
 
     x, y = np.meshgrid(x, y)
 
