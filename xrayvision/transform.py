@@ -7,8 +7,6 @@ takes inputs which have positional information `dft_map` and the inverse `idft_m
 
 """
 
-from typing import Union, Optional
-
 import astropy.units as apu
 import numpy as np
 import numpy.typing as npt
@@ -22,8 +20,8 @@ __all__ = ["generate_xy", "generate_uv", "dft_map", "idft_map"]
 def generate_xy(
     number_pixels: Quantity[apu.pix],
     *,
-    phase_center: Optional[Quantity[apu.arcsec]] = 0.0 * apu.arcsec,
-    pixel_size: Optional[Quantity[apu.arcsec / apu.pix]] = 1.0 * apu.arcsec / apu.pix,
+    phase_center: Quantity[apu.arcsec] | None = 0.0 * apu.arcsec,
+    pixel_size: Quantity[apu.arcsec / apu.pix] | None = 1.0 * apu.arcsec / apu.pix,
 ) -> Quantity[apu.arcsec]:
     """
     Generate the x or y coordinates given the number of pixels, phase_center and pixel size.
@@ -70,8 +68,8 @@ def generate_xy(
 def generate_uv(
     number_pixels: Quantity[apu.pix],
     *,
-    phase_center: Optional[Quantity[apu.arcsec]] = 0.0 * apu.arcsec,
-    pixel_size: Optional[Quantity[apu.arcsec / apu.pix]] = 1.0 * apu.arcsec / apu.pix,
+    phase_center: Quantity[apu.arcsec] | None = 0.0 * apu.arcsec,
+    pixel_size: Quantity[apu.arcsec / apu.pix] | None = 1.0 * apu.arcsec / apu.pix,
 ) -> Quantity[1 / apu.arcsec]:
     """
     Generate the u or v coordinates given the number of pixels, phase_center and pixel size.
@@ -124,13 +122,13 @@ def generate_uv(
 
 @apu.quantity_input()
 def dft_map(
-    input_array: Union[Quantity, npt.NDArray],
+    input_array: Quantity | npt.NDArray,
     *,
     u: Quantity[1 / apu.arcsec],
     v: Quantity[1 / apu.arcsec],
     phase_center: Quantity[apu.arcsec] = (0.0, 0.0) * apu.arcsec,
     pixel_size: Quantity[apu.arcsec / apu.pix] = (1.0, 1.0) * apu.arcsec / apu.pix,
-) -> Union[Quantity, npt.NDArray]:
+) -> Quantity | npt.NDArray:
     r"""
     Discrete Fourier transform in terms of coordinates returning 1-D array complex visibilities.
 
@@ -183,15 +181,15 @@ def dft_map(
 
 @apu.quantity_input
 def idft_map(
-    input_vis: Union[Quantity, npt.NDArray],
+    input_vis: Quantity | npt.NDArray,
     *,
     u: Quantity[1 / apu.arcsec],
     v: Quantity[1 / apu.arcsec],
     shape: Quantity[apu.pix],
-    weights: Optional[npt.NDArray] = None,
+    weights: npt.NDArray | None = None,
     phase_center: Quantity[apu.arcsec] = (0.0, 0.0) * apu.arcsec,
     pixel_size: Quantity[apu.arcsec / apu.pix] = (1.0, 1.0) * apu.arcsec / apu.pix,
-) -> Union[Quantity, npt.NDArray]:
+) -> Quantity | npt.NDArray:
     r"""
     Inverse discrete Fourier transform in terms of coordinates returning a 2D real array or image.
 
