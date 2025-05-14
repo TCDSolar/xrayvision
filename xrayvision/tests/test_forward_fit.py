@@ -11,7 +11,7 @@ from xrayvision.forward_fit import (
     SourceList,
     circular_gaussian,
     circular_gaussian_vis,
-    sources_to_map,
+    sources_to_image,
     sources_to_vis,
     vis_forward_fit,
 )
@@ -65,7 +65,7 @@ def test_simple_fit():
 
 def test_sources_to_map():
     sources = SourceList([Source("circle", [2, -4, -5, 2]), Source("circle", [4, 5, 4, 3])])
-    map = sources_to_map(sources, (33, 33))
+    map = sources_to_image(sources, (33, 33))
     assert_allclose(map.sum(), 6, rtol=5e-5)
     y, x = 33 // 2 - 4, 33 // 2 - 5
     assert_allclose(map[x, y], 2 / (2 * np.pi * 2**2), atol=1e-5, rtol=5e-5)
@@ -88,5 +88,23 @@ def test_vis_forward_fit():
     u, v = np.meshgrid(uu, uu)
     vis = sources_to_vis(sources, u.value, v.value)
     visobs = Visibilities(vis.flatten() * apu.ph, u.flatten(), v.flatten())
+
+    # Create non-optimal source parameters
+    sources.from_list([1, -5, -4, 1, 5, 6, 3, 4])
     sources_fit, res = vis_forward_fit(visobs, sources)
-    assert sources_fit == sources_orig
+    assert_allclose(sources_fit.params, sources_orig.params, atol=1e-4, rtol=1e-5)
+
+
+def test_vis_forward_fit_pso():
+    sources = SourceList([Source("circle", [2, -4, -5, 2]), Source("circle", [4, 5, 4, 3])])
+    sources_orig = deepcopy(sources)
+    uu = generate_uv(33 * apu.pixel)
+    u, v = np.meshgrid(uu, uu)
+    vis = sources_to_vis(sources, u.value, v.value)
+    visobs = Visibilities(vis.flatten() * apu.ph, u.flatten(), v.flatten())
+    sources_fit, res = vis_forward_fit(visobs, sources, method="PSO")
+
+    # the order of the sources isn't necessarily going to match so sort based on x,y location?
+    sources_orig = SourceList(sorted(sources_orig.sources, key=lambda s: s.params[1:2]))
+    sources_fit = SourceList(sorted(sources_fit.sources, key=lambda s: s.params[1:2]))
+    assert_allclose(sources_fit.params, sources_orig.params, atol=1e-4, rtol=1e-5)
