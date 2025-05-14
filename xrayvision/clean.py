@@ -7,7 +7,6 @@ appropriate component shapes at different scales.
 
 """
 
-from typing import Union, Optional
 from collections.abc import Iterable
 
 import astropy.units as u
@@ -71,11 +70,11 @@ def clean(
     dirty_map: Quantity,
     dirty_beam: Quantity,
     pixel_size: Quantity[u.arcsec / u.pix] = None,
-    clean_beam_width: Optional[Quantity[u.arcsec]] = 4.0 * u.arcsec,
-    gain: Optional[float] = 0.1,
-    thres: Optional[float] = None,
+    clean_beam_width: Quantity[u.arcsec] | None = 4.0 * u.arcsec,
+    gain: float | None = 0.1,
+    thres: float | None = None,
     niter: int = 5000,
-) -> Union[Quantity, NDArray[np.float64]]:
+) -> Quantity | NDArray[np.float64]:
     r"""
     Clean the image using Hogbom's original method.
 
@@ -176,10 +175,10 @@ def vis_clean(
     vis: Visibilities,
     shape: Quantity[u.pix],
     pixel_size: Quantity[u.arcsec / u.pix],
-    clean_beam_width: Optional[Quantity[u.arcsec]] = 4.0,
-    niter: Optional[int] = 5000,
-    map: Optional[bool] = True,
-    gain: Optional[float] = 0.1,
+    clean_beam_width: Quantity[u.arcsec] | None = 4.0,
+    niter: int | None = 5000,
+    map: bool | None = True,
+    gain: float | None = 0.1,
     **kwargs,
 ):
     r"""
@@ -258,12 +257,12 @@ def ms_clean(
     dirty_map: Quantity,
     dirty_beam: Quantity,
     pixel_size: Quantity[u.arcsec / u.pix],
-    scales: Union[Iterable, NDArray, None] = None,
+    scales: Iterable | NDArray | None = None,
     clean_beam_width: Quantity = 4.0 * u.arcsec,
     gain: float = 0.1,
     thres: float = 0.01,
     niter: int = 5000,
-) -> Union[Quantity, NDArray[np.float64]]:
+) -> Quantity | NDArray[np.float64]:
     r"""
     Clean the map using a multiscale clean algorithm.
 
@@ -406,13 +405,13 @@ def vis_ms_clean(
     vis: Visibilities,
     shape: Quantity[u.pix],
     pixel_size: Quantity[u.arcsec / u.pix],
-    scales: Optional[Iterable],
-    clean_beam_width: Optional[Quantity[u.arcsec]] = 4.0,
-    niter: Optional[int] = 5000,
-    map: Optional[bool] = True,
-    gain: Optional[float] = 0.1,
-    thres: Optional[float] = 0.01,
-) -> Union[Quantity, NDArray[np.float64]]:
+    scales: Iterable | None,
+    clean_beam_width: Quantity[u.arcsec] | None = 4.0,
+    niter: int | None = 5000,
+    map: bool | None = True,
+    gain: float | None = 0.1,
+    thres: float | None = 0.01,
+) -> Quantity | NDArray[np.float64]:
     r"""
     Clean the visibilities using a multiscale clean method.
 

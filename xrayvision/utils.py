@@ -1,8 +1,7 @@
 import logging
-from typing import Union, Optional
 
 
-def get_logger(name: str, level: Optional[Union[int, str]] = logging.WARNING) -> logging.Logger:
+def get_logger(name: str, level: int | str | None = logging.WARNING) -> logging.Logger:
     """
     Return a configured logger instance.
 
