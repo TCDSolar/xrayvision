@@ -1,8 +1,14 @@
-.. _forward_fit:
+.. vis_forward_fit:
 
-Forward Fit ('xrayvision.forward_fit')
-**********************
+Vis Forward Fit ('xrayvision.vis_forward_fit')
+**********************************************
 
-The ``forward_fit`` submodule contains the Maximum Entropy methods.
+The ``vis_forward_fit`` submodule contains the visibility forward fitting methods
 
-.. automodapi:: xrayvision.forward_fit
+.. automodapi:: xrayvision.vis_forward_fit
+
+.. automodapi:: xrayvision.vis_forward_fit.forward_fit
+   :include-all-objects:
+
+.. automodapi:: xrayvision.vis_forward_fit.sources
+   :include-all-objects:

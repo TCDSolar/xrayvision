@@ -14,9 +14,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from xrayvision.clean import vis_clean
-from xrayvision.forward_fit import vis_forward_fit
 from xrayvision.imaging import vis_psf_map, vis_to_map
 from xrayvision.mem import mem, resistant_mean
+from xrayvision.vis_forward_fit.forward_fit import vis_forward_fit
+from xrayvision.vis_forward_fit.sources import Source, SourceList
 
 ###############################################################################
 # Create images from STIX visibility data.
@@ -69,10 +70,12 @@ mem_map = mem(
 ###############################################################################
 # VIS_FWD_FIT
 
-vis_fwd_map = vis_forward_fit(stix_vis, shape=[129, 129] * apu.pixel, pixel_size=[1, 1] * apu.arcsec / apu.pix)
+sources = SourceList([Source("circular", 15, 1, 2, 5)])
+
+vis_fwd_map = vis_forward_fit(stix_vis, sources, shape=[129, 129] * apu.pixel, pixel_size=[1, 1] * apu.arcsec / apu.pix)
 
 vis_fwd_pso_map = vis_forward_fit(
-    stix_vis, method="PSO", shape=[129, 129] * apu.pixel, pixel_size=[1, 1] * apu.arcsec / apu.pix
+    stix_vis, sources, method="PSO", shape=[129, 129] * apu.pixel, pixel_size=[1, 1] * apu.arcsec / apu.pix
 )
 
 ###############################################################################
