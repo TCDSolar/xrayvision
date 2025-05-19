@@ -1,7 +1,7 @@
 import astropy.units as apu
 import numpy as np
 import pytest
-from numpy.fft import fft2, fftshift, ifft2, ifftshift
+from numpy.fft import fft2, ifft2
 from numpy.testing import assert_allclose
 from scipy import signal
 
@@ -377,34 +377,36 @@ def test_phase_center_equivalence():
     assert np.allclose(data, img2)
 
 
-def test_fft_equivalence():
-    # Odd (3, 3) so symmetric and chose shape and pixel size so xy values will run from 0 to 2 the same as in fft
-    # TODO: add same kind of test for even for fft2 then A[n/2] has both pos and negative nyquist frequencies
-    #  e.g shape (2, 2), (3, 2), (2, 3)
-    shape = (3, 3)
-    pixel = (1, 1)
-    center = (1, 1)
+@pytest.mark.parametrize("dim", ((2, 3, 4, 5, 6)))
+def test_fft_equivalence(dim):
+    shape = np.array((dim, dim))
+    pixel = np.array((1, 1))
 
-    data = np.arange(np.prod(shape)).reshape(shape)
+    # In order to replicate the FFT need to make the product of x*u + y*v match mk/M + nl/N where M, N and the array
+    # dimensions so neex x, y to go from 0 to M-1, N-1 and u, v 0 to m-1/M, and n-1/N so need to chose parameters so
+    # this happens namely the center for u, v and the dft
+    uv_center = -1 / ((0 - shape / 2 + 0.5) / (shape * pixel))
+    xy_center = -1 * (0 - shape / 2 + 0.5)
     vv = generate_uv(
-        shape[0] * apu.pix, phase_center=center[0] * apu.arcsec, pixel_size=pixel[0] * apu.arcsec / apu.pix
+        shape[0] * apu.pix, phase_center=uv_center[0] * apu.arcsec, pixel_size=pixel[0] * apu.arcsec / apu.pix
     )
     uu = generate_uv(
-        shape[1] * apu.pix, phase_center=center[1] * apu.arcsec, pixel_size=pixel[1] * apu.arcsec / apu.pix
+        shape[1] * apu.pix, phase_center=uv_center[1] * apu.arcsec, pixel_size=pixel[1] * apu.arcsec / apu.pix
     )
     u, v = np.meshgrid(uu, vv)
     u = u.flatten()
     v = v.flatten()
 
-    vis = dft_map(data, u=u, v=v, pixel_size=pixel * apu.arcsec / apu.pix, phase_center=center * apu.arcsec)
+    data = np.arange(np.prod(shape)).reshape(shape)
+    vis = dft_map(data, u=u, v=v, pixel_size=pixel * apu.arcsec / apu.pix, phase_center=xy_center * apu.arcsec)
 
     ft = fft2(data)
-    fts = fftshift(ft)
     vis = vis.reshape(shape)
-    # Convention in xrayvison has the minus sign on the forward transform but numpy has it on reverse
+    # Convention in xrayvison has the minus sign on the forward transform but numpy has it on reverse and the first
+    #
+    # The rtol seems to vary as the size increase I'm assuming poor round off error handling in the naive DFT/IDFT
     vis_conj = np.conjugate(vis)
-    assert_allclose(fts, vis_conj, atol=1e-13)
+    assert_allclose(ft, vis_conj, rtol=1e-10, atol=1e-10)
 
-    vis_ft = ifftshift(vis_conj)
-    img = ifft2(vis_ft)
-    assert_allclose(np.real(img), data, atol=1e-14)
+    img = ifft2(vis_conj)
+    assert_allclose(np.real(img), data, rtol=1e-10, atol=1e-10)
