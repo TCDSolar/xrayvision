@@ -11,5 +11,6 @@ Reference
    transform
    utils
    visibility
+   forward_fit
 
    ../whatsnew/index
