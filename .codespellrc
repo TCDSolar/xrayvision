@@ -13,4 +13,5 @@ ignore-words-list =
     process,
     technik,
     thirdparty,
-    lamba
+    lamba,
+    sav
