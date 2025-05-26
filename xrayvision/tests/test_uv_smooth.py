@@ -20,7 +20,7 @@ def test_uv_smooth():
     # vis_data = vis_data[vis_data['v'] > 0]
     # # vis_data = vis_data[vis_data["obsvis"] != 0 + 0j]
 
-    vis_sav = readsav("/Users/sm/hsi_hsi_20020221_0006-0007_12-25.save")
+    vis_sav = readsav("/Users/sm/hsi_hsi_20020221_0006-0007_12-25.sav")
     vis_data = vis_sav["vis"]
     ###############################################################################
     # Now we can create the visibility object from the filtered visibilities.
