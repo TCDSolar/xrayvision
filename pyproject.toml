@@ -10,14 +10,14 @@ build-backend = 'setuptools.build_meta'
 [project]
 name = "xrayvisim"
 description = "An open-source Python library for Fourier or synthesis X-Ray imaging instruments."
-requires-python = ">=3.9"
+requires-python = ">=3.11"
 readme = {file = "README.rst", content-type="text/x-rst"}
 license = "BSD-3-Clause"
 license-files = ["LICENSE.rst"]
 authors = [{name="Shane Maloney", email = "shane.maloney@dias.ie"}]
 dependencies = [
     "astropy>=6.0.0",
-    "numpy>=1.24.0",
+    "numpy>=1.25.0",
     "packaging>=23.0",
     "scipy>=1.13",
     "xarray>=2023.5.0"
@@ -91,7 +91,7 @@ version_file = "xrayvision/_version.py"
 
 [tool.mypy]
 disable_error_code = "import-untyped"
-python_version = "py39"
+python_version = "3.11"
 
 [ tool.gilesbot ]
 
