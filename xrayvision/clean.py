@@ -8,13 +8,13 @@ appropriate component shapes at different scales.
 """
 
 from typing import Union, Optional
-from collections.abc import Iterable
+from collections.abc import Iterable, MutableSequence
 
 import astropy.units as u
 import numpy as np
 from astropy.convolution import Gaussian2DKernel
 from astropy.units import Quantity
-from numpy.typing import NDArray
+from numpy.typing import ArrayLike, NDArray
 from scipy import signal
 from scipy.ndimage import shift
 from sunpy.map.map_factory import Map
@@ -258,7 +258,7 @@ def ms_clean(
     dirty_map: Quantity,
     dirty_beam: Quantity,
     pixel_size: Quantity[u.arcsec / u.pix],
-    scales: Union[Iterable, NDArray, None] = None,
+    scales: Optional[MutableSequence[int]] = None,
     clean_beam_width: Quantity = 4.0 * u.arcsec,
     gain: float = 0.1,
     thres: float = 0.01,
@@ -281,9 +281,8 @@ def ms_clean(
     scale_sizes: NDArray[np.int_] = 2 ** np.arange(number_of_scales)
 
     if scales:
-        scales = np.array(scales)
         number_of_scales = len(scales)
-        scale_sizes = scales
+        scale_sizes = scales[:]
 
     scale_sizes = np.where(scale_sizes == 0, 1, scale_sizes)
 
@@ -298,10 +297,10 @@ def ms_clean(
 
     # Pre-compute scales, residual maps and dirty beams at each scale and dirty beam cross terms
     scales = np.zeros((dirty_map.shape[0], dirty_map.shape[1], number_of_scales))
-    scaled_residuals = np.zeros((dirty_map.shape[0], dirty_map.shape[1], number_of_scales))
-    scaled_dirty_beams = np.zeros((dirty_beam.shape[0], dirty_beam.shape[1], number_of_scales))
-    max_scaled_dirty_beams = np.zeros(number_of_scales)
-    cross_terms = {}
+    scaled_residuals: NDArray = np.zeros((dirty_map.shape[0], dirty_map.shape[1], number_of_scales))
+    scaled_dirty_beams: NDArray = np.zeros((dirty_beam.shape[0], dirty_beam.shape[1], number_of_scales))
+    max_scaled_dirty_beams: NDArray = np.zeros(number_of_scales)
+    cross_terms: dict[tuple[int, int], ArrayLike] = {}
 
     for i, scale in enumerate(scale_sizes):
         scales[:, :, i] = _component(scale=scale, shape=dirty_map.shape)
