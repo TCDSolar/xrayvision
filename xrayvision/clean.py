@@ -7,7 +7,6 @@ appropriate component shapes at different scales.
 
 """
 
-from typing import Union, Optional
 from collections.abc import Iterable, MutableSequence
 
 import astropy.units as u
@@ -258,7 +257,7 @@ def ms_clean(
     dirty_map: Quantity,
     dirty_beam: Quantity,
     pixel_size: Quantity[u.arcsec / u.pix],
-    scales: Optional[MutableSequence[int]] = None,
+    scales: MutableSequence[int] | None = None,
     clean_beam_width: Quantity = 4.0 * u.arcsec,
     gain: float = 0.1,
     thres: float = 0.01,
