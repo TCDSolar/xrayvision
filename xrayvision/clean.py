@@ -198,7 +198,6 @@ def vis_clean(
     map :
         Return a `sunpy.map.Map` by default or array only if `False`
     """
-
     dirty_map = vis_to_map(vis, shape=shape, pixel_size=pixel_size, **kwargs)
     dirty_beam_shape = [x.value * 3 + 1 if x.value * 3 % 2 == 0 else x.value * 3 for x in shape] * shape.unit
     dirty_beam = vis_psf_image(vis, shape=dirty_beam_shape, pixel_size=pixel_size, **kwargs)

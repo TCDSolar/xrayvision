@@ -3,7 +3,7 @@ from typing import Union, Callable, Optional
 import astropy.units as apu
 import numpy as np
 from astropy.units import Quantity, quantity_input
-from hypothesis.extra.numpy import NDArray
+from numpy.typing import NDArray
 from pymoo.algorithms.soo.nonconvex.pso import PSO
 from pymoo.core.problem import ElementwiseProblem
 from pymoo.optimize import minimize as moo_minimize
@@ -52,6 +52,7 @@ def sources_to_image(
         Shape of the image create
     pixel_size :
         Size
+
     Returns
     -------
 
@@ -160,7 +161,7 @@ def vis_forward_fit(
     map :
         Return a `Map`
     method :
-        Method to use any of those supported methods by `scipy.optimize.minimize` and 'PSO'.
+        Method to use any of those supported methods by `scipy.optimize.minimize` or 'PSO' for particle swarm optimization
     """
     if method is None:
         method = "Nelder-Mead"

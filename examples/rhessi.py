@@ -4,6 +4,7 @@ RHESSI Visibility Imaging
 ======================================
 
 Create images from RHESSI visibility data
+
 """
 
 import astropy.units as apu

@@ -257,6 +257,7 @@ class Elliptical(GenericSource):
         r"""
         Elliptical gaussian source parameters.
 
+        Parameters
         ----------
         amp :
             Amplitude

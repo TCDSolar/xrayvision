@@ -77,6 +77,7 @@ def plot_vis_diff(visa: Visibilities, visb: Visibilities, fig=None, **mplkwargs)
         Figure to use
     mplkwargs
         Keyword arguments passed to matplotlib
+
     Returns
     -------
 

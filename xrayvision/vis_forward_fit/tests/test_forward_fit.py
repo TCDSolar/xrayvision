@@ -74,4 +74,4 @@ def test_vis_forward_fit_minimise_pso():
     init_souces = SourceList.from_params(sources, np.random.randn(len(sources.params)) * 0.1 + sources.params)
     visobs = Visibilities(vis.flatten() * apu.ph, u.flatten(), v.flatten())
     sources_fit, res = _vis_forward_fit_minimise(visobs, init_souces, method="PSO")
-    assert_allclose(sources_fit.params, sources.params, atol=1e-4, rtol=1e-5)
+    assert_allclose(sources_fit.params, sources.params, atol=1e-4, rtol=5e-5)

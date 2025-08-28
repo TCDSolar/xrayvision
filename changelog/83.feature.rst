@@ -1,0 +1,1 @@
+Add a basic visibility forward fitting method (`xrayvision.vis_forward_fit.forward_fit.vis_forward_fit`).
