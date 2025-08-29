@@ -41,7 +41,7 @@ def circular_gaussian(amp, x, y, x0, y0, sigma):
         Center x coordinate
     y0 :
         Center y coordinate
-    sigma
+    sigma :
         Sigma
 
     See Also
@@ -72,7 +72,7 @@ def circular_gaussian_vis(amp, u, v, x0, y0, sigma):
         Center x coordinate
     y0 :
         Center y coordinate
-    sigma
+    sigma :
         Sigma
 
     See Also
@@ -107,9 +107,9 @@ def elliptical_gaussian(amp, x, y, x0, y0, sigmax, sigmay, theta):
         Center y coordinate
     sigmax :
         Sigma in x direction
-    sigma :
+    sigmay :
         Sigma in y direction
-    theta
+    theta :
         Rotation angle in anticlockwise
 
     See Also
@@ -147,9 +147,9 @@ def elliptical_gaussian_vis(amp, u, v, x0, y0, sigmax, sigmay, theta):
         Center y coordinate
     sigmax :
         Sigma in x direction
-    sigma :
+    sigmay :
         Sigma in y direction
-    theta
+    theta :
         Rotation angle in anticlockwise
 
     See Also
@@ -232,8 +232,8 @@ class Circular(GenericSource):
     @property
     def bounds(self) -> list[list[float]]:
         return [
-            [self.amp / 4, self.x0 - 5 * np.abs(self.sigma), self.x0 - 5 * np.abs(self.sigma), self.sigma / 4],
-            [self.amp * 4, self.x0 + 5 * np.abs(self.sigma), self.x0 + 5 * np.abs(self.sigma), self.sigma * 4],
+            [self.amp / 4, self.x0 - 5 * np.abs(self.sigma), self.y0 - 5 * np.abs(self.sigma), self.sigma / 4],
+            [self.amp * 4, self.x0 + 5 * np.abs(self.sigma), self.y0 + 5 * np.abs(self.sigma), self.sigma * 4],
         ]
 
     @property

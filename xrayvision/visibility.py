@@ -431,7 +431,7 @@ class Visibilities(VisibilitiesABC):
         if len(item) != len(dims):
             item = list(item) + [slice(None)] * (len(dims) - len(item))
         if all(isinstance(idx, numbers.Integral) for idx in item):
-            ValueError("Slicing out single visibility not supported.")
+            raise ValueError("Slicing out single visibility not supported.")
         ds_item = dict(zip(dims, item))
         new_data = self._data.isel(ds_item)
         new_data.attrs[self._meta_key][_VIS_LABELS_KEY] = new_data.coords[_VIS_LABELS_KEY].values
