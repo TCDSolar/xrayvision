@@ -14,6 +14,8 @@ from xrayvision.vis_forward_fit.sources import (
     circular_gaussian_vis,
     elliptical_gaussian,
     elliptical_gaussian_vis,
+    loop,
+    loop_vis,
 )
 from xrayvision.visibility import Visibilities
 
@@ -65,6 +67,56 @@ def test_equivalence_elliptical_to_circular_vis(x0, y0, sigma):
     vis_circular = circular_gaussian_vis(amp, u, v, x0, y0, sigma)
     vis_elliptical = elliptical_gaussian_vis(amp, u, v, x0, y0, sigma, sigma, 0)
     assert_allclose(vis_circular, vis_elliptical, atol=1e-13)
+
+
+@pytest.mark.parametrize("size", (65, 79))
+def test_loop_ft_equivalence_fft(size):
+    # So unless the array is sufficiently large this test fails
+    # I think has to do with the fact no taking into account the sampleing and implicit windowing
+    # TODO: How does this affect algo where the vis derived from map are compare to the observed?
+    # sigma = 4 * apu.arcsec
+    xx = generate_xy(size * apu.pix)
+    x, y = np.meshgrid(xx, xx)
+    uu = generate_uv(size * apu.pix)
+    u, v = np.meshgrid(uu, uu)
+    u = u.flatten()
+    v = v.flatten()
+
+    image = loop(
+        80,
+        x,
+        y,
+        0 * apu.arcsec,
+        0 * apu.arcsec,
+        22.5 * apu.arcsec,
+        9.0 * apu.arcsec,
+        np.deg2rad(90),
+        np.deg2rad(70),
+    )
+
+    vis_obs = image_to_vis(image * apu.ph, u=u, v=v)
+    vis_func = Visibilities(
+        loop_vis(
+            80,
+            u,
+            v,
+            0 * apu.arcsec,
+            0 * apu.arcsec,
+            22.5 * apu.arcsec,
+            9.0 * apu.arcsec,
+            np.deg2rad(90),
+            np.deg2rad(70),
+        ).flatten()
+        * apu.ph,
+        u,
+        v,
+    )
+
+    image_func = vis_to_image(vis_func, [size, size] * apu.pixel)
+    image_vis = vis_to_image(vis_obs, [size, size] * apu.pixel)
+
+    assert_allclose(vis_func.visibilities, vis_obs.visibilities, atol=1e-9)
+    assert_allclose(image_func, image_vis, atol=1e-9)
 
 
 def test_source_factory():
