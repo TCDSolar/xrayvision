@@ -245,7 +245,7 @@ def vis_psf_image(
     # Make sure psf is always odd so power is in exactly one pixel
     shape = [s // 2 * 2 + 1 for s in shape.to_value(apu.pix)] * shape.unit
     psf_arr = idft_map(
-        np.ones(vis.visibilities.shape) * vis.visibilities.unit,
+        np.ones(vis.visibilities.shape) * np.prod(pixel_size.value) * vis.visibilities.unit,
         u=vis.u,
         v=vis.v,
         shape=shape,

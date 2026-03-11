@@ -39,7 +39,10 @@ SOURCE_TO_VIS: dict[str, Callable] = {
 
 
 def sources_to_image(
-    source_list: SourceList, shape: Quantity[apu.pix], pixel_size: Quantity[apu.arcsec / apu.pix]
+    source_list: SourceList,
+    shape: Quantity[apu.pix],
+    pixel_size: Quantity[apu.arcsec / apu.pix],
+    center=(0, 0) * apu.arcsec,
 ) -> np.ndarray[float]:
     r"""
     Create an image from a list of sources.
@@ -58,8 +61,8 @@ def sources_to_image(
 
     """
     image = np.zeros(shape.value.astype(int))
-    x = generate_xy(shape[1]).value
-    y = generate_xy(shape[0]).value
+    x = generate_xy(shape[1], pixel_size=pixel_size[1], phase_center=center[1]).value
+    y = generate_xy(shape[0], pixel_size=pixel_size[0], phase_center=center[0]).value
     x, y = np.meshgrid(x, y)
     for source in source_list:
         try:
@@ -111,7 +114,7 @@ def _vis_forward_fit_minimise(
         Method to use for the minimisation
 
     """
-    if method == "PSO":
+    if method.casefold() == "pso":
         problem = VisForwardFitProblem(visobs.u, visobs.v, visobs, sources)
         algo = PSO(pop=100)
         res = moo_minimize(problem, algo)
@@ -130,7 +133,7 @@ def _vis_forward_fit_minimise(
             sources.params,
             (visobs.u, visobs.v, visobs_ri, sources),
             method=method,
-            bounds=[(x, y) for x, y in zip(*sources.bounds)],
+            # bounds=[(x, y) for x, y in zip(*sources.bounds)],
         )
         sources_fit = sources.from_params(sources, res.x)
     return sources_fit, res
@@ -166,7 +169,7 @@ def vis_forward_fit(
     if method is None:
         method = "Nelder-Mead"
     sources, res = _vis_forward_fit_minimise(vis, sources, method=method)
-    image = sources_to_image(sources, shape, pixel_size)
+    image = sources_to_image(sources, shape, pixel_size, center=vis.phase_center)
     if map:
         header = generate_header(vis, shape=shape, pixel_size=pixel_size)
         return Map((image, header))

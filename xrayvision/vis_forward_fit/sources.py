@@ -370,6 +370,162 @@ def loop_vis(amp, u, v, x0, y0, sigma_max, sigma_min, alpha, beta):
     return vis
 
 
+# def model_img(coeff, nx, ny, pix):
+#     """
+#     Creates model map from gaussian coefficients COEFF(NPAR,NG).
+#
+#     Args:
+#         coeff (np.ndarray): Gaussian coefficients (2D array).
+#             coeff[0, *] = amplitude
+#             coeff[1, *] = x gaussian width (in arcseconds)
+#             coeff[2, *] = x-position (in arcseconds)
+#             coeff[3, *] = y-position (in arcseconds)
+#             coeff[4, *] = eccentricity: ecc=(x_width/y_width)-1.
+#             coeff[5, *] = tilt angle of elliptical gaussian (counterclockwise from y-axis)
+#             coeff[6, *] = curvature ratio: q=coeff[1, *]/curvature radius
+#         nx (int): Pixel dimension of the image in the x-direction.
+#         ny (int): Pixel dimension of the image in the y-direction.
+#         pix (float): Pixel size (in arcseconds).
+#
+#     Returns:
+#         np.ndarray: The 2D-array of the model map.
+#     """
+#
+#     # Coordinates of pixel midpoints
+#     x = np.arange(nx) - nx / 2 + 0.5
+#     y = np.arange(ny) - ny / 2 + 0.5
+#
+#     npar, num_gaussians = coeff.shape
+#
+#     modelmap = np.zeros((nx, ny), dtype=np.float32)
+#
+#     # Create coordinate grids
+#     xx, yy = np.meshgrid(x, y, indexing='xy')
+#
+#     for i in range(num_gaussians):
+#         f0 = coeff[0, i]
+#         w0 = coeff[1, i] / pix
+#         x0 = coeff[2, i] / pix
+#         y0 = coeff[3, i] / pix
+#
+#         v0 = w0
+#         a0 = 0.0
+#         q0 = 0.0
+#
+#         if npar >= 5:
+#             v0 = w0 * (coeff[4, i] + 1.0)
+#         if npar >= 6:
+#             a0 = coeff[5, i] * np.pi / 180.0
+#         if npar >= 7:
+#             q0 = coeff[6, i]
+#
+#         if q0 < 0:
+#             q0 = abs(q0)
+#             a0 += np.pi
+#
+#         rmax = max(w0, v0) * 5.0
+#
+#         dxx = xx - x0
+#         dyy = yy - y0
+#
+#         # Rotate coordinates
+#         dx_ = dxx * np.cos(a0) + dyy * np.sin(a0)
+#         dy_ = -dxx * np.sin(a0) + dyy * np.cos(a0)
+#
+#         if q0 == 0:
+#             # Infinite curvature radius
+#             dx, dy = dx_, dy_
+#         else:
+#             # Finite curvature radius
+#             r0 = w0 / q0
+#             rho = np.sqrt(dy_ ** 2 + (dx_ + r0) ** 2)
+#
+#             # arctan2 provides the correct angle across all quadrants
+#             a = np.arctan2(dy_, (dx_ + r0))
+#
+#             dy = r0 * a
+#             dx = rho - r0
+#
+#         # Select points within the max radius
+#         d = np.sqrt(dxx ** 2 + dyy ** 2)
+#         indices = d <= rmax
+#
+#         # Calculate the Gaussian and add to the model map
+#         gaussian_term = f0 * np.exp(-dx ** 2 / (2.0 * w0 ** 2) - dy ** 2 / (2.0 * v0 ** 2))
+#         modelmap[indices] += gaussian_term[indices]
+#
+#     return modelmap
+
+# def model_vis(coeff, nu, nv, pix):
+#     # Coordinates of pixel midpoints
+#     u = (np.arange(nu) - (nu / 2) + 0.5) / (pix * nu)
+#     v = (np.arange(nv) - (nv / 2) + 0.5) / (pix * nu)
+#
+#     npar, num_gaussians = coeff.shape
+#
+#     model_vis = np.zeros((nu, nv), dtype=complex)
+#
+#     # Create coordinate grids
+#     uu, vv = np.meshgrid(u, v, indexing='xy')
+#
+#     for i in range(num_gaussians):
+#         f0 = coeff[0, i]
+#         w0 = coeff[1, i] / pix
+#         x0 = coeff[2, i] / pix
+#         y0 = coeff[3, i] / pix
+#
+#         v0 = w0
+#         a0 = 0.0
+#         q0 = 0.0
+#
+#         if npar >= 5:
+#             v0 = w0 * (coeff[4, i] + 1.0)
+#         if npar >= 6:
+#             a0 = coeff[5, i] * np.pi / 180.0
+#         if npar >= 7:
+#             q0 = coeff[6, i]
+#
+#         if q0 < 0:
+#             q0 = abs(q0)
+#             a0 += np.pi
+#
+#         rmax = max(w0, v0) * 5.0
+#
+#         duu = uu
+#         dvv = vv
+#
+#         # Rotate coordinates
+#         up_ = duu * np.cos(a0) + dvv * np.sin(a0)
+#         vp_ = -duu * np.sin(a0) + dvv * np.cos(a0)
+#
+#         if q0 == 0:
+#             # Infinite curvature radius
+#             up, vp = up_, vp_
+#         else:
+#             # Finite curvature radius
+#             r0 = w0 / q0
+#             rho = np.sqrt(up_**2 + (vp_ + r0)**2)
+#
+#             # arctan2 provides the correct angle across all quadrants
+#             a = np.arctan2(up_, (vp_ + r0))
+#
+#             up = r0 * a
+#             vp = rho - r0
+#
+#         # Select points within the max radius
+#         d = np.sqrt(up ** 2 + vp ** 2)
+#         indices = d > 1/rmax
+#
+#         # Calculate the Gaussian and add to the model map
+#         gaussian_term = (
+#             f0
+#             * np.exp(-2 * np.pi**2 * ((up**2 * w0**2) + (vp**2 * v0**2 )))
+#             * np.exp(2j * np.pi * (x0 * u + y0 * v))
+#         )
+#         model_vis[indices] += gaussian_term[indices]
+#     return model_vis
+
+
 class GenericSource(ABC):
     r"""
     Abstract source class defining the properties and methods.

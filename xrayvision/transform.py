@@ -172,7 +172,7 @@ def dft_map(
                 2j * np.pi * (x[..., np.newaxis] * uv[np.newaxis, 0, :] + y[..., np.newaxis] * uv[np.newaxis, 1, :])
             ),
             axis=(0, 1),
-        )
+        ) * np.prod(pixel_size.value)
 
         return vis
     else:
@@ -243,7 +243,7 @@ def idft_map(
             axis=2,
         )
 
-        return np.real(image)
+        return np.real(image) / np.prod(pixel_size.value)
     else:
         raise UnitsError("Incompatible units on uv {uv.unit} should cancel with xy to leave a dimensionless quantity")
 
