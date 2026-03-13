@@ -70,7 +70,19 @@ mem_map = mem(
 ###############################################################################
 # VIS_FWD_FIT
 
-sources = SourceList([Source("circular", 15, 1, 2, 5)])
+sources = SourceList(
+    [
+        Source(
+            "elliptical",
+            15 * stix_vis.visibilities.unit,
+            1 * apu.arcsec,
+            2 * apu.arcsec,
+            5 * apu.arcsec,
+            2 * apu.arcsec,
+            1,
+        )
+    ]
+)
 
 vis_fwd_map = vis_forward_fit(stix_vis, sources, shape=[129, 129] * apu.pixel, pixel_size=[1, 1] * apu.arcsec / apu.pix)
 

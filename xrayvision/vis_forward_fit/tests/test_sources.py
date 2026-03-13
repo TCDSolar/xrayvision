@@ -95,8 +95,8 @@ def test_loop_ft_equivalence_fft(size):
         y,
         0 * apu.arcsec,
         0 * apu.arcsec,
-        22.5 * apu.arcsec,
         9.0 * apu.arcsec,
+        22.5 * apu.arcsec,
         np.deg2rad(90),
         np.deg2rad(70),
     )
@@ -109,8 +109,8 @@ def test_loop_ft_equivalence_fft(size):
             v,
             0 * apu.arcsec,
             0 * apu.arcsec,
-            22.5 * apu.arcsec,
             9.0 * apu.arcsec,
+            22.5 * apu.arcsec,
             np.deg2rad(90),
             np.deg2rad(70),
         ).flatten()

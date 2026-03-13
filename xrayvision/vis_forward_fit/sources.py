@@ -168,7 +168,7 @@ def elliptical_gaussian_vis(amp, u, v, x0, y0, sigmax, sigmay, theta):
     )
 
 
-def loop(amp, x, y, x0, y0, sigma_max, sigma_min, alpha, beta, max_comps=21):
+def loop(amp, x, y, x0, y0, sigma_min, sigma_max, alpha, beta, max_comps=21):
     r"""
     Loop source sampled at x, y.
 
@@ -252,7 +252,7 @@ def loop(amp, x, y, x0, y0, sigma_max, sigma_min, alpha, beta, max_comps=21):
     sinus = np.sin(pasep)
     cosinus = np.cos(pasep)
 
-    data = np.zeros(x.shape)
+    data = None
     pixel = [1, 1]
     for i in range(iseq.size):
         flux_new = amp * relflux[i]  #  Split the flux between components.
@@ -265,12 +265,15 @@ def loop(amp, x, y, x0, y0, sigma_max, sigma_min, alpha, beta, max_comps=21):
         x_tmp = 2.0 * np.sqrt(2.0 * np.log(2.0)) * x_tmp / circfwhm
         y_tmp = 2.0 * np.sqrt(2.0 * np.log(2.0)) * y_tmp / circfwhm
         im_tmp = np.exp(-(x_tmp**2.0 + y_tmp**2.0) / 2.0)
-        data += im_tmp / (im_tmp.sum() * pixel[0] * pixel[1]) * flux_new
+        if data is None:
+            data = im_tmp / (im_tmp.sum() * pixel[0] * pixel[1]) * flux_new
+        else:
+            data += im_tmp / (im_tmp.sum() * pixel[0] * pixel[1]) * flux_new
 
     return data
 
 
-def loop_vis(amp, u, v, x0, y0, sigma_max, sigma_min, alpha, beta):
+def loop_vis(amp, u, v, x0, y0, sigma_min, sigma_max, alpha, beta):
     r"""
     Loop source sampled at u, v in Fourier space.
 
@@ -345,10 +348,9 @@ def loop_vis(amp, u, v, x0, y0, sigma_max, sigma_min, alpha, beta):
     fsumy = (yloop * relflux).sum()
     fsumy2 = (yloop**2 * relflux).sum()
     loopradius = np.sqrt((sigmajor**2 - sigminor**2) / (fsumx2 - fsumy2 + fsumy**2))
-    term = max(
-        (sigmajor**2 - loopradius**2 * fsumx2), 0 * sigmajor.unit**2
-    )  # >0 condition avoids problems in next step.
-    circfwhm = max(sig2fwhm * np.sqrt(term), 1 * sigmajor.unit)  # Set minimum to avoid display problems
+    sgm_unti = getattr(sigmajor, "unit", 1)
+    term = max((sigmajor**2 - loopradius**2 * fsumx2), 0 * sgm_unti**2)  # >0 condition avoids problems in next step.
+    circfwhm = max(sig2fwhm * np.sqrt(term), 1 * sgm_unti)  # Set minimum to avoid display problems
 
     cgshift = loopradius * fsumy
     relx = xloop * loopradius  # x is axis joining 'footpoints'
@@ -590,10 +592,11 @@ class Circular(GenericSource):
 
     @property
     def bounds(self) -> list[list[float]]:
-        return [
+        raw_bounds = [
             [self.amp / 4, self.x0 - 5 * np.abs(self.sigma), self.y0 - 5 * np.abs(self.sigma), self.sigma / 4],
             [self.amp * 4, self.x0 + 5 * np.abs(self.sigma), self.y0 + 5 * np.abs(self.sigma), self.sigma * 4],
         ]
+        return [[q.value if hasattr(q, "value") else q for q in sublist] for sublist in raw_bounds]
 
     @property
     def param_list(self) -> list[float]:
@@ -640,7 +643,7 @@ class Elliptical(GenericSource):
 
     @property
     def bounds(self) -> list[list[float]]:
-        return [
+        raw_bounds = [
             [
                 self.amp / 4,
                 self.x0 - (5 * np.abs(self.sigmax)),
@@ -658,10 +661,62 @@ class Elliptical(GenericSource):
                 self.theta + 22.5,
             ],
         ]
+        return [[q.value if hasattr(q, "value") else q for q in sublist] for sublist in raw_bounds]
 
     @property
     def param_list(self) -> list[float]:
         return [self.amp, self.x0, self.y0, self.sigmax, self.sigmay, self.theta]
+
+    def estimate_bounds(self, *args, **kwargs) -> list[list[float]]:
+        return self.bounds
+
+
+@dataclass
+class Loop(GenericSource):
+    amp: float
+    x0: float
+    y0: float
+    sigma_min: float
+    sigma_max: float
+    alpha: float
+    beta: float
+
+    def __init__(self, amp, x0, y0, sigma_min, sigma_max, alpha, beta):
+        self.amp = amp
+        self.x0 = x0
+        self.y0 = y0
+        self.sigma_min = sigma_min
+        self.sigma_max = sigma_max
+        self.alpha = alpha
+        self.beta = beta
+
+    @property
+    def bounds(self) -> list[list[float]]:
+        raw_bounds = [
+            [
+                self.amp / 2,
+                self.x0 - (2 * np.abs(self.sigma_max)),
+                self.y0 - (2 * np.abs(self.sigma_max)),
+                self.sigma_min / 2,
+                self.sigma_max / 2,
+                -np.pi / 2,
+                0,
+            ],
+            [
+                self.amp * 2,
+                self.x0 + (2 * np.abs(self.sigma_max)),
+                self.y0 + (2 * np.abs(self.sigma_max)),
+                self.sigma_min * 2,
+                self.sigma_max * 2,
+                np.pi / 2,
+                np.pi,
+            ],
+        ]
+        return [[q.value if hasattr(q, "value") else q for q in sublist] for sublist in raw_bounds]
+
+    @property
+    def param_list(self) -> list[float]:
+        return [self.amp, self.x0, self.y0, self.sigma_min, self.sigma_max, self.alpha, self.beta]
 
     def estimate_bounds(self, *args, **kwargs) -> list[list[float]]:
         return self.bounds
