@@ -34,13 +34,18 @@ def test_simple_fit():
 
 
 def test_sources_to_map():
-    sources = SourceList([Source("circular", 2, -4, -5, 2), Source("circular", 4, 5, 4, 3)])
+    sources = SourceList(
+        [
+            Source("circular", 2 * apu.arcsec, -4 * apu.arcsec, -5 * apu.arcsec, 2 * apu.arcsec),
+            Source("circular", 4 * apu.arcsec, 5 * apu.arcsec, 4 * apu.arcsec, 3 * apu.arcsec),
+        ]
+    )
     image = sources_to_image(sources, [33, 33] * apu.pixel, pixel_size=[1, 1] * apu.arcsec / apu.pixel)
-    assert_allclose(image.sum(), 6, rtol=5e-5)
+    assert_allclose(image.sum().value, 6, rtol=5e-5)
     y, x = 33 // 2 - 4, 33 // 2 - 5
-    assert_allclose(image[x, y], 2 / (2 * np.pi * 2**2), atol=1e-5, rtol=5e-5)
+    assert_allclose(image[x, y].value, 2 / (2 * np.pi * 2**2), atol=1e-5, rtol=5e-5)
     y, x = 33 // 2 + 5, 33 // 2 + 4
-    assert_allclose(image[x, y], 4 / (2 * np.pi * 3**2), atol=1e-5, rtol=5e-5)
+    assert_allclose(image[x, y].value, 4 / (2 * np.pi * 3**2), atol=1e-5, rtol=5e-5)
 
 
 def test_sources_to_vis():
@@ -53,25 +58,27 @@ def test_sources_to_vis():
 
 # Just testing the machinery not if the fitting is robust/good
 def test_vis_forward_fit_minimise():
+    rng = np.random.default_rng(42)
     sources = SourceList([Source("circular", 2, -4, -5, 2), Source("elliptical", 4, 5, 4, 3, 8, 45)])
     uu = generate_uv(33 * apu.pixel)
     u, v = np.meshgrid(uu, uu)
     vis = sources_to_vis(sources, u.value, v.value)
     visobs = Visibilities(vis.flatten() * apu.ph, u.flatten(), v.flatten())
     # Create non-optimal source parameters
-    init_souces = SourceList.from_params(sources, np.random.randn(len(sources.params)) * 0.1 + sources.params)
+    init_souces = SourceList.from_params(sources, rng.standard_normal(len(sources.params)) * 0.1 + sources.params)
     sources_fit, res = _vis_forward_fit_minimise(visobs, init_souces, method="Nelder-Mead")
     assert_allclose(sources_fit.params, sources.params, atol=1e-4, rtol=1e-5)
 
 
 # Just testing the machinery not if the fitting is robust/good
 def test_vis_forward_fit_minimise_pso():
+    rng = np.random.default_rng(42)
     sources = SourceList([Source("circular", 2, -4, -5, 2), Source("circular", 4, 5, 4, 3)])
     uu = generate_uv(33 * apu.pixel)
     u, v = np.meshgrid(uu, uu)
     vis = sources_to_vis(sources, u.value, v.value)
     # Create non-optimal source parameters
-    init_souces = SourceList.from_params(sources, np.random.randn(len(sources.params)) * 0.1 + sources.params)
+    init_souces = SourceList.from_params(sources, rng.standard_normal(len(sources.params)) * 0.1 + sources.params)
     visobs = Visibilities(vis.flatten() * apu.ph, u.flatten(), v.flatten())
     sources_fit, res = _vis_forward_fit_minimise(visobs, init_souces, method="PSO")
     # the sources can swap so sort by x0, y0 before comparison

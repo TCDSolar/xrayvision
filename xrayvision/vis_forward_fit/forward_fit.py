@@ -17,11 +17,11 @@ from xrayvision.vis_forward_fit.sources import (
     Elliptical,
     Loop,
     SourceList,
-    circular_gaussian,
+    circular_gaussian_img,
     circular_gaussian_vis,
-    elliptical_gaussian,
+    elliptical_gaussian_img,
     elliptical_gaussian_vis,
-    loop,
+    loop_img,
     loop_vis,
 )
 from xrayvision.visibility import Visibilities
@@ -30,9 +30,9 @@ __all__ = ["SOURCE_TO_IMAGE", "SOURCE_TO_VIS", "sources_to_image", "sources_to_v
 
 #: Mapping of sources to image generation functions
 SOURCE_TO_IMAGE: dict[str, Callable] = {
-    Circular.__name__: circular_gaussian,
-    Elliptical.__name__: elliptical_gaussian,
-    Loop.__name__: loop,
+    Circular.__name__: circular_gaussian_img,
+    Elliptical.__name__: elliptical_gaussian_img,
+    Loop.__name__: loop_img,
 }
 
 #: Mapping of sources to visibility generation functions
@@ -189,7 +189,7 @@ def vis_forward_fit(
     if map:
         header = generate_header(vis, shape=shape, pixel_size=pixel_size)
         return Map((image, header))
-    return image
+    return image, sources_out
 
 
 class VisForwardFitProblem(ElementwiseProblem):

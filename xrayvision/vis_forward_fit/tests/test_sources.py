@@ -10,12 +10,14 @@ from xrayvision.vis_forward_fit.sources import (
     Elliptical,
     Source,
     SourceList,
-    circular_gaussian,
+    circular_gaussian_img,
     circular_gaussian_vis,
-    elliptical_gaussian,
+    elliptical_gaussian_img,
     elliptical_gaussian_vis,
-    loop,
+    loop_img,
+    loop_img_old,
     loop_vis,
+    loop_vis_old,
 )
 from xrayvision.visibility import Visibilities
 
@@ -36,7 +38,7 @@ def test_circular_ft_equivalence_fft(x0, y0, sigma, size, shape):
     u = u.flatten()
     v = v.flatten()
 
-    image = circular_gaussian(1, x, y, x0 * apu.arcsec, y0 * apu.arcsec, sigma * size * apu.arcsec)
+    image = circular_gaussian_img(1, x, y, x0 * apu.arcsec, y0 * apu.arcsec, sigma * size * apu.arcsec)
 
     vis_obs = image_to_vis(image, u=u, v=v, pixel_size=[size, size] * apu.arcsec / apu.pixel)
     # by definition map center on phase 0,0
@@ -58,8 +60,8 @@ def test_circular_ft_equivalence_fft(x0, y0, sigma, size, shape):
 def test_equivalence_elliptical_to_circular(x0, y0, sigma):
     amp = 1
     x, y = np.meshgrid(np.linspace(-20, 20, 101), np.linspace(-20, 20, 101))
-    image_circular = circular_gaussian(amp, x, y, x0, y0, sigma)
-    image_elliptical = elliptical_gaussian(amp, x, y, x0, y0, sigma, sigma, 0)
+    image_circular = circular_gaussian_img(amp, x, y, x0, y0, sigma)
+    image_elliptical = elliptical_gaussian_img(amp, x, y, x0, y0, sigma, sigma, 0)
     assert_allclose(image_circular, image_elliptical, atol=1e-13)
 
 
@@ -89,21 +91,13 @@ def test_loop_ft_equivalence_fft(size):
     u = u.flatten()
     v = v.flatten()
 
-    image = loop(
-        80,
-        x,
-        y,
-        0 * apu.arcsec,
-        0 * apu.arcsec,
-        9.0 * apu.arcsec,
-        22.5 * apu.arcsec,
-        np.deg2rad(90),
-        np.deg2rad(70),
+    image = loop_img_old(
+        80, x, y, 0 * apu.arcsec, 0 * apu.arcsec, 9.0 * apu.arcsec, 22.5 * apu.arcsec, np.deg2rad(90), np.deg2rad(70)
     )
 
     vis_obs = image_to_vis(image * apu.ph, u=u, v=v)
     vis_func = Visibilities(
-        loop_vis(
+        loop_vis_old(
             80,
             u,
             v,
@@ -170,3 +164,45 @@ def test_source_list():
     assert params == [1, 2, 3, 4, 1, 2, 3, 4, 5, 6]
     new_sources = SourceList.from_params(orig_sources, params)
     assert orig_sources == new_sources
+
+
+def test_loop_image_oldvnew():
+    x = generate_xy(65 * apu.pixel).value
+    y = generate_xy(65 * apu.pixel).value
+    x, y = np.meshgrid(x, y)
+
+    flux = 100
+    x0 = 0
+    y0 = 0
+    sigmaj = 20
+    sigmin = 10
+    rotatiion = np.pi / 4
+    loopw = np.deg2rad(110)
+
+    sigma_to_fwhm = 2 * np.sqrt(2 * np.log(2))
+
+    image_old = loop_img_old(flux, x, y, x0, y0, sigmin * sigma_to_fwhm, sigmaj * sigma_to_fwhm, rotatiion, loopw)
+    image = loop_img(flux, x, y, x0, y0, sigmin, sigmaj, rotatiion, loopw)
+
+    assert_allclose(image, image_old)
+
+
+def test_loop_vis_oldvnew():
+    u = generate_uv(65 * apu.pixel).value
+    v = generate_uv(65 * apu.pixel).value
+    u, v = np.meshgrid(u, v)
+
+    flux = 100
+    x0 = 0
+    y0 = 0
+    sigmaj = 20
+    sigmin = 10
+    rotatiion = np.pi / 4
+    loopw = np.deg2rad(110)
+
+    sigma_to_fwhm = 2 * np.sqrt(2 * np.log(2))
+
+    vis_old = loop_vis_old(flux, u, v, x0, y0, sigmin * sigma_to_fwhm, sigmaj * sigma_to_fwhm, rotatiion, loopw)
+    vis = loop_vis(flux, u, v, x0, y0, sigmin, sigmaj, rotatiion, loopw)
+
+    assert_allclose(vis, vis_old)
