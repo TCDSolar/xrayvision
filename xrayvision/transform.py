@@ -161,10 +161,8 @@ def dft_map(
     x, y = np.meshgrid(x, y)
     uv = np.vstack([u, v])
     # Check units are correct for exp need to be dimensionless and then remove units for speed
-    if (uv[0, :] * x[0, 0]).unit == apu.dimensionless_unscaled and (
-        uv[1, :] * y[0, 0]
-    ).unit == apu.dimensionless_unscaled:
-        uv = uv.value  # type: ignore
+    if (uv.unit * x.unit) == apu.dimensionless_unscaled and (uv.unit * y.unit) == apu.dimensionless_unscaled:
+        uv = uv.value  # src_type: ignore
         x = x.value
         y = y.value
 
@@ -174,7 +172,7 @@ def dft_map(
                 2j * np.pi * (x[..., np.newaxis] * uv[np.newaxis, 0, :] + y[..., np.newaxis] * uv[np.newaxis, 1, :])
             ),
             axis=(0, 1),
-        )
+        ) * np.prod(pixel_size.value)
 
         return vis
     else:
@@ -245,7 +243,7 @@ def idft_map(
             axis=2,
         )
 
-        return np.real(image)
+        return np.real(image) / np.prod(pixel_size.value)
     else:
         raise UnitsError("Incompatible units on uv {uv.unit} should cancel with xy to leave a dimensionless quantity")
 

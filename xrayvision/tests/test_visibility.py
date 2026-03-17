@@ -109,7 +109,7 @@ def test_vis_eq(visibilities):
 def test_meta_eq(vis_meta):
     meta = vis_meta
     assert meta == meta
-    meta = vm.VisMeta(dict())
+    meta = vm.VisMeta({})
     assert meta == meta
 
 

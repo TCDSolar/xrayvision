@@ -20,7 +20,7 @@ dependencies = [
     "numpy>=1.24.0",
     "packaging>=23.0",
     "scipy>=1.13",
-    "xarray>=2023.5.0"
+    "xarray>=2023.5.0",
 ]
 dynamic = ["version"]
 keywords = ["solar", "physics", "solar", "sun", "x-rays"]
@@ -42,7 +42,10 @@ classifiers = [
 map = [
     "sunpy[map]>=5.1.0"
 ]
-all = ["xrayvisim[map]"]
+pso = [
+        "pymoo>=0.6.1.3"
+]
+all = ["xrayvisim[map,pso]"]
 tests = [
     "matplotlib>=3.8.0",
     "pytest-astropy>=0.11.0",

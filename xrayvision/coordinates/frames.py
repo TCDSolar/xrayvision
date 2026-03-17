@@ -71,7 +71,7 @@ def projective_wcs_to_frame(wcs):
     observer = None
     for frame, attr_names in required_attrs.items():
         attrs = [getattr(wcs.wcs.aux, attr_name) for attr_name in attr_names]
-        if all([attr is not None for attr in attrs]):
+        if all(attr is not None for attr in attrs):
             kwargs = {"obstime": dateavg}
             if rsun is not None:
                 kwargs["rsun"] = rsun
