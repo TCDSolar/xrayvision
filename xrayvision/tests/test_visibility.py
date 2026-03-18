@@ -1,3 +1,4 @@
+import astropy.units as apu
 import numpy as np
 import pytest
 from numpy.testing import assert_array_equal
@@ -23,7 +24,8 @@ def test_visibilities():
 
 
 def test_visibility():
-    vis = Visibility(vis=1 * apu.ct, u=1 / apu.deg, v=1 / apu.deg)
+    with pytest.warns(SunpyDeprecationWarning):
+        vis = Visibility(vis=1 * apu.ct, u=1 / apu.deg, v=1 / apu.deg)
     assert vis.vis == 1 * apu.ct
     assert vis.u == 1 / apu.deg
     assert vis.v == 1 / apu.deg

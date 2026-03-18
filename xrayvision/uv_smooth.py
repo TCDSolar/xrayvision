@@ -1,8 +1,14 @@
+import logging
+
 import numpy as np
 from numpy.fft import fft2, fftshift, ifft2, ifftshift
-from scipy.interpolate import Rbf, RBFInterpolator
+from scipy.interpolate import RBFInterpolator
 
 from xrayvision.visibility import Visibilities
+
+__all__ = ["uv_smooth"]
+
+logger = logging.getLogger(__name__)
 
 
 def uv_smooth(vis: Visibilities, niter: int = 50):
@@ -114,7 +120,6 @@ def uv_smooth(vis: Visibilities, niter: int = 50):
     F_Trasf = fftshift(F_Trasf_shifted)
 
     for iter in range(niter):
-        print(iter)
         # Update rule
         F_Trasf_up = F_Trasf + tau * (g - chi * F_Trasf)
         F_Trasf = F_Trasf_up
@@ -139,8 +144,10 @@ def uv_smooth(vis: Visibilities, niter: int = 50):
             with np.errstate(divide="ignore", invalid="ignore"):
                 descent[iter - 1] = (normAf_g[iter - 1] - normAf_g[iter]) / normAf_g[iter - 1]
             if descent[iter - 1] < 0.02:
-                print("Converged at iteration", iter)
+                logger.info("Converge at iteration %d", iter)
                 break
+    else:
+        logger.info("Max iterations reached %d", iter)
 
     # output
     F_Trasf = 4 * np.pi**2 * F_Trasf
@@ -153,7 +160,7 @@ def uv_smooth(vis: Visibilities, niter: int = 50):
     return map_solution, F_Trasf
 
 
-def uv_smooth_flexible(vis: Visibilities, niter: int = 50, pixel_size: float = None, image_dim: int = 128):
+def uv_smooth_flexible(vis: Visibilities, niter: int = 50, pixel_size: float = 1, image_dim: int = 128):
     """
     UV smooth with user-specified image dimensions and pixel size.
 
@@ -178,8 +185,8 @@ def uv_smooth_flexible(vis: Visibilities, niter: int = 50, pixel_size: float = N
     """
 
     # Calculate maximum UV radius
-    r = np.sqrt(vis.u**2 + vis.v**2).value
-    r_max = r.max()
+    # r = np.sqrt(vis.u**2 + vis.v**2).value
+    # r_max = r.max()
 
     # Determine UV pixel size
     if pixel_size is not None:
@@ -195,7 +202,7 @@ def uv_smooth_flexible(vis: Visibilities, niter: int = 50, pixel_size: float = N
             uv_pixel = uv_pixel * 2.0
 
     # Call the main function with appropriate parameters
-    map_solution, F_Trasf, xpix, ypix = uv_smooth(vis, niter=niter, pixel_size=uv_pixel, shape=image_dim)
+    map_solution, F_Trasf, xpix, ypix = uv_smooth_new(vis, niter=niter, pixel_size=uv_pixel, shape=image_dim)
 
     # Calculate actual pixel size
     fov_uv = xpix[-1] - xpix[0]
@@ -205,7 +212,7 @@ def uv_smooth_flexible(vis: Visibilities, niter: int = 50, pixel_size: float = N
 
 
 def uv_smooth_new(
-    vis: Visibilities, niter: int = 50, pixel_size: float = None, shape: int = None, natural_weighting: bool = True
+    vis: Visibilities, niter: int = 50, pixel_size: float = 1, shape: int = 128, natural_weighting: bool = True
 ):
     """
     UV smooth algorithm with flexible image dimensions.
@@ -424,6 +431,8 @@ def uv_smooth_new(
             with np.errstate(divide="ignore", invalid="ignore"):
                 descent[iter - 1] = (normAf_g[iter - 1] - normAf_g[iter]) / normAf_g[iter - 1]
 
+            logger.debug("Iteration %d: %f", iter, descent[iter - 1])
+
             if descent[iter - 1] < 0.02:
                 print(f"Converged at iteration {iter}")
                 break
@@ -443,190 +452,3 @@ def uv_smooth_new(
     map_solution = map_solution * im_new**2
 
     return map_solution, F_Trasf, xpixnew, ypixnew
-
-
-def uv_smooth_flexible(
-    vis: Visibilities, niter: int = 50, target_pixel_size_arcsec: float = None, image_dim: int = 128
-):
-    """
-    UV smooth with user-specified image dimensions and pixel size.
-
-    Parameters
-    ----------
-    vis : Visibilities
-        Input visibilities
-    niter : int
-        Number of Landweber iterations
-    target_pixel_size_arcsec : float, optional
-        Desired pixel size in arcseconds for the output image.
-        If None, automatically determined.
-    image_dim : int
-        Desired output image dimension in pixels (default: 128)
-
-    Returns
-    -------
-    map_solution : ndarray
-        Reconstructed image of size (image_dim, image_dim)
-    pixel_size_arcsec : float
-        Actual pixel size in arcseconds
-    """
-
-    # Calculate maximum UV radius
-    r = np.sqrt(vis.u**2 + vis.v**2).value
-    r_max = r.max()
-
-    # Determine UV pixel size
-    if target_pixel_size_arcsec is not None:
-        # Convert arcsec to arcsec^-1 for UV space
-        # For an image of size L arcsec, the UV sampling is 1/L arcsec^-1
-        fov_arcsec = target_pixel_size_arcsec * image_dim
-        uv_pixel = 1.0 / fov_arcsec
-    else:
-        # Use default based on detector
-        uv_pixel = 0.0005
-        detmin = min(vis.meta["isc"])
-        if detmin <= 1:
-            uv_pixel = uv_pixel * 2.0
-
-    # Call the main function with appropriate parameters
-    map_solution, F_Trasf, xpix, ypix = uv_smooth_new(vis, niter=niter, pixel_size=uv_pixel, shape=image_dim)
-
-    # Calculate actual pixel size
-    fov_uv = xpix[-1] - xpix[0]
-    pixel_size_arcsec = 1.0 / fov_uv
-
-    return map_solution, pixel_size_arcsec
-
-
-def uv_smooth_alt(vis, noplot=True):
-    # --- Setup and Parameters ---
-    # Assuming 'vis' is a structured array or object with u, v, obsvis, isc, etc.
-    detmin = np.min(vis.meta["isc"])
-    # mapcenter = vis.meta['xyoffset'][0]
-
-    u_vals = vis.u
-    v_vals = vis.v
-    obsvis = vis.visibilities
-
-    Rmax = np.max(np.sqrt(u_vals**2 + v_vals**2))
-    pixel = 0.0005
-
-    if detmin == 0:
-        fov, pixel, N = 0.45, pixel * 2.0, 450
-    elif detmin == 1:
-        fov, pixel, N = 0.26, pixel * 2.0, 260
-    else:
-        fov, N = 0.16, 320
-
-    # Definition of the uniform grid
-    ulimit = (N / 2.0 - 1) * pixel + pixel / 2.0
-    usampl = -ulimit + np.arange(N) * pixel
-    vsampl = usampl
-
-    # Create meshgrid for interpolation and masking
-    uu, vv = np.meshgrid(usampl, vsampl, indexing="ij")
-
-    # --- Interpolation with Splines (GRID_TPS Equivalent) ---
-    # IDL's GRID_TPS is a Thin Plate Spline. Scipy's Rbf with 'thin_plate' is the match.
-    # Note: We scale by 4*pi^2 as per the IDL source.
-    scale_factor = 4 * np.pi**2
-
-    # Real Part
-    rbf_re = Rbf(u_vals, v_vals, np.real(obsvis) / scale_factor, function="thin_plate")
-    reintz = rbf_re(uu, vv)
-
-    # Imaginary Part
-    rbf_im = Rbf(u_vals, v_vals, np.imag(obsvis) / scale_factor, function="thin_plate")
-    imintz = rbf_im(uu, vv)
-
-    visnew = reintz + 1j * imintz
-
-    # Zero out values outside the disk (Rmax)
-    dist_map = np.sqrt(uu**2 + vv**2)
-    visnew[dist_map > Rmax.value] = 0.0 + 0.0j
-
-    # --- Zero-Padding ---
-    fov_new = 0.96
-    Nnew = 1920
-    intzpadd = np.zeros((Nnew, Nnew), dtype=complex)
-
-    start_idx = (Nnew - N) // 2
-    intzpadd[start_idx : start_idx + N, start_idx : start_idx + N] = visnew
-
-    # --- Resampling with 15x15 Mask ---
-    im_new_size = Nnew // 15
-    # Extract every 15th pixel starting at offset 7
-    intznew = intzpadd[7::15, 7::15]
-
-    # Re-calculate sampling logic for space-space
-    # xpixnew equivalent for logic
-    ulimit_new = (Nnew / 2.0 - 1) * pixel + pixel / 2.0
-    xpix = -ulimit_new + np.arange(Nnew) * pixel
-    xpixnew = xpix[7::15]
-
-    omega = (xpixnew[-1] - xpixnew[0]) / 2.0
-    deltaomega = (xpixnew[-1] - xpixnew[0]) / im_new_size
-
-    # --- FFT Computation ---
-    g = intznew.copy()
-
-    # In IDL: shift(intznew, [-im_new/2, -im_new/2])
-    # This centers the DC component. In Python, we use ifftshift.
-    intz_shifted = ifftshift(intznew)
-
-    # IDL FFT behavior: IDL's forward FFT includes a 1/N scaling.
-    # Python's np.fft.fft2 does NOT. We must divide by the size manually or use norm='forward'.
-    # IDL code: 4*!pi*!pi * deltaomega^2 * im_new^2 * float(FFT(intznew))
-    fft_res = fft2(intz_shifted, norm="forward")
-    fftInverse = scale_factor * (deltaomega**2) * (im_new_size**2) * np.real(fft_res)
-    fftInverse = fftshift(fftInverse)
-
-    # --- Landweber Iterations ---
-    # Characteristic function (Mask)
-    x_mesh, y_mesh = np.meshgrid(xpixnew, xpixnew, indexing="ij")
-    chi = np.zeros((im_new_size, im_new_size), dtype=complex)
-    chi[np.sqrt(x_mesh**2 + y_mesh**2) <= Rmax.value] = 1.0 + 0.0j
-
-    iterLand = 50
-    tau = 0.2
-    map_actual = np.zeros((im_new_size, im_new_size), dtype=complex)
-
-    # Initial F_Trasf calculation
-    map_shifted = ifftshift(map_actual)
-    # IDL inverse FFT doesn't scale, Python's ifft2 DOES scale by 1/N.
-    # To match IDL's /inverse (no scale), we use norm='backward' and multiply by N.
-    f_trasf_shifted = ifft2(map_shifted) / (scale_factor * (deltaomega**2) * (im_new_size**2))
-    f_trasf = fftshift(f_trasf_shifted)
-
-    normAf_g = np.zeros(iterLand)
-
-    for i in range(iterLand):
-        # Landweber updating rule
-        f_trasf = f_trasf + tau * (g - chi * f_trasf)
-
-        # Updated solution to space domain
-        f_trasf_shifted = ifftshift(f_trasf)
-        map_shifted = fft2(f_trasf_shifted, norm="forward") * scale_factor * (deltaomega**2) * (im_new_size**2)
-        map_actual = fftshift(map_shifted)
-
-        # Positivity constraint (Projection)
-        map_actual = np.where(np.real(map_actual) < 0, 0.0 + 0.0j, map_actual)
-
-        # Recompute F_trasf for next iteration
-        map_shifted = ifftshift(map_actual)
-        f_trasf_shifted = ifft2(map_shifted) / (scale_factor * (deltaomega**2) * (im_new_size**2))
-        f_trasf = fftshift(f_trasf_shifted)
-
-        # Convergence Check
-        af_g = chi * f_trasf - g
-        normAf_g[i] = np.sqrt(np.sum(np.abs(af_g) ** 2))
-
-        if i >= 1:
-            descent = (normAf_g[i - 1] - normAf_g[i]) / normAf_g[i - 1]
-            if descent < 0.02:
-                break
-
-    # Final scaling
-    f_trasf_final = scale_factor * f_trasf
-
-    return np.real(map_actual), f_trasf_final
