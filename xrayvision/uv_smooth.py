@@ -13,7 +13,11 @@ logger = logging.getLogger(__name__)
 
 def uv_smooth(vis: Visibilities, niter: int = 50):
     r"""
-    UV-smoothing imaging algorithm.
+    uv_smooth image reconstruction method.
+
+    This method reconstructs images from sparse Fourier-domain visibilities using an iterative Landweber scheme. It
+    interpolates visibilities onto a regular uv grid, applies smoothing to stabilize the reconstruction, and
+    iteratively refines the image while enforcing positivity.
 
     Parameters
     ----------
@@ -22,9 +26,34 @@ def uv_smooth(vis: Visibilities, niter: int = 50):
     niter :
         Maximum number of iterations.
 
+    References
+    ----------
+    * :cite:t:`Massone2009_uv_smooth`
+
     Returns
     -------
+        Reconstructed 2D image of the X-ray source.
 
+    Notes
+    -----
+    UV_smooth solves the ill-posed image reconstruction problem in the uv-plane
+    through the following steps:
+
+    1. **Visibility Gridding**: Sparse visibilities `V(u_i, v_i)` are interpolated onto a regular uv grid `V_grid(u,v)`
+    using a smoothing kernel `K(u,v)`: `V_grid(u,v) = sum_i V(u_i,v_i) * K(u-u_i, v-v_i)`
+
+    2. **Smoothing / Regularization**: The kernel enforces smoothness in the uv-plane to mitigate noise and compensate
+    for sparse coverage.
+
+    3. **Iterative Landweber Update**: The image `I_n(x,y)` at iteration n is updated using the Landweber scheme:
+    `I_{n+1} = I_n + λ * F^{-1}[ V_grid - F[I_n] ]`
+    where `F` and `F^{-1}` are the Fourier and inverse Fourier transforms, and λ is a relaxation parameter. After
+    each iteration, positivity is enforced: `I_{n+1} = max(0, I_{n+1})`
+
+    4. **Stopping Criterion**: Iteration continues until either:
+    `|| F[I_{n+1}] - V_grid || < tolerance`
+    or the maximum number of iterations `max_iter` is reached. This residual norm ensures that updates stop when the
+    reconstruction is consistent with the measured visibilities.
     """
 
     pixel = 0.0005
@@ -238,6 +267,7 @@ def uv_smooth_new(
         Reconstructed image
     F_Trasf : ndarray
         Final Fourier transform
+
     """
 
     # Determine pixel size if not provided

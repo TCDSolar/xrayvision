@@ -11,5 +11,7 @@ Reference
    transform
    utils
    visibility
+   uv-smooth
+   bibliography
 
    ../whatsnew/index
