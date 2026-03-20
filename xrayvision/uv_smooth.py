@@ -243,7 +243,6 @@ def uv_smooth_new(
     shape=128,
     pixel_size: float = 1.0,
     uv_pixel_size: float | None = None,
-    uv_grid_size: int | None = None,
     niter: int = 50,
     upsample_factor: int = 25,
 ):
@@ -301,31 +300,18 @@ def uv_smooth_new(
     DOWNSAMPLE_FACTOR = 15
     DOWNSAMPLE_OFFSET = 7
     PADDING_FACTOR = 6
-    # Landweber iteration parameters
-    RELAXATION_PARAMETER = 0.2
-    CONVERGENCE_THRESHOLD = 0.02
-    FOURIER_NORMALIZATION = 4 * np.pi**2
 
     r = np.sqrt(vis.u**2 + vis.v**2).value
     r_max = r.max()
     # r_min = r[r > 0].min()
 
-    if uv_pixel_size is None:
-        uv_extent = 1 / pixel_size
-        output_uv_pixel_size = uv_extent / (shape - 1)
-        uv_pixel_size = output_uv_pixel_size / DOWNSAMPLE_FACTOR
+    if uv_pixel_size is not None:
         padded_uv_grid_size = shape * DOWNSAMPLE_FACTOR
         uv_grid_size = int(padded_uv_grid_size / PADDING_FACTOR)
-
-        # output_uv_pixel_size = 1 / (shape * pixel_size)
-        # uv_pixel_size = output_uv_pixel_size / DOWNSAMPLE_FACTOR
-        # padded_uv_grid_size = int(1 // uv_pixel_size)
-        # uv_grid_size = int(padded_uv_grid_size // PADDING_FACTOR)
-
-        logger.info(f"Calculated uv_pixel_size: {uv_pixel_size} and uv_grid_size: {uv_grid_size}")
-
-    assert uv_grid_size is not None
-    padded_uv_grid_size = uv_grid_size * 6
+    else:
+        padded_uv_grid_size, uv_grid_size, uv_pixel_size = determine_grid_parameters(
+            shape, pixel_size, PADDING_FACTOR, DOWNSAMPLE_FACTOR
+        )
 
     # Construct regular UV grid for interpolation
     uv_limit = (uv_grid_size / 2 - 1) * uv_pixel_size + uv_pixel_size / 2
@@ -379,6 +365,80 @@ def uv_smooth_new(
     uv_coverage_mask = np.zeros((downsampled_size, downsampled_size), dtype=np.complex128)
     uv_coverage_mask[np.sqrt(x_grid**2 + y_grid**2) < r_max] = 1 + 0j
 
+    final_image, fourier_transform = landweber_iteration(
+        target_visibilities=target_visibilities,
+        downsampled_size=downsampled_size,
+        uv_coverage_mask=uv_coverage_mask,
+        delta_omega=delta_omega,
+    )
+
+    return final_image, fourier_transform, pixel_size
+
+
+def determine_grid_parameters(
+    shape: int, pixel_size: float, PADDING_FACTOR: int, DOWNSAMPLE_FACTOR: int
+) -> tuple[int, int, float]:
+    r"""
+    Determine Foroer pixe size and grid sizes based on output image shape and pixel size.
+
+    Parameters
+    ----------
+    shape :
+        Output image shape.
+    pixel_size :
+        Size of output pixels.
+    PADDING_FACTOR :
+        Padding factor.
+    DOWNSAMPLE_FACTOR
+        Downsampling factor.
+
+    Returns
+    -------
+    padded_uv_grid_size,
+        Sixe of the padded u, v grid
+    uv_grid_size,
+        Sixe of the u, v grid
+    uv_pixel_size
+        Sixe of the u, v pixel size
+    """
+
+    uv_extent = 1 / pixel_size
+    output_uv_pixel_size = uv_extent / (shape)
+    uv_pixel_size = output_uv_pixel_size / DOWNSAMPLE_FACTOR
+    padded_uv_grid_size = shape * DOWNSAMPLE_FACTOR
+    uv_grid_size = int(padded_uv_grid_size / PADDING_FACTOR)
+
+    return padded_uv_grid_size, uv_grid_size, uv_pixel_size
+
+
+def landweber_iteration(
+    target_visibilities, downsampled_size, uv_coverage_mask, delta_omega, niter=50, tau=0.2, convergence_threshold=0.02
+):
+    r"""
+    Perform Landweber iterative reconstruction with positivity constraint.
+
+    Parameters
+    ----------
+    target_visibilities
+        Gridded visibility data
+    downsampled_size
+        Output size
+    uv_coverage_mask
+        Mask for observed u, v coverage
+    delta_omega :
+        Pixel size in Fourier space (assumes square pixel)
+    niter :
+        Maximum number of iterations
+    tau :
+        Relaxation parameter
+    convergence_threshold :
+        Threshold for convergence
+
+    Returns
+    -------
+
+    """
+    FOURIER_NORMALIZATION = 4 * np.pi**2
     # Initialize Landweber iteration
     current_image = np.zeros((downsampled_size, downsampled_size), dtype=np.complex128)
     iteration_history = np.zeros((niter, downsampled_size, downsampled_size))
@@ -393,9 +453,7 @@ def uv_smooth_new(
     # Landweber iterations
     for iteration in range(niter):
         # Update Fourier transform using Landweber scheme
-        fourier_transform = fourier_transform + RELAXATION_PARAMETER * (
-            target_visibilities - uv_coverage_mask * fourier_transform
-        )
+        fourier_transform = fourier_transform + tau * (target_visibilities - uv_coverage_mask * fourier_transform)
 
         # Transform back to image domain
         current_image = fftshift(fft2(ifftshift(fourier_transform)) * FOURIER_NORMALIZATION * delta_omega * delta_omega)
@@ -419,7 +477,7 @@ def uv_smooth_new(
                 descent_rates[iteration - 1] = (
                     residual_norms[iteration - 1] - residual_norms[iteration]
                 ) / residual_norms[iteration - 1]
-            if descent_rates[iteration - 1] < CONVERGENCE_THRESHOLD:
+            if descent_rates[iteration - 1] < convergence_threshold:
                 logger.info("Converged at iteration %d", iteration)
                 break
     else:
@@ -434,7 +492,7 @@ def uv_smooth_new(
     else:
         final_image = current_image.real
 
-    return final_image, fourier_transform, pixel_size
+    return final_image, fourier_transform
 
 
 def interpolate_visibilities_to_grid(u, v, vis, ugrid, vgrid, **kwargs):
