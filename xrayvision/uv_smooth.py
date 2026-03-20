@@ -114,19 +114,17 @@ def uv_smooth(vis: Visibilities, niter: int = 50):
         for j in range(im_new):
             intznew[i, j] = intzpadd[15 * i + 7, 15 * j + 7]
 
-    # xx, yy = np.meshgrid(np.arange(im_new), np.arange(im_new), indexing="xy")
-    # intznew = intzpadd[(15 * xx) + 7, (15 * yy) + 7]
-    # xpixnew = xpix[(15 * xx[0,:]) + 7]
-    # ypixnew = ypix[(15 * yy[:,0]) + 7]
+    xx, yy = np.meshgrid(np.arange(im_new), np.arange(im_new), indexing="xy")
+    intznew = intzpadd[(15 * xx) + 7, (15 * yy) + 7]
+    xpixnew = xpix[(15 * xx[0, :]) + 7]
+    ypixnew = ypix[(15 * yy[:, 0]) + 7]
 
-    # OMEGA = (xpixnew[im_new - 1] - xpixnew[0]) / 2
-    # X = im_new // (4 * OMEGA)
+    OMEGA = (xpixnew[im_new - 1] - xpixnew[0]) / 2
+    X = im_new // (4 * OMEGA)
     deltaomega = (xpixnew[im_new - 1] - xpixnew[0]) / im_new
-    # deltax = 2 * X / im_new
+    deltax = 2 * X / im_new
 
     g = intznew[:, :]
-    # fftInverse = 4 * np.pi**2 * deltaomega * deltaomega * fft2(ifftshift(intznew)).real
-    # fftInverse = fftshift(fftInverse)
 
     # Characteristic function of disk
     chi = np.zeros((im_new, im_new), dtype=np.complex128)
@@ -173,7 +171,7 @@ def uv_smooth(vis: Visibilities, niter: int = 50):
             with np.errstate(divide="ignore", invalid="ignore"):
                 descent[iter - 1] = (normAf_g[iter - 1] - normAf_g[iter]) / normAf_g[iter - 1]
             if descent[iter - 1] < 0.02:
-                logger.info("Converge at iteration %d", iter)
+                logger.info("Converged at iteration %d", iter)
                 break
     else:
         logger.info("Max iterations reached %d", iter)
@@ -186,7 +184,7 @@ def uv_smooth(vis: Visibilities, niter: int = 50):
     else:
         map_solution = map_actual.real
 
-    return map_solution, F_Trasf
+    return map_solution, F_Trasf, deltax
 
 
 def uv_smooth_flexible(vis: Visibilities, niter: int = 50, pixel_size: float = 1, image_dim: int = 128):
@@ -241,6 +239,243 @@ def uv_smooth_flexible(vis: Visibilities, niter: int = 50, pixel_size: float = 1
 
 
 def uv_smooth_new(
+    vis: Visibilities,
+    shape=128,
+    pixel_size: float = 1.0,
+    uv_pixel_size: float | None = None,
+    uv_grid_size: int | None = None,
+    niter: int = 50,
+    upsample_factor: int = 25,
+):
+    r"""
+    uv_smooth image reconstruction method.
+
+    This method reconstructs images from sparse Fourier-domain visibilities using an iterative Landweber scheme. It
+    interpolates visibilities onto a regular uv grid, applies smoothing to stabilize the reconstruction, and
+    iteratively refines the image while enforcing positivity.
+
+    Parameters
+    ----------
+    vis :
+        Input visibilities.
+    uv_pixel_size :
+        Grid spacing in uv-plane (arcsec^-1). If None, automatically determined from
+        UV coverage to provide ~3-4 samples per minimum baseline
+    uv_grid_size :
+        Size of initial interpolation grid (N×N). If None, automatically determined to
+        cover UV extent with adequate sampling
+    niter :
+        Maximum number of iterations.
+
+    References
+    ----------
+    * :cite:t:`Massone2009_uv_smooth`
+
+    Returns
+    -------
+        Reconstructed 2D image of the X-ray source.
+
+    Notes
+    -----
+    UV_smooth solves the ill-posed image reconstruction problem in the uv-plane
+    through the following steps:
+
+    1. **Visibility Gridding**: Sparse visibilities `V(u_i, v_i)` are interpolated onto a regular uv grid `V_grid(u,v)`
+    using a smoothing kernel `K(u,v)`: `V_grid(u,v) = sum_i V(u_i,v_i) * K(u-u_i, v-v_i)`
+
+    2. **Smoothing / Regularization**: The kernel enforces smoothness in the uv-plane to mitigate noise and compensate
+    for sparse coverage.
+
+    3. **Iterative Landweber Update**: The image `I_n(x,y)` at iteration n is updated using the Landweber scheme:
+    `I_{n+1} = I_n + λ * F^{-1}[ V_grid - F[I_n] ]`
+    where `F` and `F^{-1}` are the Fourier and inverse Fourier transforms, and λ is a relaxation parameter. After
+    each iteration, positivity is enforced: `I_{n+1} = max(0, I_{n+1})`
+
+    4. **Stopping Criterion**: Iteration continues until either:
+    `|| F[I_{n+1}] - V_grid || < tolerance`
+    or the maximum number of iterations `max_iter` is reached. This residual norm ensures that updates stop when the
+    reconstruction is consistent with the measured visibilities.
+    """
+    # Zero-padding and downsampling constants
+    # PADDED_GRID_SIZE = 1920
+    DOWNSAMPLE_FACTOR = 15
+    DOWNSAMPLE_OFFSET = 7
+    PADDING_FACTOR = 6
+    # Landweber iteration parameters
+    RELAXATION_PARAMETER = 0.2
+    CONVERGENCE_THRESHOLD = 0.02
+    FOURIER_NORMALIZATION = 4 * np.pi**2
+
+    r = np.sqrt(vis.u**2 + vis.v**2).value
+    r_max = r.max()
+    # r_min = r[r > 0].min()
+
+    if uv_pixel_size is None:
+        uv_extent = 1 / pixel_size
+        output_uv_pixel_size = uv_extent / (shape - 1)
+        uv_pixel_size = output_uv_pixel_size / DOWNSAMPLE_FACTOR
+        padded_uv_grid_size = shape * DOWNSAMPLE_FACTOR
+        uv_grid_size = int(padded_uv_grid_size / PADDING_FACTOR)
+
+        # output_uv_pixel_size = 1 / (shape * pixel_size)
+        # uv_pixel_size = output_uv_pixel_size / DOWNSAMPLE_FACTOR
+        # padded_uv_grid_size = int(1 // uv_pixel_size)
+        # uv_grid_size = int(padded_uv_grid_size // PADDING_FACTOR)
+
+        logger.info(f"Calculated uv_pixel_size: {uv_pixel_size} and uv_grid_size: {uv_grid_size}")
+
+    assert uv_grid_size is not None
+    padded_uv_grid_size = uv_grid_size * 6
+
+    # Construct regular UV grid for interpolation
+    uv_limit = (uv_grid_size / 2 - 1) * uv_pixel_size + uv_pixel_size / 2
+    uv_sample_coords = -uv_limit + np.arange(uv_grid_size) * uv_pixel_size
+    uu_grid, vv_grid = np.meshgrid(uv_sample_coords, uv_sample_coords)
+
+    # Interpolate visibilities onto regular grid using RBF
+    vis_gridded = interpolate_visibilities_to_grid(u=vis.u, v=vis.v, vis=vis.visibilities, ugrid=uu_grid, vgrid=vv_grid)
+
+    # Mask values outside the original UV sampling coverage
+    uv_grid_radius = np.sqrt(uu_grid**2 + vv_grid**2)
+    vis_gridded[uv_grid_radius > r_max] = 0j
+
+    # Zero-pad visibilities to larger grid
+    padded_uv_limit = (padded_uv_grid_size / 2 - 1) * uv_pixel_size + uv_pixel_size / 2
+    padded_x_coords = -padded_uv_limit + np.arange(padded_uv_grid_size) * uv_pixel_size
+    padded_y_coords = padded_x_coords
+
+    vis_zero_padded = np.zeros((padded_uv_grid_size, padded_uv_grid_size), dtype=np.complex128)
+    pad_start = (padded_uv_grid_size - uv_grid_size) // 2
+    pad_end = pad_start + uv_grid_size
+    vis_zero_padded[pad_start:pad_end, pad_start:pad_end] = vis_gridded
+
+    # pad_width = (padded_uv_grid_size - uv_grid_size) // 2
+    # vis_zero_padded_new = np.pad(vis_gridded, pad_width, mode='constant', constant_values=0j)
+
+    # Downsample to final image grid
+    downsampled_size = padded_uv_grid_size // DOWNSAMPLE_FACTOR
+    vis_downsampled = np.zeros((downsampled_size, downsampled_size), dtype=np.complex128)
+    x_coords_downsampled = np.zeros(downsampled_size)
+    y_coords_downsampled = np.zeros(downsampled_size)
+
+    for i in range(downsampled_size):
+        x_coords_downsampled[i] = padded_x_coords[DOWNSAMPLE_FACTOR * i + DOWNSAMPLE_OFFSET]
+        y_coords_downsampled[i] = padded_y_coords[DOWNSAMPLE_FACTOR * i + DOWNSAMPLE_OFFSET]
+        for j in range(downsampled_size):
+            vis_downsampled[i, j] = vis_zero_padded[
+                DOWNSAMPLE_FACTOR * i + DOWNSAMPLE_OFFSET, DOWNSAMPLE_FACTOR * j + DOWNSAMPLE_OFFSET
+            ]
+
+    # Calculate grid spacing in frequency domain
+    total_extent = x_coords_downsampled[-1] - x_coords_downsampled[0]
+    delta_omega = total_extent / downsampled_size  # UV pixel spacing
+    pixel_size = 1 / total_extent  # Image spacing
+
+    # Target visibilities for reconstruction
+    target_visibilities = vis_downsampled[:, :]
+
+    # Create characteristic function (mask) for UV coverage
+    x_grid, y_grid = np.meshgrid(x_coords_downsampled, y_coords_downsampled, indexing="ij")
+    uv_coverage_mask = np.zeros((downsampled_size, downsampled_size), dtype=np.complex128)
+    uv_coverage_mask[np.sqrt(x_grid**2 + y_grid**2) < r_max] = 1 + 0j
+
+    # Initialize Landweber iteration
+    current_image = np.zeros((downsampled_size, downsampled_size), dtype=np.complex128)
+    iteration_history = np.zeros((niter, downsampled_size, downsampled_size))
+    final_image = np.zeros((downsampled_size, downsampled_size))
+
+    residual_norms = np.zeros(niter)
+    descent_rates = np.zeros(niter - 1)
+
+    # Initial Fourier transform (of zero image)
+    fourier_transform = fftshift(ifft2(ifftshift(current_image)) / (FOURIER_NORMALIZATION * delta_omega * delta_omega))
+
+    # Landweber iterations
+    for iteration in range(niter):
+        # Update Fourier transform using Landweber scheme
+        fourier_transform = fourier_transform + RELAXATION_PARAMETER * (
+            target_visibilities - uv_coverage_mask * fourier_transform
+        )
+
+        # Transform back to image domain
+        current_image = fftshift(fft2(ifftshift(fourier_transform)) * FOURIER_NORMALIZATION * delta_omega * delta_omega)
+
+        # Enforce positivity constraint
+        current_image[current_image.real < 0] = 0 + 0j
+        iteration_history[iteration, :, :] = current_image.real
+
+        # Transform updated image back to Fourier domain for next iteration
+        fourier_transform = fftshift(
+            ifft2(ifftshift(current_image)) / (FOURIER_NORMALIZATION * delta_omega * delta_omega)
+        )
+
+        # Calculate residual for convergence check
+        residual = uv_coverage_mask * fourier_transform - target_visibilities
+        residual_norms[iteration] = np.sqrt(np.sum(np.abs(residual) * np.abs(residual)))
+
+        # Check convergence criterion
+        if iteration >= 1:
+            with np.errstate(divide="ignore", invalid="ignore"):
+                descent_rates[iteration - 1] = (
+                    residual_norms[iteration - 1] - residual_norms[iteration]
+                ) / residual_norms[iteration - 1]
+            if descent_rates[iteration - 1] < CONVERGENCE_THRESHOLD:
+                logger.info("Converged at iteration %d", iteration)
+                break
+    else:
+        logger.info("Max iterations reached %d", iteration)
+
+    # Prepare final output
+    fourier_transform = FOURIER_NORMALIZATION * fourier_transform
+
+    if iteration == niter - 1:
+        # Use iteration 14 if max iterations reached (maintains original behavior)
+        final_image[:, :] = iteration_history[14, :, :].real
+    else:
+        final_image = current_image.real
+
+    return final_image, fourier_transform, pixel_size
+
+
+def interpolate_visibilities_to_grid(u, v, vis, ugrid, vgrid, **kwargs):
+    r"""
+    Interpolate sparse visibilities to regular grid using `~RBFInterpolator`.
+
+    Parameters
+    ----------
+    u :
+        Sparse ``v`` coordinates.
+    v :
+        Sparse ``u`` coordinates.
+    vis :
+        Sparse complex visibilities corresponding to ``u`` and ``v``.
+    ugrid :
+        Regular grid of ``v``
+    vgrid :
+        Regular grid of ``u``
+
+    Returns
+    -------
+    vis_grid : ndarray
+        Interpolated visibilities on regular grid (complex)
+    """
+    norm = 4 * np.pi**2
+    uv_observed = np.vstack([u, v]).T
+    uv_grid_points = np.vstack([ugrid.flatten(), vgrid.flatten()]).T
+
+    # Interpolate real and imaginary components separately
+    real_interpolator = RBFInterpolator(uv_observed, vis.real / norm)
+    real_interpolated = real_interpolator(uv_grid_points)
+
+    imag_interpolator = RBFInterpolator(uv_observed, vis.imag / norm)
+    imag_interpolated = imag_interpolator(uv_grid_points)
+
+    vis_gridded = (real_interpolated + 1j * imag_interpolated).reshape(ugrid.shape)
+
+    return vis_gridded
+
+
+def uv_smooth_alt(
     vis: Visibilities, niter: int = 50, pixel_size: float = 1, shape: int = 128, natural_weighting: bool = True
 ):
     """

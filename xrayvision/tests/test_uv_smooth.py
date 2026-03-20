@@ -6,7 +6,7 @@ from astropy.io import fits
 from numpy.testing import assert_allclose
 
 from xrayvision.simulation.instruments import rhessi_like_uv_coverage
-from xrayvision.uv_smooth import uv_smooth
+from xrayvision.uv_smooth import uv_smooth, uv_smooth_new
 from xrayvision.visibility import Visibilities, VisMeta
 
 
@@ -67,7 +67,7 @@ def rhessi_like_gaussian_vis():
     """
     uv = rhessi_like_uv_coverage()
     # detectors 3-7 or isc 2-6
-    u, v, isc = uv["u"][2:7].flatten(), uv["v"][2:7].flatten(), uv["det"][2:7].flatten()
+    u, v, isc = uv["u"][2:7].flatten(), uv["v"][2:7].flatten(), uv["isc"][2:7].flatten()
 
     flux = 100.0  # ph/cm^2/s
     sigma = 5.0 * apu.arcsec
@@ -87,8 +87,7 @@ def rhessi_like_gaussian_vis():
 def test_uv_smooth_peak_at_origin(rhessi_like_gaussian_vis):
     vis, flux, sigma = rhessi_like_gaussian_vis
 
-    image, _ = uv_smooth(vis, niter=50)
-
+    image, *_ = uv_smooth(vis, niter=50)
     # For a source centered at (0, 0) the peak should lie at the image center
     peak_idx = np.unravel_index(np.argmax(image), image.shape)
     center = np.array(image.shape) // 2
@@ -100,24 +99,26 @@ def test_uv_smooth_peak_at_origin(rhessi_like_gaussian_vis):
 def test_uv_smooth_matches_gaussian(rhessi_like_gaussian_vis):
     vis, flux, sigma = rhessi_like_gaussian_vis
     sigma = sigma.value
-    image, _ = uv_smooth(vis, niter=50)
-    im_new = image.shape[0]
+
+    image_orig, *og = uv_smooth(vis, niter=50)
+    image_new, *nw = uv_smooth_new(vis, uv_pixel_size=0.0005, uv_grid_size=320, niter=50)
+    image_auto, *au = uv_smooth_new(vis, shape=128, pixel_size=1.0)
+
+    im_new = image_orig.shape[0]
 
     # Build the reference Gaussian on the same pixel grid as the uv_smooth output
-    pixel_size = 1.0  # _uv_smooth_pixel_scale()  # arcsec/pixel
+    pixel_size = 1.00  # _uv_smooth_pixel_scale()  # arcsec/pixel
     coords = (np.arange(im_new) - im_new // 2) * pixel_size  # arcsec
     xx, yy = np.meshgrid(coords, coords)
     ref_image = (100.0 / (2 * np.pi * sigma**2)) * np.exp(-0.5 * (xx**2 + yy**2) / sigma**2)
 
-    np.testing.assert_allclose(image, ref_image, atol=0.05)
+    np.testing.assert_allclose(image_orig, ref_image, atol=0.05)
+    np.testing.assert_allclose(image_new, ref_image, atol=0.05)
+    np.testing.assert_allclose(image_auto, ref_image, atol=0.05)
 
 
 def test_uv_smooth_idl(rhessi_like_gaussian_vis):
     vis, flux, sigma = rhessi_like_gaussian_vis
-    # vis.u
-    # vis.v
-    # vis.obsvis
-    # vis.isc
 
     ssw = hissw.Environment(ssw_packages=["hessi"])
     script = """
@@ -133,6 +134,9 @@ uv_smooth, visin, map, reconstructed_map_visibilities=visout
             "isc": vis.meta["isc"].tolist(),
         },
     )
-    image, _ = uv_smooth(vis, niter=50)
+    image_orig, *info = uv_smooth(vis, niter=50)
+    image_new, *_ = uv_smooth_new(vis, uv_pixel_size=0.0005, uv_grid_size=320, niter=50)
+    image_auto, *_ = uv_smooth_new(vis)
     image_idl = out["map"]["data"][0]
-    assert_allclose(image, image_idl, atol=5e-5)
+    assert_allclose(image_orig, image_idl, atol=5e-5)
+    assert_allclose(image_new, image_idl, atol=5e-5)
