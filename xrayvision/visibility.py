@@ -208,7 +208,7 @@ class Visibilities(VisibilitiesABC):
         visibilities: apu.Quantity,
         u: apu.Quantity[1 / apu.deg],
         v: apu.Quantity[1 / apu.deg],
-        phase_center: apu.Quantity[apu.arcsec] = [0, 0] * apu.arcsec,
+        phase_center: apu.Quantity[apu.arcsec] = (0, 0) * apu.arcsec,
         meta: VisMetaABC | None = None,
         uncertainty: apu.Quantity | None = None,
         amplitude: apu.Quantity | None = None,

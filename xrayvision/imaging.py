@@ -332,7 +332,7 @@ def generate_header(
 @apu.quantity_input()  # type: ignore[untyped-decorator]
 def map_to_vis(amap: GenericMap, *, u: Quantity[1 / apu.arcsec], v: Quantity[1 / apu.arcsec]) -> Visibilities:
     r"""
-    Return a Visibilities object created from the map, sampling it at give `u`, `v` coordinates.
+    Return a Visibilities object created from the map, sampling it at given `u`, `v` coordinates.
 
     Parameters
     ----------
