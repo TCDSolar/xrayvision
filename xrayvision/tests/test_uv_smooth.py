@@ -101,7 +101,7 @@ def test_uv_smooth_matches_gaussian(rhessi_like_gaussian_vis):
     sigma = sigma.value
 
     image_orig, *og = uv_smooth(vis, niter=50)
-    image_new, *nw = uv_smooth_new(vis, uv_pixel_size=0.0005, uv_grid_size=320, niter=50)
+    image_new, *nw = uv_smooth_new(vis, shape=128, pixel_size=1.046, niter=50)
     image_auto, *au = uv_smooth_new(vis, shape=128, pixel_size=1.0)
 
     im_new = image_orig.shape[0]
@@ -114,7 +114,7 @@ def test_uv_smooth_matches_gaussian(rhessi_like_gaussian_vis):
 
     np.testing.assert_allclose(image_orig, ref_image, atol=0.05)
     np.testing.assert_allclose(image_new, ref_image, atol=0.05)
-    np.testing.assert_allclose(image_auto, ref_image, atol=0.05)
+    np.testing.assert_allclose(image_auto, ref_image, atol=0.02)
 
 
 def test_uv_smooth_idl(rhessi_like_gaussian_vis):
@@ -135,7 +135,7 @@ uv_smooth, visin, map, reconstructed_map_visibilities=visout
         },
     )
     image_orig, *info = uv_smooth(vis, niter=50)
-    image_new, *_ = uv_smooth_new(vis, uv_pixel_size=0.0005, uv_grid_size=320, niter=50)
+    image_new, *_ = uv_smooth_new(vis, shape=128, uv_pixel_size=0.0005, niter=50)
     image_auto, *_ = uv_smooth_new(vis)
     image_idl = out["map"]["data"][0]
     assert_allclose(image_orig, image_idl, atol=5e-5)
