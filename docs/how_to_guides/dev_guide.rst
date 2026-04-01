@@ -3,10 +3,10 @@ Developers Guide
 
 The instructions in this following section are based upon resources:
 
-* `Astropy Dev Workflow <https://docs.astropy.org/en/latest/development/workflow/development_workflow.html>`_
-* `Astropy Dev environment <https://docs.astropy.org/en/latest/development/workflow/get_devel_version.html#get-devel>`_
-* `Astropy Pull Request Example <https://docs.astropy.org/en/latest/development/workflow/git_edit_workflow_examples.html#astropy-fix-example>`_
-* `Sunpy Newcomers' Guide <https://docs.sunpy.org/en/latest/dev_guide/newcomers.html>`_
+* `Astropy Dev Workflow <https://docs.astropy.org/en/latest/development/quickstart.html>`_
+* `Astropy Dev environment <https://docs.astropy.org/en/latest/development/development_details.html>`_
+* `Astropy Pull Request Example <https://docs.astropy.org/en/latest/development/git_edit_workflow_examples.html>`_
+* `Sunpy Newcomers' Guide <https://docs.sunpy.org/en/latest/dev_guide/contents/newcomers.html>`_
 
 Fork and Clone Repository
 -------------------------
@@ -38,7 +38,7 @@ available to help manage and create isolated environment such as
 
 For this documentation we will proceed using Python's venv but the step would be similar in other
 tools. For a more detailed overview see the virturl environment section of astropy development
-workflow `here <https://docs.astropy.org/en/stable/development/workflow/virtual_pythons.html#virtual-envs>`_.
+workflow `here <https://docs.astropy.org/en/latest/development/quickstart.html#create-an-isolated-development-environment>`_.
 
 
 

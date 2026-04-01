@@ -241,9 +241,9 @@ __common_ms_clean_doc__ = r"""
     This is an implementation of the multiscale clean algorithm as outlined in [R1]_ adapted for \
     x-ray Fourier observations.
 
-    It is based on the on the implementation in the CASA software which can be found here_.
+    It is based on the on the implementation in the CASA software which can be found here_ ~L956.
 
-    .. _here: https://github.com/casacore/casacore/blob/f4dc1c36287c766796ce3375cebdfc8af797a388/lattices/LatticeMath/LatticeCleaner.tcc#L956 #noqa
+    .. _here: https://github.com/casacore/casacore/blob/f4dc1c36287c766796ce3375cebdfc8af797a388/lattices/LatticeMath/LatticeCleaner.tcc
 
     References
     ----------

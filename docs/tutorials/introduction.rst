@@ -1,7 +1,7 @@
 Introduction
 ============
 
-Below is a figure inspired by `Dale Gary`_, which summarises the problem XRAYVISION tries to solve.
+Below is a figure inspired by Dale Gary lectures, which summarises the problem XRAYVISION tries to solve.
 The top row shows a source map, the point spread function (PSF) or dirty beam and the convolution of
 two, the dirty map (left to right). The bottom row shows the corresponding visibilities,
 notice the convolution is replaced by multiplication in frequency space. The problem is given the
@@ -155,7 +155,3 @@ In reality the integrals above must be turned into summations over finite coordi
 can be written as
 
 .. math:: I(l_i, m_j) = \sum_{k=0}^{N} e^{2 \pi i ( l_i u_k + m_i v_k)}
-
-where :math:`x_i`
-
-.. _Dale Gary: https://web.njit.edu/~gary/728/Lecture6.html
