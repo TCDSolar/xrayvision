@@ -6,7 +6,7 @@ from scipy.interpolate import RBFInterpolator
 
 from xrayvision.visibility import Visibilities
 
-__all__ = ["uv_smooth"]
+__all__ = ["uv_smooth", "uv_smooth_new"]
 
 logger = logging.getLogger(__name__)
 
@@ -187,64 +187,8 @@ def uv_smooth(vis: Visibilities, niter: int = 50):
     return map_solution, F_Trasf, deltax
 
 
-def uv_smooth_flexible(vis: Visibilities, niter: int = 50, pixel_size: float = 1, image_dim: int = 128):
-    """
-    UV smooth with user-specified image dimensions and pixel size.
-
-    Parameters
-    ----------
-    vis : Visibilities
-        Input visibilities
-    niter : int
-        Number of Landweber iterations
-    pixel_size : float, optional
-        Desired pixel size in arcseconds for the output image.
-        If None, automatically determined.
-    image_dim : int
-        Desired output image dimension in pixels (default: 128)
-
-    Returns
-    -------
-    map_solution : ndarray
-        Reconstructed image of size (image_dim, image_dim)
-    pixel_size_arcsec : float
-        Actual pixel size in arcseconds
-    """
-
-    # Calculate maximum UV radius
-    # r = np.sqrt(vis.u**2 + vis.v**2).value
-    # r_max = r.max()
-
-    # Determine UV pixel size
-    if pixel_size is not None:
-        # Convert arcsec to arcsec^-1 for UV space
-        # For an image of size L arcsec, the UV sampling is 1/L arcsec^-1
-        fov_arcsec = pixel_size * image_dim
-        uv_pixel = 1.0 / fov_arcsec
-    else:
-        # Use default based on detector
-        uv_pixel = 0.0005
-        detmin = min(vis.meta["isc"])
-        if detmin <= 1:
-            uv_pixel = uv_pixel * 2.0
-
-    # Call the main function with appropriate parameters
-    map_solution, F_Trasf, xpix, ypix = uv_smooth_new(vis, niter=niter, pixel_size=uv_pixel, shape=image_dim)
-
-    # Calculate actual pixel size
-    fov_uv = xpix[-1] - xpix[0]
-    pixel_size_arcsec = 1.0 / fov_uv
-
-    return map_solution, pixel_size_arcsec
-
-
 def uv_smooth_new(
-    vis: Visibilities,
-    shape=128,
-    pixel_size: float = 1.0,
-    uv_pixel_size: float | None = None,
-    niter: int = 50,
-    upsample_factor: int = 25,
+    vis: Visibilities, shape=128, pixel_size: float = 1.0, uv_pixel_size: float | None = None, niter: int = 50, **kwargs
 ):
     r"""
     uv_smooth image reconstruction method.
@@ -256,55 +200,129 @@ def uv_smooth_new(
     Parameters
     ----------
     vis :
-        Input visibilities.
+        Input visibilities
+    shape :
+        Shape of output image
+    pixel_size :
+        Size of output pixels
     uv_pixel_size :
-        Grid spacing in uv-plane (arcsec^-1). If None, automatically determined from
-        UV coverage to provide ~3-4 samples per minimum baseline
-    uv_grid_size :
-        Size of initial interpolation grid (N×N). If None, automatically determined to
-        cover UV extent with adequate sampling
+        Grid spacing in uv-plane (arcsec^-1) **Use with caution a holdover to allow comparison to old RHESSI code**
     niter :
         Maximum number of iterations.
+
+    Returns
+    -------
+    final_image :
+        Reconstructed 2D image of the X-ray source.
+    fourier_transform :
+        The final visibilities
+    pixel_size :
+        The output pixel size
 
     References
     ----------
     * :cite:t:`Massone2009_uv_smooth`
 
-    Returns
-    -------
-        Reconstructed 2D image of the X-ray source.
-
     Notes
     -----
-    UV_smooth solves the ill-posed image reconstruction problem in the uv-plane
-    through the following steps:
+    UV_smooth solves the ill-posed image reconstruction problem from sparse Fourier-domain
+    measurements through a four-stage pipeline:
 
-    1. **Visibility Gridding**: Sparse visibilities `V(u_i, v_i)` are interpolated onto a regular uv grid `V_grid(u,v)`
-    using a smoothing kernel `K(u,v)`: `V_grid(u,v) = sum_i V(u_i,v_i) * K(u-u_i, v-v_i)`
+    **Stage 1: Grid Configuration**
 
-    2. **Smoothing / Regularization**: The kernel enforces smoothness in the uv-plane to mitigate noise and compensate
-    for sparse coverage.
+    Determines uv pixel size and grid dimensions based on the desired output image shape, pixel size as well as the
+    padding and downsampling factors.
 
-    3. **Iterative Landweber Update**: The image `I_n(x,y)` at iteration n is updated using the Landweber scheme:
-    `I_{n+1} = I_n + λ * F^{-1}[ V_grid - F[I_n] ]`
-    where `F` and `F^{-1}` are the Fourier and inverse Fourier transforms, and λ is a relaxation parameter. After
-    each iteration, positivity is enforced: `I_{n+1} = max(0, I_{n+1})`
+    **Stage 2: Visibility Gridding**
 
-    4. **Stopping Criterion**: Iteration continues until either:
-    `|| F[I_{n+1}] - V_grid || < tolerance`
-    or the maximum number of iterations `max_iter` is reached. This residual norm ensures that updates stop when the
-    reconstruction is consistent with the measured visibilities.
+    Sparse visibility measurements :math:`V(u_i, v_i)` at irregular UV coordinates are interpolated onto a regular Cartesian
+    grid using Radial Basis Function (RBF) interpolation:
+
+    .. math::
+        V_{grid}(u,v) = \sum_i V(u_i, v_i) \cdot \phi(\|(u,v) - (u_i,v_i)\|)
+
+    where :math:`\phi` is the RBF kernel. Real and imaginary components are interpolated separately. Points outside the
+    maximum observed spatial extent are masked to zero to preserve the UV coverage constraint.
+
+    **Stage 3: Sinc Interpolation to Final Grid**
+
+    The gridded visibilities are resampled to the output reconstruction grid using sinc interpolation, the theoretically
+    optimal method for band-limited signals. This is implemented efficiently via:
+
+    1. **Zero-padding** grid in Fourier space
+    2. **Centered downsampling** by factor obtain output grid
+
+    This combination is mathematically equivalent to sinc interpolation:
+
+    .. math::
+        V_{final}(u) = \sum_n V_{grid}[n] \cdot \text{sinc}\left(\frac{u - u_n}{\Delta u}\right)
+
+    where :math:`\text{sinc}(x) = \sin(\pi x) / (\pi x)`. The Whittaker-Shannon interpolation
+    theorem guarantees this preserves all information within the signal's bandwidth, making it
+    ideal for band-limited signal as with Fourier based X-ray imaging.
+
+    The downsampling uses centered sampling with offset :math:`(factor - 1) / 2` to preserve spatial
+    symmetry around the origin, which is critical for maintaining Fourier transform properties.
+
+    **Stage 4: Iterative Landweber Reconstruction**
+
+    The image :math:`I(x,y)` is reconstructed through iterative refinement using the Landweber scheme
+    with positivity constraint:
+
+    .. math::
+        F_{n+1} &= F_n + \tau (V_{final} - \chi \cdot F_n) \\
+        I_{n+1} &= \mathcal{F}^{-1}[F_{n+1}] \\
+        I_{n+1} &= \max(0, I_{n+1})
+
+    where:
+
+    - :math:`F_n` is the Fourier transform of the image at iteration n
+    - :math:`\tau = 0.2` is the relaxation parameter controlling step size
+    - :math:`\chi` is the characteristic function (binary mask) defining the observed UV coverage region
+    - :math:`\mathcal{F}^{-1}` denotes the inverse Fourier transform
+    - The max operation enforces non-negativity (physical images have positive intensities)
+
+    After each positivity projection, the image is transformed back to the Fourier domain to
+    compute the residual for the next iteration.
+
+    **Convergence Criterion**
+
+    Iteration continues until either:
+
+    1. The relative change in residual norm falls below a given threshold.:
+
+       .. math::
+           \frac{\|F_{n-1} - V_{final}\| - \|F_n - V_{final}\|}{\|F_{n-1} - V_{final}\|} < threshold
+
+    2. The maximum number of iterations `niter` is reached
+
+    This stopping criterion ensures the reconstruction is consistent with the observed
+    visibilities while avoiding over-iteration that could amplify noise.
+
+    **Mathematical Foundation**
+
+    The reconstruction leverages several key principles:
+
+    - **Band-limited signals**: Fourier based X-ray image data is naturally band-limited by the
+      maximum baseline, making sinc interpolation theoretically optimal
+    - **Regularization through iteration**: The Landweber scheme with positivity acts as an
+      implicit regularizer, stabilizing the ill-posed inverse problem
+    - **UV coverage constraint**: Restricting reconstruction to the observed Fourier domain
+      (via χ mask) prevents artifacts from unmeasured regions
+    - **Fourier symmetry**: Centered sampling and symmetric grids preserve the mathematical
+      properties required for accurate Fourier transforms
+
     """
     # Zero-padding and downsampling constants
     # PADDED_GRID_SIZE = 1920
     DOWNSAMPLE_FACTOR = 15
-    DOWNSAMPLE_OFFSET = 7
+    # DOWNSAMPLE_OFFSET = 7
     PADDING_FACTOR = 6
 
     r = np.sqrt(vis.u**2 + vis.v**2).value
     r_max = r.max()
-    # r_min = r[r > 0].min()
 
+    # for comparison to old RHESSI code
     if uv_pixel_size is not None:
         padded_uv_grid_size = shape * DOWNSAMPLE_FACTOR
         uv_grid_size = int(padded_uv_grid_size / PADDING_FACTOR)
@@ -319,57 +337,37 @@ def uv_smooth_new(
     uu_grid, vv_grid = np.meshgrid(uv_sample_coords, uv_sample_coords)
 
     # Interpolate visibilities onto regular grid using RBF
-    vis_gridded = interpolate_visibilities_to_grid(u=vis.u, v=vis.v, vis=vis.visibilities, ugrid=uu_grid, vgrid=vv_grid)
+    vis_gridded = interpolate_visibilities_to_grid(
+        u=vis.u, v=vis.v, vis=vis.visibilities, ugrid=uu_grid, vgrid=vv_grid, **kwargs
+    )
 
     # Mask values outside the original UV sampling coverage
     uv_grid_radius = np.sqrt(uu_grid**2 + vv_grid**2)
     vis_gridded[uv_grid_radius > r_max] = 0j
 
-    # Zero-pad visibilities to larger grid
-    padded_uv_limit = (padded_uv_grid_size / 2 - 1) * uv_pixel_size + uv_pixel_size / 2
-    padded_x_coords = -padded_uv_limit + np.arange(padded_uv_grid_size) * uv_pixel_size
-    padded_y_coords = padded_x_coords
-
-    vis_zero_padded = np.zeros((padded_uv_grid_size, padded_uv_grid_size), dtype=np.complex128)
-    pad_start = (padded_uv_grid_size - uv_grid_size) // 2
-    pad_end = pad_start + uv_grid_size
-    vis_zero_padded[pad_start:pad_end, pad_start:pad_end] = vis_gridded
-
-    # pad_width = (padded_uv_grid_size - uv_grid_size) // 2
-    # vis_zero_padded_new = np.pad(vis_gridded, pad_width, mode='constant', constant_values=0j)
-
-    # Downsample to final image grid
-    downsampled_size = padded_uv_grid_size // DOWNSAMPLE_FACTOR
-    vis_downsampled = np.zeros((downsampled_size, downsampled_size), dtype=np.complex128)
-    x_coords_downsampled = np.zeros(downsampled_size)
-    y_coords_downsampled = np.zeros(downsampled_size)
-
-    for i in range(downsampled_size):
-        x_coords_downsampled[i] = padded_x_coords[DOWNSAMPLE_FACTOR * i + DOWNSAMPLE_OFFSET]
-        y_coords_downsampled[i] = padded_y_coords[DOWNSAMPLE_FACTOR * i + DOWNSAMPLE_OFFSET]
-        for j in range(downsampled_size):
-            vis_downsampled[i, j] = vis_zero_padded[
-                DOWNSAMPLE_FACTOR * i + DOWNSAMPLE_OFFSET, DOWNSAMPLE_FACTOR * j + DOWNSAMPLE_OFFSET
-            ]
-
-    # Calculate grid spacing in frequency domain
-    total_extent = x_coords_downsampled[-1] - x_coords_downsampled[0]
-    delta_omega = total_extent / downsampled_size  # UV pixel spacing
-    pixel_size = 1 / total_extent  # Image spacing
+    vis_downsampled, x_coords_downsampled, y_coords_downsampled, delta_omega, pixel_size = (
+        _sinc_interpolate_to_final_grid(
+            vis_gridded=vis_gridded,
+            uv_grid_size=uv_grid_size,
+            uv_pixel_size=uv_pixel_size,
+            padded_uv_grid_size=padded_uv_grid_size,
+        )
+    )
 
     # Target visibilities for reconstruction
     target_visibilities = vis_downsampled[:, :]
 
     # Create characteristic function (mask) for UV coverage
-    x_grid, y_grid = np.meshgrid(x_coords_downsampled, y_coords_downsampled, indexing="ij")
-    uv_coverage_mask = np.zeros((downsampled_size, downsampled_size), dtype=np.complex128)
+    x_grid, y_grid = np.meshgrid(x_coords_downsampled, y_coords_downsampled)
+    uv_coverage_mask = np.zeros(vis_downsampled.shape, dtype=np.complex128)
     uv_coverage_mask[np.sqrt(x_grid**2 + y_grid**2) < r_max] = 1 + 0j
 
     final_image, fourier_transform = landweber_iteration(
         target_visibilities=target_visibilities,
-        downsampled_size=downsampled_size,
+        downsampled_size=vis_downsampled.shape[0],
         uv_coverage_mask=uv_coverage_mask,
         delta_omega=delta_omega,
+        niter=niter,
     )
 
     return final_image, fourier_transform, pixel_size
@@ -379,7 +377,7 @@ def determine_grid_parameters(
     shape: int, pixel_size: float, PADDING_FACTOR: int, DOWNSAMPLE_FACTOR: int
 ) -> tuple[int, int, float]:
     r"""
-    Determine Foroer pixe size and grid sizes based on output image shape and pixel size.
+    Determine Fourier pixel and grid sizes based on output image shape and pixel size.
 
     Parameters
     ----------
@@ -394,12 +392,12 @@ def determine_grid_parameters(
 
     Returns
     -------
-    padded_uv_grid_size,
-        Sixe of the padded u, v grid
-    uv_grid_size,
-        Sixe of the u, v grid
-    uv_pixel_size
-        Sixe of the u, v pixel size
+    padded_uv_grid_size :
+        Size of the padded u, v grid
+    uv_grid_size :
+        Size of the u, v grid
+    uv_pixel_size :
+        Size of the u, v pixels
     """
 
     uv_extent = 1 / pixel_size
@@ -409,6 +407,96 @@ def determine_grid_parameters(
     uv_grid_size = int(padded_uv_grid_size / PADDING_FACTOR)
 
     return padded_uv_grid_size, uv_grid_size, uv_pixel_size
+
+
+def _sinc_interpolate_to_final_grid(
+    vis_gridded: np.ndarray,
+    uv_grid_size: int,
+    uv_pixel_size: float,
+    padded_uv_grid_size: int,
+    downsample_factor: int = 15,
+    downsample_offset: int = 7,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """
+    Resample visibility grid using sinc interpolation (zero-pad + downsample).
+
+    This function implements sinc interpolation in the Fourier domain by:
+    1. Zero-padding the input grid to a larger size (increases frequency resolution)
+    2. Downsampling by selecting centered samples (implements the sinc kernel)
+
+    The combination of zero-padding in Fourier space followed by decimation is
+    mathematically equivalent to sinc interpolation, which is the ideal band-limited
+    interpolation method.
+
+    Parameters
+    ----------
+    vis_gridded : np.ndarray
+        Input gridded visibilities, shape (grid_size, grid_size).
+    grid_size : int
+        Original grid size.
+    pixel_size : float
+        Pixel spacing (same in padded and final grids).
+    padded_size : int, optional
+        Intermediate padded grid size (default: 1920).
+    downsample_factor : int, optional
+        Downsampling factor for final grid (default: 15).
+
+    Returns
+    -------
+    vis_final : np.ndarray
+        Sinc-interpolated visibilities on final grid.
+    x_coords_final : np.ndarray
+        X coordinates of final grid.
+    y_coords_final : np.ndarray
+        Y coordinates of final grid.
+    delta_omega : float
+        Final pixel size in Fourier domain
+    pixel_size : float
+        Finale pixel size in spatial domain
+    Notes
+    -----
+    The mathematical relationship:
+    - Zero-padding in Fourier domain → sinc interpolation in spatial domain
+    - Centered downsampling → preserves spatial symmetry
+    - Combined: ideal band-limited resampling
+
+    The downsample offset uses centered sampling:
+        offset = (downsample_factor - 1) // 2
+    This ensures the center of each sampling block is selected, preserving
+    the spatial symmetry required for accurate Fourier transforms.
+    """
+    # Zero-pad visibilities to larger grid
+    padded_uv_limit = (padded_uv_grid_size / 2 - 1) * uv_pixel_size + uv_pixel_size / 2
+    padded_x_coords = -padded_uv_limit + np.arange(padded_uv_grid_size) * uv_pixel_size
+    padded_y_coords = padded_x_coords
+
+    vis_zero_padded = np.zeros((padded_uv_grid_size, padded_uv_grid_size), dtype=np.complex128)
+    pad_start = (padded_uv_grid_size - uv_grid_size) // 2
+    pad_end = pad_start + uv_grid_size
+    vis_zero_padded[pad_start:pad_end, pad_start:pad_end] = vis_gridded
+
+    # pad_width = (padded_uv_grid_size - uv_grid_size) // 2
+    # vis_zero_padded_new = np.pad(vis_gridded, pad_width, mode='constant', constant_values=0j)
+
+    # Downsample to final image grid
+    downsampled_size = padded_uv_grid_size // downsample_factor
+    vis_downsampled = np.zeros((downsampled_size, downsampled_size), dtype=np.complex128)
+    x_coords_downsampled = np.zeros(downsampled_size)
+    y_coords_downsampled = np.zeros(downsampled_size)
+
+    for i in range(downsampled_size):
+        x_coords_downsampled[i] = padded_x_coords[downsample_factor * i + downsample_offset]
+        y_coords_downsampled[i] = padded_y_coords[downsample_factor * i + downsample_offset]
+        for j in range(downsampled_size):
+            vis_downsampled[i, j] = vis_zero_padded[
+                downsample_factor * i + downsample_offset, downsample_factor * j + downsample_offset
+            ]
+
+    # Calculate grid spacing in frequency domain
+    total_extent = x_coords_downsampled[-1] - x_coords_downsampled[0]
+    delta_omega = total_extent / downsampled_size  # UV pixel spacing
+    pixel_size = 1 / total_extent  # Image spacing
+    return vis_downsampled, x_coords_downsampled, y_coords_downsampled, delta_omega, pixel_size
 
 
 def landweber_iteration(
@@ -522,256 +610,12 @@ def interpolate_visibilities_to_grid(u, v, vis, ugrid, vgrid, **kwargs):
     uv_grid_points = np.vstack([ugrid.flatten(), vgrid.flatten()]).T
 
     # Interpolate real and imaginary components separately
-    real_interpolator = RBFInterpolator(uv_observed, vis.real / norm)
+    real_interpolator = RBFInterpolator(uv_observed, vis.real / norm, **kwargs)
     real_interpolated = real_interpolator(uv_grid_points)
 
-    imag_interpolator = RBFInterpolator(uv_observed, vis.imag / norm)
+    imag_interpolator = RBFInterpolator(uv_observed, vis.imag / norm, **kwargs)
     imag_interpolated = imag_interpolator(uv_grid_points)
 
     vis_gridded = (real_interpolated + 1j * imag_interpolated).reshape(ugrid.shape)
 
     return vis_gridded
-
-
-def uv_smooth_alt(
-    vis: Visibilities, niter: int = 50, pixel_size: float = 1, shape: int = 128, natural_weighting: bool = True
-):
-    """
-    UV smooth algorithm with flexible image dimensions.
-
-    Parameters
-    ----------
-    vis : Visibilities
-        Input visibilities
-    niter : int
-        Number of Landweber iterations (default: 50)
-    pixel_size : float, optional
-        Pixel size in UV space (arcsec^-1). If None, automatically determined
-        from detector configuration.
-    shape : int, optional
-        Final image dimension in pixels. If None, automatically determined
-        from detector configuration.
-    natural_weighting : bool
-        Apply natural weighting based on UV coverage (default: True)
-
-    Returns
-    -------
-    map_solution : ndarray
-        Reconstructed image
-    F_Trasf : ndarray
-        Final Fourier transform
-
-    """
-
-    # Determine pixel size if not provided
-    if pixel_size is None:
-        pixel_size = 0.0005
-        detmin = min(vis.meta["isc"])
-        if detmin <= 1:
-            pixel_size = pixel_size * 2.0
-
-    # Calculate maximum UV radius from the data
-    r = np.sqrt(vis.u**2 + vis.v**2).value
-    r_max = r.max()
-
-    # Determine appropriate grid size for interpolation
-    # This should be large enough to capture the UV coverage
-    # Rule of thumb: make sure pixel * N/2 > r_max
-    if shape is None:
-        # Auto-determine based on detector configuration
-        detmin = min(vis.meta["isc"])
-        if detmin == 0:
-            N = 450
-        elif detmin == 1:
-            N = 260
-        else:
-            N = 320
-    else:
-        # Calculate N to ensure we cover the UV space properly
-        # N should be at least 2 * r_max / pixel
-        N = int(np.ceil(2 * r_max / pixel_size))
-        # Make it even for FFT efficiency
-        if N % 2 == 1:
-            N += 1
-        # Ensure minimum size
-        N = max(N, 64)
-
-    # Construct new u, v grid to interpolate
-    # CRITICAL: Ulimit must accommodate r_max
-    Ulimit = (N / 2 - 1) * pixel_size + pixel_size / 2
-
-    # Check if our grid is large enough
-    if Ulimit < r_max:
-        # Increase N to accommodate the data
-        N = int(np.ceil(2 * r_max / pixel_size)) + 2
-        if N % 2 == 1:
-            N += 1
-        Ulimit = (N / 2 - 1) * pixel_size + pixel_size / 2
-        print(f"Warning: Grid size increased to N={N} to accommodate r_max={r_max:.6f}")
-
-    usampl = -Ulimit + np.arange(N) * pixel_size
-    vsampl = usampl
-    uu, vv = np.meshgrid(usampl, vsampl)
-
-    # Interpolate real and imag components onto new grid
-    uv_obs = np.vstack([vis.u, vis.v]).T
-    uv_samp = np.vstack([uu.flatten(), vv.flatten()]).T
-
-    # Normalize by 4π² for consistency with IDL code
-    interpolator = RBFInterpolator(uv_obs, vis.visibilities.real / (4 * np.pi**2))
-    real_interp = interpolator(uv_samp)
-    interpolator = RBFInterpolator(uv_obs, vis.visibilities.imag / (4 * np.pi**2))
-    imag_interp = interpolator(uv_samp)
-    vis_interp = (real_interp + 1j * imag_interp).reshape((N, N))
-
-    # CRITICAL: Set any component outside the original uv sampling to 0
-    # This prevents sampling regions where we have no data
-    uv_radius = np.sqrt(uu**2 + vv**2)
-    vis_interp[uv_radius > r_max] = 0j
-
-    # Define new grid to zero pad the visibilities
-    # The zero-padding increases the sampling in image space
-    # Choose Nnew based on desired oversampling
-    oversample_factor = 6  # This gives ~15x downsampling later
-    Nnew = N * oversample_factor
-
-    # Make sure Nnew is even
-    if Nnew % 2 == 1:
-        Nnew += 1
-
-    Ulimit_new = (Nnew / 2 - 1) * pixel_size + pixel_size / 2
-    xpix = -Ulimit_new + np.arange(Nnew) * pixel_size
-    ypix = xpix
-
-    # Zero pad the visibilities
-    intzpadd = np.zeros((Nnew, Nnew), dtype=np.complex128)
-    start_idx = (Nnew - N) // 2
-    intzpadd[start_idx : start_idx + N, start_idx : start_idx + N] = vis_interp
-
-    # Downsample to get final image size
-    # This reduces the pixel size in image space
-    downsample_factor = 15
-    im_new = Nnew // downsample_factor
-
-    # Ensure im_new is reasonable
-    if im_new < 32:
-        im_new = 32
-        downsample_factor = Nnew // im_new
-
-    intznew = np.zeros((im_new, im_new), dtype=np.complex128)
-    xpixnew = np.zeros(im_new)
-    ypixnew = np.zeros(im_new)
-
-    for i in range(im_new):
-        idx = downsample_factor * i + downsample_factor // 2
-        if idx >= Nnew:
-            idx = Nnew - 1
-        xpixnew[i] = xpix[idx]
-        ypixnew[i] = ypix[idx]
-        for j in range(im_new):
-            jdx = downsample_factor * j + downsample_factor // 2
-            if jdx >= Nnew:
-                jdx = Nnew - 1
-            intznew[i, j] = intzpadd[idx, jdx]
-
-    deltaomega = (xpixnew[im_new - 1] - xpixnew[0]) / im_new
-
-    g = intznew[:, :]
-
-    # Characteristic function of disk
-    # CRITICAL: chi should only be 1 where we have UV data coverage
-    # This constraint ensures we don't extrapolate beyond measured frequencies
-    chi = np.zeros((im_new, im_new), dtype=np.complex128)
-    uv_grid_radius = np.sqrt(xpixnew.reshape(-1, 1) ** 2 + ypixnew.reshape(1, -1) ** 2)
-
-    # IMPORTANT: Only set chi=1 where we actually have data
-    # Use a slightly smaller radius to avoid edge effects
-    chi[uv_grid_radius < (r_max * 0.95)] = 1 + 0j
-
-    if natural_weighting:
-        # Apply natural weighting based on density of UV coverage
-        # This down-weights regions with sparse sampling
-        from scipy.ndimage import gaussian_filter
-
-        # Create a density map of UV coverage
-        uv_density = np.zeros((im_new, im_new))
-        for u_obs, v_obs in zip(vis.u.value, vis.v.value):
-            # Find nearest grid point
-            i = np.argmin(np.abs(xpixnew - u_obs))
-            j = np.argmin(np.abs(ypixnew - v_obs))
-            if i < im_new and j < im_new:
-                uv_density[i, j] += 1
-
-        # Smooth the density map
-        uv_density_smooth = gaussian_filter(uv_density, sigma=1.0)
-
-        # Normalize and use as weight
-        if uv_density_smooth.max() > 0:
-            weights = uv_density_smooth / uv_density_smooth.max()
-            # Avoid complete zero weighting
-            weights = np.clip(weights, 0.1, 1.0)
-            chi = chi * weights
-
-    # Landweber iterations
-    map_actual = np.zeros((im_new, im_new), dtype=np.complex128)
-    map_iteration = np.zeros((niter, im_new, im_new))
-
-    # Relaxation parameter (can be tuned)
-    tau = 0.2
-
-    descent = np.zeros(niter - 1)
-    normAf_g = np.zeros(niter)
-
-    # Iteration 0: Inverse Fourier Transform of the initial solution
-    map_shifted = ifftshift(map_actual)
-    F_Trasf_shifted = ifft2(map_shifted) / (4 * np.pi**2 * deltaomega * deltaomega)
-    F_Trasf = fftshift(F_Trasf_shifted)
-
-    for iter in range(niter):
-        # Update rule
-        F_Trasf_up = F_Trasf + tau * (g - chi * F_Trasf)
-        F_Trasf = F_Trasf_up
-
-        # FFT of the updated solution
-        F_Trasf_shifted = ifftshift(F_Trasf)
-        map_shifted = fft2(F_Trasf_shifted) / (im_new**2) * 4 * np.pi**2 * deltaomega * deltaomega
-        map_actual = fftshift(map_shifted)
-
-        # Project solution onto subset of positive solutions (positivity constraint)
-        map_actual[map_actual.real < 0] = 0 + 0j
-        map_iteration[iter, :, :] = map_actual.real
-
-        # Back to Fourier space
-        map_shifted = ifftshift(map_actual)
-        F_Trasf_shifted = ifft2(map_shifted) * (im_new**2) / (4 * np.pi**2 * deltaomega * deltaomega)
-        F_Trasf = fftshift(F_Trasf_shifted)
-
-        # Stopping criterion based on the descent of ||Af - g||
-        Af_g = chi * F_Trasf - g
-        normAf_g[iter] = np.sqrt(np.sum(np.abs(Af_g) * np.abs(Af_g)))
-
-        if iter >= 1:
-            with np.errstate(divide="ignore", invalid="ignore"):
-                descent[iter - 1] = (normAf_g[iter - 1] - normAf_g[iter]) / normAf_g[iter - 1]
-
-            logger.debug("Iteration %d: %f", iter, descent[iter - 1])
-
-            if descent[iter - 1] < 0.02:
-                print(f"Converged at iteration {iter}")
-                break
-
-    # Output
-    F_Trasf = 4 * np.pi**2 * F_Trasf
-
-    if iter == niter - 1:
-        # If didn't converge, use iteration 14 (arbitrary choice from original)
-        if niter > 14:
-            map_solution = map_iteration[14, :, :].real
-        else:
-            map_solution = map_iteration[niter - 1, :, :].real
-    else:
-        map_solution = map_actual.real
-
-    map_solution = map_solution * im_new**2
-
-    return map_solution, F_Trasf, xpixnew, ypixnew

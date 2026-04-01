@@ -10,7 +10,7 @@ from xrayvision.uv_smooth import uv_smooth, uv_smooth_new
 from xrayvision.visibility import Visibilities, VisMeta
 
 
-@pytest.mark.skip("needs local files")
+# @pytest.mark.skip("needs local files")
 def test_uv_smooth():
     hdul = fits.open("~/Downloads/hsi_vis_20020221_2357_0054_46tx3e.fits")
     times = np.unique(hdul[-1].data["TRANGE"], axis=0)
@@ -23,8 +23,7 @@ def test_uv_smooth():
     ###############################################################################
     # Now lets filter by ISC or detector to remove possibly bad data in this case
     # need to remove ISC 0 and 1.
-    vis_data = vis_data[vis_data["isc"] > 1]
-    vis_data = vis_data[vis_data["v"] > 0]
+    vis_data = vis_data[vis_data["isc"] > 2]
     vis_data = vis_data[vis_data["obsvis"] != 0 + 0j]
 
     # vis_sav = readsav("/Users/sm/hsi_hsi_20020221_0006-0007_12-25.sav")
@@ -43,7 +42,8 @@ def test_uv_smooth():
         amplitude_uncertainty=vis_data["sigamp"] * vunit,
     )
 
-    image, vis = uv_smooth(vis)
+    image_orig, vis_orig, ps_orig = uv_smooth(vis)
+    iamge_new, vis_new, ps_new = uv_smooth_new(vis, shape=128, pixel_size=1)
     print("here")
 
 
@@ -101,20 +101,20 @@ def test_uv_smooth_matches_gaussian(rhessi_like_gaussian_vis):
     sigma = sigma.value
 
     image_orig, *og = uv_smooth(vis, niter=50)
-    image_new, *nw = uv_smooth_new(vis, shape=128, pixel_size=1.046, niter=50)
+    image_new, *nw = uv_smooth_new(vis, shape=128, uv_pixel_size=0.0005, niter=50)
     image_auto, *au = uv_smooth_new(vis, shape=128, pixel_size=1.0)
 
     im_new = image_orig.shape[0]
 
     # Build the reference Gaussian on the same pixel grid as the uv_smooth output
-    pixel_size = 1.00  # _uv_smooth_pixel_scale()  # arcsec/pixel
+    pixel_size = nw[1]  # _uv_smooth_pixel_scale()  # arcsec/pixel
     coords = (np.arange(im_new) - im_new // 2) * pixel_size  # arcsec
     xx, yy = np.meshgrid(coords, coords)
     ref_image = (100.0 / (2 * np.pi * sigma**2)) * np.exp(-0.5 * (xx**2 + yy**2) / sigma**2)
 
-    np.testing.assert_allclose(image_orig, ref_image, atol=0.05)
-    np.testing.assert_allclose(image_new, ref_image, atol=0.05)
-    np.testing.assert_allclose(image_auto, ref_image, atol=0.02)
+    np.testing.assert_allclose(image_orig, ref_image, atol=0.025)
+    np.testing.assert_allclose(image_new, ref_image, atol=0.025)
+    np.testing.assert_allclose(image_auto, ref_image, atol=0.024)
 
 
 def test_uv_smooth_idl(rhessi_like_gaussian_vis):
