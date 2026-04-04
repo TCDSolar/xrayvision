@@ -11,9 +11,10 @@ import numbers
 from typing import Any
 from collections.abc import Iterable, Sequence
 
-import astropy.units as apu
 import numpy as np
 import xarray
+
+import astropy.units as apu
 from astropy.coordinates import SkyCoord
 from astropy.time import Time
 from astropy.units import Quantity

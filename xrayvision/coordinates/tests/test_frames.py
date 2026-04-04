@@ -1,7 +1,9 @@
-import astropy.units as u
 import numpy as np
 import pytest
+
+import astropy.units as u
 from astropy.wcs import WCS
+
 from sunpy.coordinates import HeliographicStonyhurst
 
 from xrayvision.coordinates.frames import Projective, projective_frame_to_wcs, projective_wcs_to_frame

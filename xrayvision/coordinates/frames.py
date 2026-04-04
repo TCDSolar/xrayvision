@@ -2,6 +2,7 @@ import astropy.coordinates
 import astropy.units as u
 from astropy.coordinates import QuantityAttribute
 from astropy.wcs import WCS
+
 from sunpy.coordinates.frameattributes import ObserverCoordinateAttribute
 from sunpy.coordinates.frames import HeliographicCarrington, HeliographicStonyhurst, SunPyBaseCoordinateFrame
 from sunpy.sun.constants import radius as _RSUN

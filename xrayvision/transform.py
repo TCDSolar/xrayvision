@@ -7,9 +7,10 @@ takes inputs which have positional information `dft_map` and the inverse `idft_m
 
 """
 
-import astropy.units as apu
 import numpy as np
 import numpy.typing as npt
+
+import astropy.units as apu
 from astropy.units import Quantity
 from astropy.units.core import UnitsError
 

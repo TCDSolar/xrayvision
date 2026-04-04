@@ -1,7 +1,8 @@
-import astropy.units as u
 import numpy as np
-from astropy.convolution.kernels import Gaussian2DKernel
 from numpy.testing import assert_allclose
+
+import astropy.units as u
+from astropy.convolution.kernels import Gaussian2DKernel
 
 from xrayvision.imaging import image_to_vis
 from xrayvision.mem import mem, resistant_mean

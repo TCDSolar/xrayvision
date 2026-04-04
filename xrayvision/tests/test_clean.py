@@ -1,8 +1,9 @@
-import astropy.units as u
 import numpy as np
-from astropy.convolution.kernels import Gaussian2DKernel
 from numpy.testing import assert_allclose
 from scipy import signal
+
+import astropy.units as u
+from astropy.convolution.kernels import Gaussian2DKernel
 
 from xrayvision.clean import (
     _component,

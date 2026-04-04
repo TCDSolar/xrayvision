@@ -9,13 +9,15 @@ appropriate component shapes at different scales.
 
 from collections.abc import Iterable, MutableSequence
 
-import astropy.units as u
 import numpy as np
-from astropy.convolution import Gaussian2DKernel
-from astropy.units import Quantity
 from numpy.typing import ArrayLike, NDArray
 from scipy import signal
 from scipy.ndimage import shift
+
+import astropy.units as u
+from astropy.convolution import Gaussian2DKernel
+from astropy.units import Quantity
+
 from sunpy.map.map_factory import Map
 
 from xrayvision.imaging import vis_psf_image, vis_to_map

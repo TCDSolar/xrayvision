@@ -1,6 +1,8 @@
-import astropy.units as apu
 import numpy as np
+
+import astropy.units as apu
 from astropy.units import Quantity
+
 from sunpy.map import GenericMap, Map
 
 from xrayvision.transform import dft_map, idft_map

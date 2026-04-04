@@ -9,9 +9,10 @@ Imports
 
 import pickle
 
-import astropy.units as apu
 import matplotlib.pyplot as plt
 import numpy as np
+
+import astropy.units as apu
 
 from xrayvision.clean import vis_clean
 from xrayvision.imaging import vis_psf_map, vis_to_map

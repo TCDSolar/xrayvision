@@ -4,11 +4,13 @@ Implementation of Maximum Entropy Method
 
 from types import SimpleNamespace
 
-import astropy.units as apu
 import numpy as np
-from astropy.units import Quantity
 from numpy.linalg import norm
 from numpy.typing import NDArray
+
+import astropy.units as apu
+from astropy.units import Quantity
+
 from sunpy.map import Map
 
 from xrayvision.imaging import generate_header
