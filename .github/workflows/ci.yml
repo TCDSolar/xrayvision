@@ -73,13 +73,14 @@ jobs:
       CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
   docs:
-    needs: [core]
+    needs: [test]
     uses: OpenAstronomy/github-actions-workflows/.github/workflows/tox.yml@v2  # zizmor: ignore[unpinned-uses]
     with:
-      default_python: '3.13'
+      default_python: '3.9'
       submodules: false
       pytest: false
       toxdeps: tox-pypi-filter
+      cache-key: docs-${{ github.run_id }}
       libraries: |
         apt:
           - graphviz

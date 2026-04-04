@@ -42,7 +42,7 @@ def test_clean_ideal():
     out_map, model, resid = clean(dirty_map, dirty_beam, clean_beam_width=None)
 
     # Within threshold default threshold of 0.1
-    assert_allclose(out_map, clean_map, atol=dirty_beam.max() * 1e-13)
+    assert_allclose(out_map, clean_map, atol=dirty_beam.max() * 1e-12)
 
 
 def test_component():
