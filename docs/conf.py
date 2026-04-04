@@ -1,26 +1,45 @@
-#
 # Configuration file for the Sphinx documentation builder.
 #
 # This file does only contain a selection of the most common options. For a
 # full list see the documentation:
 # http://www.sphinx-doc.org/en/master/config
 
+import datetime
+import pathlib
+
+from packaging.version import Version
 
 # -- Project information -----------------------------------------------------
-
-project = "xrayvision"
-copyright = "2020, "
-author = ""
-
-import pathlib
 
 # The full version, including alpha/beta/rc tags
 from xrayvision import __version__
 
-release = __version__
-is_development = ".dev" in __version__
+_version = Version(__version__)
+version = release = str(_version)
+# Avoid "post" appearing in version string in rendered docs
+if _version.is_postrelease:
+    version = release = _version.base_version
+# Avoid long githashes in rendered Sphinx docs
+elif _version.is_devrelease:
+    version = release = f"{_version.base_version}.dev{_version.dev}"
+is_development = _version.is_devrelease
+is_release = not(_version.is_prerelease or _version.is_devrelease)
+
+project = "xrayvisim"
+author = "Shane Maloney"
+copyright = f"{datetime.datetime.now().year}, {author}"  # noqa: A001
 
 # -- General configuration ---------------------------------------------------
+
+# Optional: Add specific anchors or URLs to ignore if they remain flaky
+linkcheck_ignore = [
+    r"https://anaconda.org",
+    r"https://web.njit.edu/~gary/728/Lecture6.html",
+    r"https://github.com/.*#.*", # GitHub anchors are notoriously broken in linkcheck
+]
+
+# Wrap large function/method signatures
+maximum_signature_line_length = 80
 
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
@@ -44,10 +63,7 @@ extensions = [
 ]
 
 # Add any paths that contain templates here, relative to this directory.
-# templates_path = ['_templates']
-
-# Set automodapi to generate files inside the generated directory
-automodapi_toctreedirnm = "generated/api"
+# templates_path = ["_templates"]
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
@@ -55,27 +71,16 @@ automodapi_toctreedirnm = "generated/api"
 exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 
 # The suffix(es) of source filenames.
-# You can specify multiple suffix as a list of string:
-source_suffix = ".rst"
+source_suffix = {".rst": "restructuredtext"}
 
 # The master toctree document.
 master_doc = "index"
 
-# The reST default role (used for this markup: `text`) to use for all
-# documents. Set to the "smart" one.
-default_role = "obj"
-
-# Disable having a separate return type row
-napoleon_use_rtype = True
-
-# Disable google style docstrings
-napoleon_google_docstring = False
-
-# until sphinx-gallery / sphinx is fixed https://github.com/sphinx-doc/sphinx/issues/12300
-suppress_warnings = ["config.cache"]
+# Treat everything in single ` as a Python reference.
+default_role = "py:obj"
 
 autodoc_typehints = "description"
-autoclass_content = "init"
+autoclass_content = "both"
 
 # -- Options for intersphinx extension ---------------------------------------
 
@@ -125,7 +130,7 @@ sphinx_gallery_conf = {
     "filename_pattern": "^((?!skip_).)*$",
     "examples_dirs": example_dir,
     "gallery_dirs": path.joinpath("generated", "gallery"),
-    "default_thumb_file": path.joinpath("logo", "sunpy_icon_128x128.png"),
+    # "default_thumb_file": path.joinpath("logo", "sunpy_icon_128x128.png"),
     "abort_on_example_error": False,
     "plot_gallery": "True",
     "remove_config_comments": True,

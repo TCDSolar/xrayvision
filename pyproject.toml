@@ -16,11 +16,12 @@ license = "BSD-3-Clause"
 license-files = ["LICENSE.rst"]
 authors = [{name="Shane Maloney", email = "shane.maloney@dias.ie"}]
 dependencies = [
-    "astropy>=6.0.0",
-    "numpy>=1.25.0",
-    "packaging>=23.0",
-    "scipy>=1.13",
-    "xarray>=2023.5.0"
+    "astropy>=6.1.0",
+    "packaging>=23.1",
+    "numpy>=2.0",
+    "scipy>=1.14",
+    "xarray>=2024.5.0",
+    "matplotlib>=3.9.0",
 ]
 dynamic = ["version"]
 keywords = ["solar", "physics", "solar", "sun", "x-rays"]
@@ -40,26 +41,26 @@ classifiers = [
 
 [project.optional-dependencies]
 map = [
-    "sunpy[map]>=5.1.0"
+    "sunpy[map]>=7.0.0"
 ]
 all = ["xrayvisim[map]"]
 tests = [
-    "matplotlib>=3.8.0",
     "pytest-astropy>=0.11.0",
-    "pytest-mpl>=0.16",
+    "pytest-mpl>=0.18.0",
+    "pytest>=7.4.0",
     "pytest-xdist>=3.0.2",
-    "pytest>=7.1.0"
 ]
 docs = [
-    "sphinx>=6.0.0",
-    "sphinx-automodapi>=0.14.1",
+    "sphinx>=7.1.0",
+    "sphinx-automodapi>=0.16.0",
     "packaging>=23.0",
     "sphinx-changelog>=1.5.0",
-    "sphinx-design>=0.2.0",
-    "sphinx-gallery>=0.13.0",
+    "sphinx-copybutton>=0.5.0",
+    "sphinx-design>=0.5.0",
+    "sphinx-gallery>=0.14.0",
     "sphinxext-opengraph>=0.6.0",
-    "xrayvisim[all]",
-    "pydata-sphinx-theme>=0.16.0"
+    "pydata-sphinx-theme>=0.16.0",
+    "xrayvisim[all]"
 ]
 dev = ["xrayvisim[tests,docs]"]
 
@@ -94,60 +95,63 @@ disable_error_code = "import-untyped"
 allow_redefinition = true
 python_version = "3.11"
 
-[ tool.gilesbot ]
+[tool.gilesbot]
+  [tool.gilesbot.pull_requests]
+  enabled = true
 
-  [ tool.gilesbot.pull_requests ]
-    enabled = true
+  [tool.gilesbot.towncrier_changelog]
+  enabled = true
+  verify_pr_number = true
+  changelog_skip_label = "No Changelog Entry Needed"
+  help_url = "https://github.com/TCDSolar/xrayvision/blob/main/changelog/README.rst"
 
-  [ tool.gilesbot.towncrier_changelog ]
-    enabled = true
-    verify_pr_number = true
-    changelog_skip_label = "No Changelog Entry Needed"
-    help_url = "https://github.com/TCDSolar/xrayvision/blob/main/changelog/README.rst"
+  changelog_missing_long = "There isn't a changelog file in this pull request. Please add a changelog file to the `changelog/` directory following the instructions in the changelog [README](https://github.com/TCDSolar/xrayvision/blob/main/changelog/README.rst)."
 
-    changelog_missing_long = "There isn't a changelog file in this pull request. Please add a changelog file to the `changelog/` directory following the instructions in the changelog [README](https://github.com/TCDSolar/xrayvision/blob/main/changelog/README.rst)."
+  type_incorrect_long = "The changelog file you added is not one of the allowed types. Please use one of the types described in the changelog [README](https://github.com/TCDSolar/xrayvision/blob/main/changelog/README.rst)"
 
-    type_incorrect_long = "The changelog file you added is not one of the allowed types. Please use one of the types described in the changelog [README](https://github.com/TCDSolar/xrayvision/blob/main/changelog/README.rst)"
+  number_incorrect_long = "The number in the changelog file you added does not match the number of this pull request. Please rename the file."
 
-    number_incorrect_long = "The number in the changelog file you added does not match the number of this pull request. Please rename the file."
-
+# TODO: This should be in towncrier.toml but Giles currently only works looks in
+# pyproject.toml we should move this back when it's fixed.
 [tool.towncrier]
-    package = "xrayvision"
-    filename = "CHANGELOG.rst"
-    directory = "changelog/"
-    issue_format = "`#{issue} <https://github.com/TCDSolar/xrayvision/pull/{issue}>`__"
+  package = "xrayvision"
+  filename = "CHANGELOG.rst"
+  directory = "changelog/"
+  issue_format = "`#{issue} <https://github.com/TCDSolar/xrayvision/pull/{issue}>`__"
+  title_format = "{version} ({project_date})"
 
-    [[tool.towncrier.type]]
-        directory = "breaking"
-        name = "Backwards Incompatible Changes"
-        showcontent = true
+  [[tool.towncrier.type]]
+  directory = "breaking"
+  name = "Breaking Changes"
+  showcontent = true
 
-    [[tool.towncrier.type]]
-        directory = "api"
-        name = "API Changes"
-        showcontent = true
+  [[tool.towncrier.type]]
+  directory = "deprecation"
+  name = "Deprecations"
+  showcontent = true
 
-    [[tool.towncrier.type]]
-      directory = "removal"
-      name = "Deprecations and Removals"
-      showcontent = true
+  [[tool.towncrier.type]]
+  directory = "removal"
+  name = "Removals"
+  showcontent = true
 
-    [[tool.towncrier.type]]
-      directory = "feature"
-      name = "Features"
-      showcontent = true
+  [[tool.towncrier.type]]
+  directory = "feature"
+  name = "New Features"
+  showcontent = true
 
-    [[tool.towncrier.type]]
-      directory = "bugfix"
-      name = "Bug Fixes"
-      showcontent = true
+  [[tool.towncrier.type]]
+  directory = "bugfix"
+  name = "Bug Fixes"
+  showcontent = true
 
-    [[tool.towncrier.type]]
-      directory = "doc"
-      name = "Improved Documentation"
-      showcontent = true
+  [[tool.towncrier.type]]
+  directory = "doc"
+  name = "Documentation"
+  showcontent = true
 
-    [[tool.towncrier.type]]
-      directory = "trivial"
-      name = "Trivial/Internal Changes"
-      showcontent = true
+  [[tool.towncrier.type]]
+  directory = "trivial"
+  name = "Internal Changes"
+  showcontent = true
+
