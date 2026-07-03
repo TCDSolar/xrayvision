@@ -1,4 +1,4 @@
-name: stixpy
+name: xrayvisim
 channels:
   - conda-forge
 dependencies:

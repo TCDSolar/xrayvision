@@ -58,7 +58,16 @@ The xrayvision documentation is broken down into four keys areas.
         .. toctree::
             :maxdepth: 1
 
+            whatsnew/index
             reference/index
 
 .. toctree::
     :maxdepth: 1
+
+
+Indices and tables
+==================
+
+* :ref:`genindex`
+* :ref:`modindex`
+* :ref:`search`
