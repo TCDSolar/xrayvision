@@ -4,6 +4,8 @@ omit =
   xrayvision/*setup_package*
   xrayvision/extern/*
   xrayvision/version*
+  xrayvision/_dev/*
+  */xrayvision/_dev/*
   */xrayvision/conftest.py
   */xrayvision/*setup_package*
   */xrayvision/extern/*
