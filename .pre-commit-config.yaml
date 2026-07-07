@@ -1,7 +1,7 @@
 exclude: ".*(.csv|.fits|.fts|.fit|.header|.txt|tca.*|.json|.asdf)$|^CITATION.rst|tools\/"
 repos:
   - repo: https://github.com/zizmorcore/zizmor-pre-commit
-    rev: v1.25.2
+    rev: v1.26.1
     hooks:
       - id: zizmor
     # This should be before any formatting hooks like isort
@@ -14,7 +14,7 @@ repos:
         # Define here once and then reference using YAML anchor
         exclude: &exclude_dirs ^xrayvision/(data|extern)/
   - repo: https://github.com/PyCQA/isort
-    rev: 8.0.1
+    rev: 9.0.0a3
     hooks:
       - id: isort
         types: [python]
@@ -56,8 +56,10 @@ repos:
     rev: "v2.1.0"
     hooks:
       - id: mypy
-        additional_dependencies: [ "types-setuptools" ]
-
+        exclude: ^.*/tests/
+        additional_dependencies: [ "types-setuptools", "numpy>=2.0" ]
+        pass_filenames: false
+        args: [ --config-file=pyproject.toml, xrayvision ]
 ci:
   autofix_prs: false
   autoupdate_schedule: "quarterly"

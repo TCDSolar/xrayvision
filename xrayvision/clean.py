@@ -7,7 +7,8 @@ appropriate component shapes at different scales.
 
 """
 
-from collections.abc import Iterable, MutableSequence
+from typing import Any, cast
+from collections.abc import Sequence
 
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
@@ -67,7 +68,7 @@ __common_clean_doc__ = r"""
     """
 
 
-@u.quantity_input
+@u.quantity_input  # type: ignore[untyped-decorator]
 def clean(
     dirty_map: Quantity,
     dirty_beam: Quantity,
@@ -169,20 +170,20 @@ def clean(
     return model + dirty_map, model, dirty_map
 
 
-clean.__doc__ += __common_clean_doc__  # type: ignore
+clean.__doc__ = (clean.__doc__ or "") + __common_clean_doc__
 
 
-@u.quantity_input
+@u.quantity_input  # type: ignore[untyped-decorator]
 def vis_clean(
     vis: Visibilities,
     shape: Quantity[u.pix],
     pixel_size: Quantity[u.arcsec / u.pix],
     clean_beam_width: Quantity[u.arcsec] | None = 4.0,
-    niter: int | None = 5000,
+    niter: int = 5000,
     map: bool | None = True,
     gain: float | None = 0.1,
-    **kwargs,
-):
+    **kwargs: Any,
+) -> Any:
     r"""
     Clean the visibilities using Hogbom's original method.
 
@@ -217,7 +218,7 @@ def vis_clean(
     return [Map((data, dirty_map.meta)) for data in (clean_map, model, residual)]
 
 
-vis_clean.__doc__ += __common_clean_doc__  # type: ignore
+vis_clean.__doc__ = (vis_clean.__doc__ or "") + __common_clean_doc__
 
 __common_ms_clean_doc__ = r"""
     scales : array-like, optional, optional
@@ -254,12 +255,12 @@ __common_ms_clean_doc__ = r"""
     """
 
 
-@u.quantity_input
+@u.quantity_input  # type: ignore[untyped-decorator]
 def ms_clean(
     dirty_map: Quantity,
     dirty_beam: Quantity,
     pixel_size: Quantity[u.arcsec / u.pix],
-    scales: MutableSequence[int] | None = None,
+    scales: Sequence[int] | None = None,
     clean_beam_width: Quantity = 4.0 * u.arcsec,
     gain: float = 0.1,
     thres: float = 0.01,
@@ -283,7 +284,7 @@ def ms_clean(
 
     if scales:
         number_of_scales = len(scales)
-        scale_sizes = scales[:]
+        scale_sizes = np.array(scales)
 
     scale_sizes = np.where(scale_sizes == 0, 1, scale_sizes)
 
@@ -297,20 +298,25 @@ def ms_clean(
     pad = [0 if x % 2 == 0 else 1 for x in dirty_map.shape]
 
     # Pre-compute scales, residual maps and dirty beams at each scale and dirty beam cross terms
-    scales = np.zeros((dirty_map.shape[0], dirty_map.shape[1], number_of_scales))
-    scaled_residuals: NDArray = np.zeros((dirty_map.shape[0], dirty_map.shape[1], number_of_scales))
-    scaled_dirty_beams: NDArray = np.zeros((dirty_beam.shape[0], dirty_beam.shape[1], number_of_scales))
-    max_scaled_dirty_beams: NDArray = np.zeros(number_of_scales)
-    cross_terms: dict[tuple[int, int], ArrayLike] = {}
+    scale_kernels: NDArray[np.float64] = np.zeros((dirty_map.shape[0], dirty_map.shape[1], number_of_scales))
+    scaled_residuals: NDArray[np.float64] = np.zeros((dirty_map.shape[0], dirty_map.shape[1], number_of_scales))
+    scaled_dirty_beams: NDArray[np.float64] = np.zeros((dirty_beam.shape[0], dirty_beam.shape[1], number_of_scales))
+    max_scaled_dirty_beams: NDArray[np.float64] = np.zeros(number_of_scales)
+    cross_terms: dict[tuple[int, int], NDArray[np.float64]] = {}
 
     for i, scale in enumerate(scale_sizes):
-        scales[:, :, i] = _component(scale=scale, shape=dirty_map.shape)
-        scaled_residuals[:, :, i] = signal.convolve(dirty_map, scales[:, :, i], mode="same")
-        scaled_dirty_beams[:, :, i] = signal.convolve(dirty_beam, scales[:, :, i], mode="same")
+        scale_kernels[:, :, i] = _component(scale=scale, shape=dirty_map.shape)
+        scaled_residuals[:, :, i] = signal.convolve(dirty_map, scale_kernels[:, :, i], mode="same")
+        scaled_dirty_beams[:, :, i] = signal.convolve(dirty_beam, scale_kernels[:, :, i], mode="same")
         max_scaled_dirty_beams[i] = scaled_dirty_beams[:, :, i].max()
         for j in range(i, number_of_scales):
-            cross_terms[(i, j)] = signal.convolve(
-                signal.convolve(dirty_beam, scales[:, :, i], mode="same"), scales[:, :, j], mode="same"
+            cross_terms[(i, j)] = cast(
+                NDArray[np.float64],
+                signal.convolve(
+                    signal.convolve(dirty_beam, scale_kernels[:, :, i], mode="same"),
+                    scale_kernels[:, :, j],
+                    mode="same",
+                ),
             )
 
     # Clean loop
@@ -346,9 +352,11 @@ def ms_clean(
 
         # shifted = dirty_beam[xr, yr]
 
-        comp = strength * shift(scales[:, :, max_scale], (max_x - map_center[0], max_y - map_center[1]), order=0)
+        comp = strength * shift(
+            scale_kernels[:, :, max_scale], (max_x - map_center[0], max_y - map_center[1]), order=0
+        )
 
-        # comp = strength * scales[xr, yr]
+        # comp = strength * scale_kernels[xr, yr]
 
         # Add this component to current model
         model = np.add(model, comp)
@@ -399,19 +407,19 @@ def ms_clean(
     return model, scaled_residuals.sum(axis=2)
 
 
-ms_clean.__doc__ += __common_ms_clean_doc__  # type: ignore
+ms_clean.__doc__ = (ms_clean.__doc__ or "") + __common_ms_clean_doc__
 
 
 def vis_ms_clean(
     vis: Visibilities,
     shape: Quantity[u.pix],
     pixel_size: Quantity[u.arcsec / u.pix],
-    scales: Iterable | None,
+    scales: Sequence[int] | None,
     clean_beam_width: Quantity[u.arcsec] | None = 4.0,
-    niter: int | None = 5000,
+    niter: int = 5000,
     map: bool | None = True,
-    gain: float | None = 0.1,
-    thres: float | None = 0.01,
+    gain: float = 0.1,
+    thres: float = 0.01,
 ) -> Quantity | NDArray[np.float64]:
     r"""
     Clean the visibilities using a multiscale clean method.
@@ -467,7 +475,7 @@ def vis_ms_clean(
 # vis_ms_clean.__doc__ += __common_ms_clean_doc__
 
 
-def _radial_prolate_sphereoidal(nu):
+def _radial_prolate_sphereoidal(nu: float) -> float:  # pyright: ignore[reportUnusedFunction]
     r"""
     Calculate prolate spheroidal wave function approximation.
 
@@ -539,12 +547,12 @@ def _radial_prolate_sphereoidal(nu):
             bot += q[k, part] * np.power(delnusq, k)
 
         if bot != 0.0:
-            return top / bot
+            return float(top / bot)
         else:
             return 0
 
 
-def _vec_radial_prolate_sphereoidal(nu):
+def _vec_radial_prolate_sphereoidal(nu: ArrayLike) -> NDArray[np.float64]:
     r"""
     Calculate prolate spheroidal wave function approximation.
 
@@ -623,7 +631,7 @@ def _vec_radial_prolate_sphereoidal(nu):
     return out
 
 
-def _component(scale, shape):
+def _component(scale: float, shape: tuple[int, ...]) -> NDArray[np.float64]:
     r"""
 
     Parameters
@@ -664,4 +672,4 @@ def _component(scale, shape):
 
     wave_amp[amp_zero_indices] = 0.0
 
-    return wave_amp
+    return cast(NDArray[np.float64], wave_amp)

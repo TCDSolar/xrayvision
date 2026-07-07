@@ -3,6 +3,7 @@ Implementation of Maximum Entropy Method
 """
 
 from types import SimpleNamespace
+from typing import Any, cast
 
 import numpy as np
 from numpy.linalg import norm
@@ -33,7 +34,7 @@ __all__ = [
 logger = get_logger(__name__, "DEBUG")
 
 
-def _get_entropy(image, flux):
+def _get_entropy(image: Any, flux: Any) -> Any:
     r"""
     Return the entropy of an image.
 
@@ -60,7 +61,9 @@ def _get_entropy(image, flux):
     return np.sum(image * np.log(image / (flux * np.e)))
 
 
-def _get_fourier_matrix(vis, shape=(64, 64) * apu.pix, pixel_size=(4.0312500, 4.0312500) * apu.arcsec):
+def _get_fourier_matrix(
+    vis: Any, shape: Quantity = (64, 64) * apu.pix, pixel_size: Quantity = (4.0312500, 4.0312500) * apu.arcsec
+) -> Any:
     r"""
     Return the complex Fourier matrix used to compute the value of the visibilities.
 
@@ -85,7 +88,7 @@ def _get_fourier_matrix(vis, shape=(64, 64) * apu.pix, pixel_size=(4.0312500, 4.
     y = generate_xy(m, phase_center=0 * apu.arcsec, pixel_size=pixel_size[1])
     x = generate_xy(n, phase_center=0 * apu.arcsec, pixel_size=pixel_size[0])
     x, y = np.meshgrid(x, y, indexing="ij")
-    uv = np.vstack([vis.u, vis.v])
+    uv = cast(Quantity, np.vstack([vis.u, vis.v]))
     # Check apu are correct for exp need to be dimensionless and then remove apu for speed
     if (vis.u * x[0, 0]).unit == apu.dimensionless_unscaled and (vis.v * y[0, 0]).unit == apu.dimensionless_unscaled:
         uv = uv.value
@@ -99,7 +102,7 @@ def _get_fourier_matrix(vis, shape=(64, 64) * apu.pix, pixel_size=(4.0312500, 4.
         return Hv * pixel_size[0].value * pixel_size[1].value
 
 
-def _estimate_flux(vis, shape, pixel, maxiter=1000, tol=1e-3):
+def _estimate_flux(vis: Any, shape: Quantity, pixel: Quantity, maxiter: int = 1000, tol: float = 1e-3) -> Any:
     r"""
     Estimate the total flux in the image by solving an optimisation problem.
 
@@ -165,7 +168,7 @@ def _estimate_flux(vis, shape, pixel, maxiter=1000, tol=1e-3):
     return x.sum() * pixel[0] * pixel[1]
 
 
-def _prepare_for_optimise(pixel, shape, vis):
+def _prepare_for_optimise(pixel: Quantity, shape: Quantity, vis: Any) -> Any:
     r"""
     Return matrices and vectors in format for optimisation
 
@@ -221,7 +224,7 @@ def _prepare_for_optimise(pixel, shape, vis):
     return Hv, Lip, Visib
 
 
-def _get_mean_visibilities(vis, shape, pixel):
+def _get_mean_visibilities(vis: Any, shape: Quantity, pixel: Quantity) -> Any:
     r"""
     Return the mean visibilities sampling the same call in the discretisation of the (u,v) plane.
 
@@ -309,7 +312,7 @@ def _get_mean_visibilities(vis, shape, pixel):
     return SimpleNamespace(u=u, v=v, visibilities=visib, amplitude_uncertainty=weights)
 
 
-def _proximal_entropy(y, m, lamba, Lip, tol=10**-10):
+def _proximal_entropy(y: Any, m: Any, lamba: Any, Lip: Any, tol: float = 10**-10) -> Any:
     r"""
     This function computes the value of the proximity operator of the entropy function subject to
     positivity constraint, i.e. it solves the problem
@@ -351,7 +354,7 @@ def _proximal_entropy(y, m, lamba, Lip, tol=10**-10):
     return c
 
 
-def _proximal_operator(z, f, m, lamb, Lip, niter=250):
+def _proximal_operator(z: Any, f: Any, m: Any, lamb: Any, Lip: Any, niter: int = 250) -> Any:
     r"""
     Computes the value of the proximity operator of the entropy function subject to
     positivity constraint and flux constraint by means of a Dykstra-like proximal algorithm
@@ -381,6 +384,7 @@ def _proximal_operator(z, f, m, lamb, Lip, niter=250):
     p = np.zeros_like(x)
     q = np.zeros_like(x)
 
+    i = 0
     for i in range(niter):
         tmp = x + p
         # Projection on the hyperplane that represents the flux constraint
@@ -397,7 +401,9 @@ def _proximal_operator(z, f, m, lamb, Lip, niter=250):
     return x, i
 
 
-def _optimise_fb(Hv, Visib, Lip, flux, lambd, shape, pixel, maxiter, tol):
+def _optimise_fb(
+    Hv: Any, Visib: Any, Lip: Any, flux: Any, lambd: Any, shape: Quantity, pixel: Quantity, maxiter: int, tol: float
+) -> Any:
     r"""
     Solve the optimization problem using a forward-backward splitting algorithm
 
@@ -461,11 +467,12 @@ def _optimise_fb(Hv, Visib, Lip, flux, lambd, shape, pixel, maxiter, tol):
 
     diff_V = Hvx - Visib
     f_0 = (diff_V**2).sum()
-    J = f_0 + lambd * f_R
+    obj_j = f_0 + lambd * f_R
 
     n_iterations = 0  # number of iterations done in the proximal steps to update the minimizer
+    x_old = x
     for i in range(maxiter):
-        J_old = np.copy(J)
+        obj_j_old = np.copy(obj_j)
         x_old = np.copy(x)
         t_old = np.copy(t)
 
@@ -483,19 +490,19 @@ def _optimise_fb(Hv, Visib, Lip, flux, lambd, shape, pixel, maxiter, tol):
 
         diff_Vp = Hvp - Visib
         f_0 = (diff_Vp**2).sum()
-        Jp = f_0 + lambd * f_Rp
+        obj_jp = f_0 + lambd * f_Rp
 
         # CHECK OF THE MONOTONICITY
         # we update 'x' only if 'Jp' is less than or equal to 'J_old'
         check = True
-        if Jp > J_old:
+        if obj_jp > obj_j_old:
             x[:] = x_old
-            J = J_old
+            obj_j = obj_j_old
             check = False
             n_iterations += pi
         else:
             x[:] = p.real
-            J = Jp
+            obj_j = obj_jp
             n_iterations = 0
 
         if n_iterations >= 500:
@@ -508,7 +515,7 @@ def _optimise_fb(Hv, Visib, Lip, flux, lambd, shape, pixel, maxiter, tol):
         z = x + tau * (x - x_old) + (t_old / t) * (p - x)
 
         if i % 25 == 0:
-            logger.info(f"Iter: {i}, Obj function: {J}")
+            logger.info(f"Iter: {i}, Obj function: {obj_j}")
 
         if check and (np.sqrt(((x - x_old) ** 2.0).sum()) < tol * np.sqrt((x_old**2).sum())):
             break
@@ -516,7 +523,7 @@ def _optimise_fb(Hv, Visib, Lip, flux, lambd, shape, pixel, maxiter, tol):
     return x_old
 
 
-def resistant_mean(data, sigma_cut):
+def resistant_mean(data: NDArray[np.float64], sigma_cut: float) -> tuple[float, float]:
     r"""
     Return a resistant mean
 
@@ -572,10 +579,10 @@ def resistant_mean(data, sigma_cut):
     # Now the standard deviation of the mean:
     sigma = sigma / np.sqrt(good_points.size - 1)
 
-    return mean, sigma
+    return float(mean), float(sigma)
 
 
-@apu.quantity_input
+@apu.quantity_input  # type: ignore[untyped-decorator]
 def mem(
     vis: Visibilities,
     shape: Quantity[apu.pix],

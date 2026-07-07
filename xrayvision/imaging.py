@@ -1,3 +1,5 @@
+from typing import Any
+
 import numpy as np
 
 import astropy.units as apu
@@ -55,7 +57,7 @@ def get_weights(vis: Visibilities, scheme: str = "natural", norm: bool = True) -
     return weights
 
 
-@apu.quantity_input()
+@apu.quantity_input()  # type: ignore[untyped-decorator]
 def validate_and_expand_kwarg(q: Quantity, name: str | None = "") -> Quantity:
     r"""
     Expand a scalar or array of size one to size two by repeating.
@@ -91,7 +93,7 @@ def validate_and_expand_kwarg(q: Quantity, name: str | None = "") -> Quantity:
     return q
 
 
-@apu.quantity_input
+@apu.quantity_input  # type: ignore[untyped-decorator]
 def image_to_vis(
     image: Quantity,
     *,
@@ -128,10 +130,11 @@ def image_to_vis(
     vis = dft_map(
         image, u=u, v=v, phase_center=[0.0, 0.0] * apu.arcsec, pixel_size=pixel_size
     )  # TODO: adapt to generic map center
-    return Visibilities(vis, u=u, v=v, phase_center=phase_center)
+    result: Visibilities = Visibilities(vis, u=u, v=v, phase_center=phase_center)
+    return result
 
 
-@apu.quantity_input()
+@apu.quantity_input()  # type: ignore[untyped-decorator]
 def vis_to_image(
     vis: Visibilities,
     shape: Quantity[apu.pix] = (65, 65) * apu.pixel,
@@ -175,13 +178,13 @@ def vis_to_image(
     return bp_arr
 
 
-@apu.quantity_input
+@apu.quantity_input  # type: ignore[untyped-decorator]
 def vis_psf_map(
     vis: Visibilities,
     *,
     shape: Quantity[apu.pix] = (65, 65) * apu.pixel,
     pixel_size: Quantity[apu.arcsec / apu.pix] | None = 1 * apu.arcsec / apu.pix,
-    scheme: str | None = "natural",
+    scheme: str = "natural",
 ) -> GenericMap:
     r"""
     Create a map of the point spread function for given the visibilities.
@@ -209,7 +212,7 @@ def vis_psf_map(
     return Map((psf, header))
 
 
-@apu.quantity_input()
+@apu.quantity_input()  # type: ignore[untyped-decorator]
 def vis_psf_image(
     vis: Visibilities,
     *,
@@ -255,12 +258,12 @@ def vis_psf_image(
     return psf_arr
 
 
-@apu.quantity_input()
+@apu.quantity_input()  # type: ignore[untyped-decorator]
 def vis_to_map(
     vis: Visibilities,
     shape: Quantity[apu.pix] = (65, 65) * apu.pixel,
     pixel_size: Quantity[apu.arcsec / apu.pix] | None = 1 * apu.arcsec / apu.pixel,
-    scheme: str | None = "natural",
+    scheme: str = "natural",
 ) -> GenericMap:
     r"""
     Create a map by performing a back projection of inverse transform on the visibilities.
@@ -290,8 +293,10 @@ def vis_to_map(
     return Map((image, header))
 
 
-@apu.quantity_input()
-def generate_header(vis: Visibilities, *, shape: Quantity[apu.pix], pixel_size: Quantity[apu.arcsec / apu.pix]) -> dict:
+@apu.quantity_input()  # type: ignore[untyped-decorator]
+def generate_header(
+    vis: Visibilities, *, shape: Quantity[apu.pix], pixel_size: Quantity[apu.arcsec / apu.pix]
+) -> dict[str, Any]:
     r"""
     Generate a map head given the visibilities, pixel size and shape
 
@@ -324,7 +329,7 @@ def generate_header(vis: Visibilities, *, shape: Quantity[apu.pix], pixel_size: 
     return header
 
 
-@apu.quantity_input()
+@apu.quantity_input()  # type: ignore[untyped-decorator]
 def map_to_vis(amap: GenericMap, *, u: Quantity[1 / apu.arcsec], v: Quantity[1 / apu.arcsec]) -> Visibilities:
     r"""
     Return a Visibilities object created from the map, sampling it at give `u`, `v` coordinates.
@@ -359,7 +364,7 @@ def map_to_vis(amap: GenericMap, *, u: Quantity[1 / apu.arcsec], v: Quantity[1 /
     if "cdelt2" in meta:
         new_psize[0] = float(meta["cdelt2"])
 
-    vis = image_to_vis(
+    vis: Visibilities = image_to_vis(
         amap.quantity, u=u, v=v, pixel_size=new_psize * apu.arcsec / apu.pix, phase_center=new_pos * apu.arcsec
     )
 

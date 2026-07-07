@@ -1,3 +1,5 @@
+from typing import cast
+
 import astropy.coordinates
 import astropy.units as u
 from astropy.coordinates import QuantityAttribute
@@ -14,7 +16,7 @@ X_CTYPE = "PJLN"
 Y_CTYPE = "PJLT"
 
 
-class Projective(SunPyBaseCoordinateFrame):
+class Projective(SunPyBaseCoordinateFrame):  # type: ignore[misc]
     """A generic projective coordinate frame for an arbitrary observer."""
 
     observer = ObserverCoordinateAttribute(HeliographicStonyhurst)
@@ -32,7 +34,7 @@ class Projective(SunPyBaseCoordinateFrame):
     }
 
 
-def projective_wcs_to_frame(wcs):
+def projective_wcs_to_frame(wcs: WCS) -> Projective | None:
     r"""
     This function registers the coordinate frames to their FITS-WCS coordinate
     type values in the `astropy.wcs.utils.wcs_to_celestial_frame` registry.
@@ -46,7 +48,7 @@ def projective_wcs_to_frame(wcs):
     : `Projective`
     """
     if hasattr(wcs, "coordinate_frame"):
-        return wcs.coordinate_frame
+        return cast(Projective, wcs.coordinate_frame)
 
     # Not a lat,lon coordinate system bail out early
     if X_CTYPE not in wcs.wcs.ctype[0] or Y_CTYPE not in wcs.wcs.ctype[1]:
@@ -87,7 +89,7 @@ def projective_wcs_to_frame(wcs):
     return Projective(**frame_args)
 
 
-def projective_frame_to_wcs(frame, projection="TAN"):
+def projective_frame_to_wcs(frame: SunPyBaseCoordinateFrame, projection: str = "TAN") -> WCS | None:
     r"""
     For a given frame, this function returns the corresponding WCS object.
 

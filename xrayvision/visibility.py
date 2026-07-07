@@ -8,7 +8,7 @@ certain spacecraft or instruments
 import abc
 import copy
 import numbers
-from typing import Any
+from typing import Any, cast
 from collections.abc import Iterable, Sequence
 
 import numpy as np
@@ -54,7 +54,7 @@ class VisMetaABC(abc.ABC):
 
     @property
     @abc.abstractmethod
-    def vis_labels(self) -> Sequence[Iterable[str]]:
+    def vis_labels(self) -> Sequence[Iterable[str]] | None:
         """
         Labels of each visibility.
         """
@@ -139,7 +139,7 @@ class VisibilitiesABC(abc.ABC):
         """
 
 
-class VisMeta(VisMetaABC, dict):
+class VisMeta(VisMetaABC, dict[str, Any]):
     """
     A class for holding Visibility-specific metadata.
 
@@ -149,7 +149,7 @@ class VisMeta(VisMetaABC, dict):
         A dictionary of the metadata
     """
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         # Check controlled/expected inputs are of correct type and units.
         controled_args = (
@@ -160,31 +160,39 @@ class VisMeta(VisMetaABC, dict):
         for args in controled_args:
             self._check_input_type_and_unit(*args)
 
-    def _check_input_type_and_unit(self, key, key_type, unit=None, equivalencies=None):
+    def _check_input_type_and_unit(
+        self, key: str, key_type: type | tuple[type, ...], unit: Any = None, equivalencies: Any = None
+    ) -> None:
         value = self.get(key, None)
         if not isinstance(value, (key_type | type(None))):
             raise KeyError(f"Inputs must include a key, '{key}', that gives a {key_type}.")
-        if unit is not None and value is not None and not value.unit.is_equivalent(unit, equivalencies=equivalencies):
+        if (
+            unit is not None
+            and value is not None
+            and not cast(Any, value).unit.is_equivalent(  # pyright: ignore[reportUnnecessaryCast]
+                unit, equivalencies=equivalencies
+            )
+        ):
             raise ValueError(f"'{key}' must have angular units.")
 
     @property
-    def observer_coordinate(self):
+    def observer_coordinate(self) -> SkyCoord | None:
         return self.get(_OBS_COORD_KEY, None)
 
     @property
-    def spectral_range(self):
+    def spectral_range(self) -> Iterable[apu.Quantity] | None:
         return self.get(_E_RANGE_KEY, None)
 
     @property
-    def time_range(self):
+    def time_range(self) -> Iterable[Time] | None:
         return self.get(_T_RANGE_KEY, None)
 
     @property
-    def vis_labels(self):
+    def vis_labels(self) -> Sequence[Iterable[str]] | None:
         return self.get(_VIS_LABELS_KEY, None)
 
     @property
-    def instrument(self):
+    def instrument(self) -> str | None:
         instr = None
         i, n = 0, len(_INSTR_KEYS)
         while not instr and i < n:
@@ -194,7 +202,7 @@ class VisMeta(VisMetaABC, dict):
 
 
 class Visibilities(VisibilitiesABC):
-    @apu.quantity_input()
+    @apu.quantity_input()  # type: ignore[untyped-decorator]
     def __init__(
         self,
         visibilities: apu.Quantity,
@@ -322,45 +330,45 @@ class Visibilities(VisibilitiesABC):
         self._phase_center = phase_center
 
     @property
-    def visibilities(self):
+    def visibilities(self) -> Quantity:
         return self._build_quantity(self._vis_key)
 
     @property
-    def u(self):
+    def u(self) -> Quantity:
         return self._build_quantity(self._u_key, self._uv_key)
 
     @property
-    def v(self):
+    def v(self) -> Quantity:
         return self._build_quantity(self._v_key, self._uv_key)
 
     @property
-    def phase_center(self):
+    def phase_center(self) -> Quantity:
         return self._phase_center
 
     @phase_center.setter
-    def phase_center(self, value: apu.Quantity[apu.deg]):
+    def phase_center(self, value: apu.Quantity[apu.deg]) -> None:
         self._phase_center = value
 
     @property
-    def uncertainty(self):
+    def uncertainty(self) -> Quantity | None:
         return self._build_quantity(self._uncert_key, self._vis_key) if self._uncert_key in self._data.keys() else None
 
     @property
-    def meta(self):
+    def meta(self) -> VisMetaABC:
         meta, coords = self._data.attrs[self._meta_key], self._data.coords
         if _VIS_LABELS_KEY in coords:
             meta[_VIS_LABELS_KEY] = coords[_VIS_LABELS_KEY].values
-        return meta
+        return cast(VisMetaABC, meta)
 
     @property
-    def amplitude(self):
+    def amplitude(self) -> Quantity:
         if self._amplitude_key in self._data:
             return self._build_quantity(self._amplitude_key, self._vis_key)
         else:
             return np.sqrt(np.real(self.visibilities) ** 2 + np.imag(self.visibilities) ** 2)
 
     @property
-    def amplitude_uncertainty(self):
+    def amplitude_uncertainty(self) -> Quantity | None:
         if self._amplitude_uncert_key in self._data:
             return self._build_quantity(self._amplitude_uncert_key, self._vis_key)
         else:
@@ -374,7 +382,7 @@ class Visibilities(VisibilitiesABC):
                 )
 
     @property
-    def phase(self):
+    def phase(self) -> Quantity:
         if self._phase_key in self._data:
             return self._build_quantity(self._phase_key)
         else:
@@ -382,7 +390,7 @@ class Visibilities(VisibilitiesABC):
             return np.arctan2(np.imag(vis), np.real(vis)).to(apu.deg)
 
     @property
-    def phase_uncertainty(self):
+    def phase_uncertainty(self) -> Quantity | None:
         if self._phase_uncert_key in self._data:
             return self._build_quantity(self._phase_uncert_key, self._phase_key)
         else:
@@ -398,7 +406,7 @@ class Visibilities(VisibilitiesABC):
                     * apu.rad
                 ).to(apu.deg)
 
-    def index_by_label(self, *labels: Any):
+    def index_by_label(self, *labels: Any) -> "Visibilities":
         """
         Extract visibilities based on their labels.
 
@@ -421,13 +429,13 @@ class Visibilities(VisibilitiesABC):
         new_vis._data = new_data
         return new_vis
 
-    def _build_quantity(self, label, unit_label=None):
+    def _build_quantity(self, label: str, unit_label: str | None = None) -> Quantity:
         if unit_label is None:
             unit_label = label
         data = self._data[label].to_numpy()
         return apu.Quantity(data, unit=self._data.attrs[self._units_key][unit_label])
 
-    def __getitem__(self, item):
+    def __getitem__(self, item: Any) -> "Visibilities":
         if not isinstance(item, tuple):
             item = (item,)
         dims = self._data.dims
@@ -442,7 +450,7 @@ class Visibilities(VisibilitiesABC):
         new_vis._data = new_data
         return new_vis
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         r"""
         Return a printable representation of the visibility.
 
@@ -453,7 +461,7 @@ class Visibilities(VisibilitiesABC):
         """
         return f"{self.__class__.__name__}< {self.u.size}, {self.visibilities}>"
 
-    def __eq__(self, other):
+    def __eq__(self, other: Any) -> bool:
         """
         Checks whether two Visibilities objects are equal.
 
@@ -486,7 +494,7 @@ class Visibilities(VisibilitiesABC):
         return True
 
 
-def _attrs_both_none_or_neither(attr1, attr2):
+def _attrs_both_none_or_neither(attr1: Any, attr2: Any) -> bool:
     if attr1 is None:
         if attr2 is not None:
             return False
@@ -495,7 +503,7 @@ def _attrs_both_none_or_neither(attr1, attr2):
     return True
 
 
-@deprecated("0.2.0", alternative="Visibilities")
+@deprecated("0.2.0", alternative="Visibilities")  # pyright: ignore[reportUntypedClassDecorator]
 class Visibility:
     r"""
     Hold a set of related visibilities and information.
@@ -503,10 +511,10 @@ class Visibility:
 
     """
 
-    @apu.quantity_input
+    @apu.quantity_input  # type: ignore[untyped-decorator]
     def __init__(
         self,
-        vis,
+        vis: Quantity,
         *,
         u: Quantity[1 / apu.arcsec],
         v: Quantity[1 / apu.arcsec],
@@ -548,7 +556,7 @@ class Visibility:
         """
         return f"{self.__class__.__name__}< {self.u.size}, {self.vis}>"
 
-    def __eq__(self, other) -> bool:
+    def __eq__(self, other: Any) -> bool:
         r"""
         Equality for Visibility class
 
