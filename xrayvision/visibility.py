@@ -424,7 +424,8 @@ class Visibilities(VisibilitiesABC):
     def _build_quantity(self, label, unit_label=None):
         if unit_label is None:
             unit_label = label
-        return apu.Quantity(self._data[label], unit=self._data.attrs[self._units_key][unit_label])
+        data = self._data[label].to_numpy()
+        return apu.Quantity(data, unit=self._data.attrs[self._units_key][unit_label])
 
     def __getitem__(self, item):
         if not isinstance(item, tuple):
