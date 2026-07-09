@@ -69,4 +69,4 @@ For more information on contributing to SunPy, please read our `Newcomers' guide
 .. _Newcomers' guide: https://docs.sunpy.org/en/latest/dev_guide/contents/newcomers.html
 .. _example gallery: https://xrayvision.readthedocs.io/en/latest/generated/gallery/index.html
 
-When you are interacting with the SunPy community you are asked at to follow our `code of conduct <https://sunpy.org/coc>`__.
+When you are interacting with the SunPy community you are asked to follow our `code of conduct <https://sunpy.org/coc>`__.

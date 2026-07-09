@@ -1,6 +1,6 @@
 Update core minimum version to:
 
-* python>=3,12
+* python>=3.12
 * astropy>=7.0.0
 * packaging>=24.2
 * numpy>=2.1
