@@ -60,7 +60,7 @@ clean_map.plot()
 
 # Compute percent_lambda
 snr_value, _ = resistant_mean((np.abs(stix_vis.visibilities) / stix_vis.amplitude_uncertainty).flatten(), 3)
-percent_lambda = 2 / (snr_value**2 + 90)
+percent_lambda = 2 / (snr_value**2 + 90) * apu.percent
 
 mem_map = mem(
     stix_vis, shape=[129, 129] * apu.pixel, pixel_size=[2, 2] * apu.arcsec / apu.pix, percent_lambda=percent_lambda
