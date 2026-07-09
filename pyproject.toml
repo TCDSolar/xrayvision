@@ -98,7 +98,7 @@ allow_redefinition = true
 exclude = "(^|/)tests/"
 
 [tool.pyright]
-pythonVersion = "3.11"
+pythonVersion = "3.12"
 typeCheckingMode = "strict"
 
 # Don't infer types from unstubbed library source (astropy/scipy/sunpy have no py.typed);
