@@ -1,8 +1,13 @@
-Update min python version to ``>=3.12`` and update min dependencies:
+Update core minimum version to:
 
-* astropy>=6.1.0
-* packaging>=23.1
-* numpy>=2.0
-* scipy>=1.14
-* xarray>=2024.5.0
-* matplotlib>=3.9.0
+* python>=3,12
+* astropy>=7.0.0
+* packaging>=24.2
+* numpy>=2.1
+* scipy>=1.15
+* xarray>=2024.7.0
+* matplotlib>=3.10.0
+
+and optional:
+
+* sunpy[map]>=7.0.0
