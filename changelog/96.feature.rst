@@ -1,0 +1,1 @@
+Updates for strict mode typing and add mypy and pyright configuration.
