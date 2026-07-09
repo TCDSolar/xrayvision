@@ -3,8 +3,8 @@ Developers Guide
 
 The instructions in this following section are based upon resources:
 
-* `Astropy Dev Workflow <https://docs.astropy.org/en/latest/development/quickstart.html>`_
-* `Astropy Dev environment <https://docs.astropy.org/en/latest/development/development_details.html>`_
+* `Astropy Dev Workflow <https://docs.astropy.org/en/latest/index_dev.html>`_
+* `Astropy Dev environment <https://docs.astropy.org/en/latest/development/quickstart.html#create-an-isolated-development-environment>`_
 * `Astropy Pull Request Example <https://docs.astropy.org/en/latest/development/git_edit_workflow_examples.html>`_
 * `Sunpy Newcomers' Guide <https://docs.sunpy.org/en/latest/dev_guide/contents/newcomers.html>`_
 

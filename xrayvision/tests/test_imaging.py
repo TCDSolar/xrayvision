@@ -1,8 +1,10 @@
-import astropy.units as apu
 import numpy as np
 import pytest
-from astropy.convolution.kernels import Gaussian2DKernel
 from numpy.testing import assert_allclose, assert_array_equal
+
+import astropy.units as apu
+from astropy.convolution.kernels import Gaussian2DKernel
+
 from sunpy.map import Map
 
 from xrayvision.imaging import image_to_vis, map_to_vis, vis_psf_image, vis_to_image, vis_to_map
