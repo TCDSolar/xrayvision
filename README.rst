@@ -43,7 +43,7 @@ See the `example gallery`_.
 Getting Help
 ------------
 
-See the `issue tracker`_.
+See the `issues page`_.
 
 Usage of Generative AI
 ----------------------
@@ -67,5 +67,6 @@ For more information on contributing to SunPy, please read our `Newcomers' guide
 .. _Developers Guide: https://xrayvision.readthedocs.io/en/latest/how_to_guides/dev_guide.html
 .. _issues page: https://github.com/TCDSolar/xrayvision/issues/
 .. _Newcomers' guide: https://docs.sunpy.org/en/latest/dev_guide/contents/newcomers.html
+.. _example gallery: https://xrayvision.readthedocs.io/en/latest/generated/gallery/index.html
 
 When you are interacting with the SunPy community you are asked at to follow our `code of conduct <https://sunpy.org/coc>`__.
