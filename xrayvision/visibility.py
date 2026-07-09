@@ -8,18 +8,20 @@ certain spacecraft or instruments
 import abc
 import copy
 import numbers
-from typing import Any, Union, Optional
+from typing import Any
 from collections.abc import Iterable, Sequence
 
-import astropy.units as apu
 import numpy as np
 import xarray
+
+import astropy.units as apu
 from astropy.coordinates import SkyCoord
 from astropy.time import Time
 from astropy.units import Quantity
 
 __all__ = ["Visibility", "Visibilities", "VisMeta", "VisibilitiesABC", "VisMetaABC"]
 
+from sunpy.util import deprecated
 
 _E_RANGE_KEY = "spectral_range"
 _T_RANGE_KEY = "time_range"
@@ -31,21 +33,21 @@ _INSTR_KEYS = ["instrument", "INSTRUME"]
 class VisMetaABC(abc.ABC):
     @property
     @abc.abstractmethod
-    def observer_coordinate(self) -> Union[SkyCoord, None]:
+    def observer_coordinate(self) -> SkyCoord | None:
         """
         Location of the observer.
         """
 
     @property
     @abc.abstractmethod
-    def spectral_range(self) -> Optional[Iterable[apu.Quantity]]:
+    def spectral_range(self) -> Iterable[apu.Quantity] | None:
         """
         Spectral range over which the visibilities are computed.
         """
 
     @property
     @abc.abstractmethod
-    def time_range(self) -> Optional[Iterable[Time]]:
+    def time_range(self) -> Iterable[Time] | None:
         """
         Time range over which the visibilities are computed.
         """
@@ -59,7 +61,7 @@ class VisMetaABC(abc.ABC):
 
     @property
     @abc.abstractmethod
-    def instrument(self) -> Union[str, None]:
+    def instrument(self) -> str | None:
         """
         The name of the instrument or observer that measured the visibilities.
         """
@@ -103,35 +105,35 @@ class VisibilitiesABC(abc.ABC):
 
     @property
     @abc.abstractmethod
-    def uncertainty(self) -> Union[Iterable[apu.Quantity], None]:
+    def uncertainty(self) -> Iterable[apu.Quantity] | None:
         """
         Uncertainties on visibilities values.
         """
 
     @property
     @abc.abstractmethod
-    def amplitude(self) -> Union[Iterable[apu.Quantity], None]:
+    def amplitude(self) -> Iterable[apu.Quantity] | None:
         """
         Amplitudes of the visibilities.
         """
 
     @property
     @abc.abstractmethod
-    def amplitude_uncertainty(self) -> Union[Iterable[apu.Quantity], None]:
+    def amplitude_uncertainty(self) -> Iterable[apu.Quantity] | None:
         """
         Amplitude uncertainty of the visibilities.
         """
 
     @property
     @abc.abstractmethod
-    def phase(self) -> Union[Iterable[apu.Quantity[apu.deg]], None]:
+    def phase(self) -> Iterable[apu.Quantity[apu.deg]] | None:
         """
         Phases of the visibilities.
         """
 
     @property
     @abc.abstractmethod
-    def phase_uncertainty(self) -> Union[Iterable[apu.Quantity[apu.deg]], None]:
+    def phase_uncertainty(self) -> Iterable[apu.Quantity[apu.deg]] | None:
         """
         Phase uncertainty of the visibilities.
         """
@@ -199,12 +201,12 @@ class Visibilities(VisibilitiesABC):
         u: apu.Quantity[1 / apu.deg],
         v: apu.Quantity[1 / apu.deg],
         phase_center: apu.Quantity[apu.arcsec] = [0, 0] * apu.arcsec,
-        meta: Optional[VisMetaABC] = None,
-        uncertainty: Optional[apu.Quantity] = None,
-        amplitude: Optional[apu.Quantity] = None,
-        amplitude_uncertainty: Optional[apu.Quantity] = None,
-        phase: Optional[apu.Quantity[apu.deg]] = None,
-        phase_uncertainty: Optional[apu.Quantity[apu.deg]] = None,
+        meta: VisMetaABC | None = None,
+        uncertainty: apu.Quantity | None = None,
+        amplitude: apu.Quantity | None = None,
+        amplitude_uncertainty: apu.Quantity | None = None,
+        phase: apu.Quantity[apu.deg] | None = None,
+        phase_uncertainty: apu.Quantity[apu.deg] | None = None,
     ):
         r"""
         A class for holding visibilities.
@@ -422,7 +424,8 @@ class Visibilities(VisibilitiesABC):
     def _build_quantity(self, label, unit_label=None):
         if unit_label is None:
             unit_label = label
-        return apu.Quantity(self._data[label], unit=self._data.attrs[self._units_key][unit_label])
+        data = self._data[label].to_numpy()
+        return apu.Quantity(data, unit=self._data.attrs[self._units_key][unit_label])
 
     def __getitem__(self, item):
         if not isinstance(item, tuple):
@@ -492,6 +495,7 @@ def _attrs_both_none_or_neither(attr1, attr2):
     return True
 
 
+@deprecated("0.2.0", alternative="Visibilities")
 class Visibility:
     r"""
     Hold a set of related visibilities and information.
@@ -506,8 +510,8 @@ class Visibility:
         *,
         u: Quantity[1 / apu.arcsec],
         v: Quantity[1 / apu.arcsec],
-        offset: Optional[Quantity[apu.arcsec]] = (0.0, 0.0) * apu.arcsec,
-        phase_centre: Optional[Quantity[apu.arcsec]] = (0.0, 0.0) * apu.arcsec,
+        offset: Quantity[apu.arcsec] | None = (0.0, 0.0) * apu.arcsec,
+        phase_centre: Quantity[apu.arcsec] | None = (0.0, 0.0) * apu.arcsec,
     ) -> None:
         r"""
         Generic Visibility object.

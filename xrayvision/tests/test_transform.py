@@ -1,9 +1,10 @@
-import astropy.units as apu
 import numpy as np
 import pytest
 from numpy.fft import fft2, fftshift, ifft2, ifftshift
 from numpy.testing import assert_allclose
 from scipy import signal
+
+import astropy.units as apu
 
 from xrayvision.transform import dft_map, generate_uv, generate_xy, idft_map
 

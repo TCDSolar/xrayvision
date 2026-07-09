@@ -1,8 +1,8 @@
-from typing import Optional
+import numpy as np
 
 import astropy.units as apu
-import numpy as np
 from astropy.units import Quantity
+
 from sunpy.map import GenericMap, Map
 
 from xrayvision.transform import dft_map, idft_map
@@ -56,7 +56,7 @@ def get_weights(vis: Visibilities, scheme: str = "natural", norm: bool = True) -
 
 
 @apu.quantity_input()
-def validate_and_expand_kwarg(q: Quantity, name: Optional[str] = "") -> Quantity:
+def validate_and_expand_kwarg(q: Quantity, name: str | None = "") -> Quantity:
     r"""
     Expand a scalar or array of size one to size two by repeating.
 
@@ -97,8 +97,8 @@ def image_to_vis(
     *,
     u: Quantity[apu.arcsec**-1],
     v: Quantity[apu.arcsec**-1],
-    phase_center: Optional[Quantity[apu.arcsec]] = (0.0, 0.0) * apu.arcsec,
-    pixel_size: Optional[Quantity[apu.arcsec / apu.pix]] = 1.0 * apu.arcsec / apu.pix,
+    phase_center: Quantity[apu.arcsec] | None = (0.0, 0.0) * apu.arcsec,
+    pixel_size: Quantity[apu.arcsec / apu.pix] | None = 1.0 * apu.arcsec / apu.pix,
 ) -> Visibilities:
     r"""
     Return a Visibilities object created from the image and u, v sampling.
@@ -135,7 +135,7 @@ def image_to_vis(
 def vis_to_image(
     vis: Visibilities,
     shape: Quantity[apu.pix] = (65, 65) * apu.pixel,
-    pixel_size: Optional[Quantity[apu.arcsec / apu.pix]] = 1 * apu.arcsec / apu.pix,
+    pixel_size: Quantity[apu.arcsec / apu.pix] | None = 1 * apu.arcsec / apu.pix,
     scheme: str = "natural",
 ) -> Quantity:
     """
@@ -180,8 +180,8 @@ def vis_psf_map(
     vis: Visibilities,
     *,
     shape: Quantity[apu.pix] = (65, 65) * apu.pixel,
-    pixel_size: Optional[Quantity[apu.arcsec / apu.pix]] = 1 * apu.arcsec / apu.pix,
-    scheme: Optional[str] = "natural",
+    pixel_size: Quantity[apu.arcsec / apu.pix] | None = 1 * apu.arcsec / apu.pix,
+    scheme: str | None = "natural",
 ) -> GenericMap:
     r"""
     Create a map of the point spread function for given the visibilities.
@@ -259,8 +259,8 @@ def vis_psf_image(
 def vis_to_map(
     vis: Visibilities,
     shape: Quantity[apu.pix] = (65, 65) * apu.pixel,
-    pixel_size: Optional[Quantity[apu.arcsec / apu.pix]] = 1 * apu.arcsec / apu.pixel,
-    scheme: Optional[str] = "natural",
+    pixel_size: Quantity[apu.arcsec / apu.pix] | None = 1 * apu.arcsec / apu.pixel,
+    scheme: str | None = "natural",
 ) -> GenericMap:
     r"""
     Create a map by performing a back projection of inverse transform on the visibilities.

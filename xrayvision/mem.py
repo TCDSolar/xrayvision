@@ -3,13 +3,14 @@ Implementation of Maximum Entropy Method
 """
 
 from types import SimpleNamespace
-from typing import Union, Optional
 
-import astropy.units as apu
 import numpy as np
-from astropy.units import Quantity
 from numpy.linalg import norm
 from numpy.typing import NDArray
+
+import astropy.units as apu
+from astropy.units import Quantity
+
 from sunpy.map import Map
 
 from xrayvision.imaging import generate_header
@@ -580,12 +581,12 @@ def mem(
     shape: Quantity[apu.pix],
     pixel_size: Quantity[apu.arcsec / apu.pix],
     *,
-    percent_lambda: Optional[Quantity[apu.percent]] = 0.02 * apu.percent,
+    percent_lambda: Quantity[apu.percent] | None = 0.02 * apu.percent,
     maxiter: int = 1000,
     tol: float = 1e-3,
     map: bool = True,
-    total_flux: Optional[Quantity] = None,
-) -> Union[Quantity, NDArray[np.float64]]:
+    total_flux: Quantity | None = None,
+) -> Quantity | NDArray[np.float64]:
     r"""
     Maximum Entropy Method visibility based image reconstruction
 
