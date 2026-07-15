@@ -7,6 +7,8 @@ takes inputs which have positional information `dft_map` and the inverse `idft_m
 
 """
 
+from typing import Any
+
 import numpy as np
 import numpy.typing as npt
 
@@ -17,7 +19,7 @@ from astropy.units.core import UnitsError
 __all__ = ["generate_xy", "generate_uv", "dft_map", "idft_map"]
 
 
-@apu.quantity_input()
+@apu.quantity_input()  # type: ignore[untyped-decorator]
 def generate_xy(
     number_pixels: Quantity[apu.pix],
     *,
@@ -65,7 +67,7 @@ def generate_xy(
     return x
 
 
-@apu.quantity_input()
+@apu.quantity_input()  # type: ignore[untyped-decorator]
 def generate_uv(
     number_pixels: Quantity[apu.pix],
     *,
@@ -121,15 +123,15 @@ def generate_uv(
     return x
 
 
-@apu.quantity_input()
+@apu.quantity_input()  # type: ignore[untyped-decorator]
 def dft_map(
-    input_array: Quantity | npt.NDArray,
+    input_array: Quantity | npt.NDArray[Any],
     *,
     u: Quantity[1 / apu.arcsec],
     v: Quantity[1 / apu.arcsec],
     phase_center: Quantity[apu.arcsec] = (0.0, 0.0) * apu.arcsec,
     pixel_size: Quantity[apu.arcsec / apu.pix] = (1.0, 1.0) * apu.arcsec / apu.pix,
-) -> Quantity | npt.NDArray:
+) -> Quantity | npt.NDArray[Any]:
     r"""
     Discrete Fourier transform in terms of coordinates returning 1-D array complex visibilities.
 
@@ -154,8 +156,8 @@ def dft_map(
     """
     m, n = input_array.shape * apu.pix
     # python array index in row, column hence y, x
-    y = generate_xy(m, phase_center=phase_center[0], pixel_size=pixel_size[0])  # type: ignore
-    x = generate_xy(n, phase_center=phase_center[1], pixel_size=pixel_size[1])  # type: ignore
+    y = generate_xy(m, phase_center=phase_center[0], pixel_size=pixel_size[0])
+    x = generate_xy(n, phase_center=phase_center[1], pixel_size=pixel_size[1])
 
     x, y = np.meshgrid(x, y)
     uv = np.vstack([u, v])
@@ -180,17 +182,17 @@ def dft_map(
         raise UnitsError("Incompatible units on uv {uv.unit} should cancel with xy to leave a dimensionless quantity")
 
 
-@apu.quantity_input
+@apu.quantity_input  # type: ignore[untyped-decorator]
 def idft_map(
-    input_vis: Quantity | npt.NDArray,
+    input_vis: Quantity | npt.NDArray[Any],
     *,
     u: Quantity[1 / apu.arcsec],
     v: Quantity[1 / apu.arcsec],
     shape: Quantity[apu.pix],
-    weights: npt.NDArray | None = None,
+    weights: npt.NDArray[Any] | None = None,
     phase_center: Quantity[apu.arcsec] = (0.0, 0.0) * apu.arcsec,
     pixel_size: Quantity[apu.arcsec / apu.pix] = (1.0, 1.0) * apu.arcsec / apu.pix,
-) -> Quantity | npt.NDArray:
+) -> Quantity | npt.NDArray[Any]:
     r"""
     Inverse discrete Fourier transform in terms of coordinates returning a 2D real array or image.
 
@@ -219,8 +221,8 @@ def idft_map(
     """
     m, n = shape
     # python array index in row, column hence y, x
-    y = generate_xy(m, phase_center=phase_center[0], pixel_size=pixel_size[0])  # type: ignore
-    x = generate_xy(n, phase_center=phase_center[1], pixel_size=pixel_size[1])  # type: ignore
+    y = generate_xy(m, phase_center=phase_center[0], pixel_size=pixel_size[0])
+    x = generate_xy(n, phase_center=phase_center[1], pixel_size=pixel_size[1])
 
     x, y = np.meshgrid(x, y)
 

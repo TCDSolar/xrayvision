@@ -1,13 +1,18 @@
 [run]
 omit =
+  xrayvision/_sunpy_init*
   xrayvision/conftest.py
   xrayvision/*setup_package*
+  xrayvision/tests/*
+  xrayvision/*/tests/*
   xrayvision/extern/*
   xrayvision/version*
   xrayvision/_dev/*
   */xrayvision/_dev/*
   */xrayvision/conftest.py
   */xrayvision/*setup_package*
+  */xrayvision/tests/*
+  */xrayvision/*/tests/*
   */xrayvision/extern/*
   */xrayvision/version*
 

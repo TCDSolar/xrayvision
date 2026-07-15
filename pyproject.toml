@@ -90,9 +90,41 @@ xrayvisim = ["data/*"]
 version_file = "xrayvision/_version.py"
 
 [tool.mypy]
+python_version = "3.12"
+strict = true
+ignore_missing_imports = true
 disable_error_code = "import-untyped"
 allow_redefinition = true
-python_version = "3.12"
+exclude = "(^|/)tests/"
+
+[tool.pyright]
+pythonVersion = "3.12"
+typeCheckingMode = "strict"
+
+# Don't infer types from unstubbed library source (astropy/scipy/sunpy have no py.typed);
+# treat them as untyped like mypy's ignore_missing_imports does, rather than statically
+# analysing their implementation.
+useLibraryCodeForTypes = false
+
+# Stop errors when third-party libraries lack types/stubs
+reportMissingImports = "none"
+reportMissingTypeStubs = "none"
+
+# Corrected rules to silence "partially unknown" issues from external packages
+reportUnknownVariableType = "none"
+reportUnknownMemberType = "none"
+reportUnknownArgumentType = "none"
+reportUnknownParameterType = "none"
+
+# astropy's `Quantity[unit]` annotations (e.g. `Quantity[u.arcsec / u.pix]`) are a runtime-checked
+# idiom for `@quantity_input`, not a real generic parameter; pyright can't parse the unit expression
+# as a type and flags every occurrence, so this is disabled rather than rewriting the signatures.
+reportInvalidTypeForm = "none"
+
+ignore = [
+    "**/tests/**",
+]
+
 
 [tool.gilesbot]
   [tool.gilesbot.pull_requests]
