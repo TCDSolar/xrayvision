@@ -173,7 +173,7 @@ class VisMeta(VisMetaABC, dict[str, Any]):
                 unit, equivalencies=equivalencies
             )
         ):
-            raise ValueError(f"'{key}' must have angular units.")
+            raise ValueError(f"'{key}' must have units equivalent to {unit}.")
 
     @property
     def observer_coordinate(self) -> SkyCoord | None:

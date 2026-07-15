@@ -1,4 +1,4 @@
-exclude: ".*(.csv|.fits|.fts|.fit|.header|.txt|tca.*|.json|.asdf)$|^CITATION.rst|tools\/"
+exclude: '.*(.csv|.fits|.fts|.fit|.header|.txt|tca.*|.json|.asdf)$|^CITATION.rst|tools\/'
 repos:
   - repo: https://github.com/zizmorcore/zizmor-pre-commit
     rev: v1.26.1
