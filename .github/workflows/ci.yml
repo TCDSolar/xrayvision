@@ -110,7 +110,7 @@ jobs:
     uses: OpenAstronomy/github-actions-workflows/.github/workflows/publish_pure_python.yml@v2  # zizmor: ignore[unpinned-uses]
     with:
       python-version: '3.13'
-      test_extras: 'tests'
+      test_extras: 'tests,map'
       test_command: 'pytest -p no:warnings --doctest-rst --pyargs xrayvision'
       submodules: false
       save_artifacts: true
