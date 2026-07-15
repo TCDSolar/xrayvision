@@ -387,7 +387,8 @@ class Visibilities(VisibilitiesABC):
             return self._build_quantity(self._phase_key)
         else:
             vis = self.visibilities
-            return np.arctan2(np.imag(vis), np.real(vis)).to(apu.deg)
+            phase = np.arctan2(np.imag(vis), np.real(vis))
+            return cast(Quantity, phase).to(apu.deg)
 
     @property
     def phase_uncertainty(self) -> Quantity | None:
