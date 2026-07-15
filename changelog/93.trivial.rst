@@ -1,1 +1,0 @@
-Updated the template and add oldest and devdeps CI builds.

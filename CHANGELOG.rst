@@ -1,3 +1,36 @@
+0.3.0 (2026-07-15)
+==================
+
+Breaking Changes
+----------------
+
+- Update core minimum versions to:
+
+  * python>=3.12
+  * astropy>=7.0.0
+  * packaging>=24.2
+  * numpy>=2.1
+  * scipy>=1.15
+  * xarray>=2024.7.0
+  * matplotlib>=3.10.0
+
+  and optional:
+
+  * sunpy[map]>=7.0.0 (`#93 <https://github.com/TCDSolar/xrayvision/pull/93>`__)
+
+
+New Features
+------------
+
+- Updates for strict mode typing and add mypy and pyright configuration. (`#97 <https://github.com/TCDSolar/xrayvision/pull/97>`__)
+
+
+Internal Changes
+----------------
+
+- Updated the template and add oldest and devdeps CI builds. (`#93 <https://github.com/TCDSolar/xrayvision/pull/93>`__)
+
+
 Xrayvision 0.2.1 (2025-04-04)
 =============================
 
@@ -43,9 +76,3 @@ Trivial/Internal Changes
 - Format code with ruff and turn on ruff format in pre-commit. (`#61 <https://github.com/TCDSolar/xrayvision/pull/61>`__)
 - Update README with useful links to example and issue tracker. (`#70 <https://github.com/TCDSolar/xrayvision/pull/70>`__)
 - Update project configuration move to `project.toml` and individual config files for each tool (isort, ruff, pytest, etc) and add zenodo config file and mailmap. (`#81 <https://github.com/TCDSolar/xrayvision/pull/81>`__)
-
-
-Xrayvision 0.1.dev60+g6fe95fa.d20210925 (2021-09-25)
-====================================================
-
-No significant changes.
