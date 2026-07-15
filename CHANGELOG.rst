@@ -4,7 +4,7 @@
 Breaking Changes
 ----------------
 
-- Update core minimum version to:
+- Update core minimum versions to:
 
   * python>=3.12
   * astropy>=7.0.0
@@ -76,9 +76,3 @@ Trivial/Internal Changes
 - Format code with ruff and turn on ruff format in pre-commit. (`#61 <https://github.com/TCDSolar/xrayvision/pull/61>`__)
 - Update README with useful links to example and issue tracker. (`#70 <https://github.com/TCDSolar/xrayvision/pull/70>`__)
 - Update project configuration move to `project.toml` and individual config files for each tool (isort, ruff, pytest, etc) and add zenodo config file and mailmap. (`#81 <https://github.com/TCDSolar/xrayvision/pull/81>`__)
-
-
-Xrayvision 0.1.dev60+g6fe95fa.d20210925 (2021-09-25)
-====================================================
-
-No significant changes.
