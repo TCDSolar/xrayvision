@@ -1,3 +1,36 @@
+0.3.0 (2026-07-15)
+==================
+
+Breaking Changes
+----------------
+
+- Update core minimum version to:
+
+  * python>=3.12
+  * astropy>=7.0.0
+  * packaging>=24.2
+  * numpy>=2.1
+  * scipy>=1.15
+  * xarray>=2024.7.0
+  * matplotlib>=3.10.0
+
+  and optional:
+
+  * sunpy[map]>=7.0.0 (`#93 <https://github.com/TCDSolar/xrayvision/pull/93>`__)
+
+
+New Features
+------------
+
+- Updates for strict mode typing and add mypy and pyright configuration. (`#97 <https://github.com/TCDSolar/xrayvision/pull/97>`__)
+
+
+Internal Changes
+----------------
+
+- Updated the template and add oldest and devdeps CI builds. (`#93 <https://github.com/TCDSolar/xrayvision/pull/93>`__)
+
+
 Xrayvision 0.2.1 (2025-04-04)
 =============================
 
