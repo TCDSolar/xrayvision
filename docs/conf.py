@@ -60,6 +60,7 @@ extensions = [
     "sphinx_changelog",
     "sphinx_design",
     "sphinx_gallery.gen_gallery",
+    "sphinxcontrib.bibtex",
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -81,6 +82,8 @@ default_role = "py:obj"
 
 autodoc_typehints = "description"
 autoclass_content = "both"
+
+bibtex_bibfiles = ["references.bib"]
 
 # -- Options for intersphinx extension ---------------------------------------
 
