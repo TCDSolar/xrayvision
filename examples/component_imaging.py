@@ -29,7 +29,7 @@ rng = np.random.default_rng(3)
 VUNIT = apu.ph / apu.cm**2
 
 ###############################################################################
-# Set up a synthetic, two-component scene: a single, centrally located
+# Set up a synthetic, two-component scene with a single, centrally located
 # "thermal" source and two "non-thermal" footpoint sources with an
 # energy-independent morphology.
 
@@ -52,7 +52,7 @@ footpoints_image /= footpoints_image.sum()
 ###############################################################################
 # Define the energy bins, the fractional contribution of each component to
 # the total flux in each bin, and the total flux itself. In a real analysis
-# these would come from an independent spectral fit; here a simple model is
+# these would come from an independent spectral fit. Here a simple model is
 # used where the thermal component dominates at low energies and the
 # non-thermal component dominates at high energies.
 
@@ -103,20 +103,45 @@ for i in range(len(energies)):
 vis_thermal, vis_nonthermal = vis_spectral_components(vis_per_energy, fractions, normalization=total_flux)
 
 ###############################################################################
-# Image each spectral component separately using CLEAN.
+# Image each spectral component separately. As in Stiefel et al. 2025 (Sect.
+# 2.4), any standard reconstruction method can be applied independently to
+# the visibilities of each component; CLEAN is used here, but MEM
+# (`~xrayvision.mem.mem`) works equally well and was used for the images
+# published in that paper, with no significant differences found between the
+# two.
 
 clean_kwargs = dict(shape=shape, pixel_size=pixel_size, niter=100, clean_beam_width=6 * apu.arcsec)
 clean_thermal, _, _ = vis_clean(vis_thermal, **clean_kwargs)
 clean_nonthermal, _, _ = vis_clean(vis_nonthermal, **clean_kwargs)
 
 ###############################################################################
-# Compare the two spectral component images.
+# For comparison, also image one of the energy bins directly, without
+# spectral component imaging. Because both sources contribute in this bin,
+# the standard energy-range image blends them together, whereas spectral
+# component imaging (below) cleanly separates the two.
 
-fig = plt.figure(figsize=(10, 5))
-ax0 = fig.add_subplot(121, projection=clean_thermal)
-ax1 = fig.add_subplot(122, projection=clean_nonthermal)
-clean_thermal.plot(axes=ax0)
-ax0.set_title("Thermal component")
-clean_nonthermal.plot(axes=ax1)
-ax1.set_title("Non-thermal component")
+mixed_idx = np.argmin(np.abs(frac_thermal - 0.5))
+clean_combined, _, _ = vis_clean(vis_per_energy[mixed_idx], **clean_kwargs)
+
+###############################################################################
+# Compare the combined, blended energy-range image (with the two components
+# overlaid as contours) to the separated thermal and non-thermal component
+# images.
+
+fig = plt.figure(figsize=(14, 5))
+ax0 = fig.add_subplot(131, projection=clean_combined)
+ax1 = fig.add_subplot(132, projection=clean_thermal)
+ax2 = fig.add_subplot(133, projection=clean_nonthermal)
+
+clean_combined.plot(axes=ax0)
+ax0.set_title(f"Combined ({energies[mixed_idx]} keV bin)")
+levels = np.arange(20, 100, 20) * apu.percent
+clean_thermal.draw_contours(levels=levels, colors="red", linewidths=0.8, axes=ax0)
+clean_nonthermal.draw_contours(levels=levels, colors="blue", linewidths=0.8, axes=ax0)
+
+clean_thermal.plot(axes=ax1)
+ax1.set_title("Thermal component")
+
+clean_nonthermal.plot(axes=ax2)
+ax2.set_title("Non-thermal component")
 plt.show()
