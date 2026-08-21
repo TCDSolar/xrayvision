@@ -8,8 +8,8 @@ https://doi.org/10.1051/0004-6361/202557373
 """
 
 import copy
-from typing import cast
 from collections.abc import Sequence
+from typing import cast
 
 import numpy as np
 from numpy.typing import NDArray
@@ -84,7 +84,7 @@ def vis_spectral_components(
         raise ValueError("vis must contain at least one Visibilities object.")
 
     if isinstance(fractions, apu.Quantity):
-        fractions = fractions.to_value(apu.dimensionless_unscaled)
+        fractions = cast(Quantity, fractions).to_value(apu.dimensionless_unscaled)
     fractions = np.atleast_2d(np.asarray(fractions, dtype=float))
     if fractions.shape[0] != n_e:
         raise ValueError(
@@ -110,7 +110,7 @@ def vis_spectral_components(
 
     if normalization is not None:
         if isinstance(normalization, apu.Quantity):
-            normalization = normalization.to_value(vis_unit)
+            normalization = cast(Quantity, normalization).to_value(vis_unit)
         normalization = np.atleast_1d(np.asarray(normalization, dtype=float))
         if normalization.shape != (n_e,):
             raise ValueError(f"normalization must have shape ({n_e},), got {normalization.shape}.")
