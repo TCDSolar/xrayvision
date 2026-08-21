@@ -12,6 +12,7 @@ Reference
    mem
    uv-smooth
    forward_fit
+   spectral
    simulation
    utils
    bibliography
