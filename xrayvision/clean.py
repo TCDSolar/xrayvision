@@ -7,8 +7,8 @@ appropriate component shapes at different scales.
 
 """
 
-from typing import Any, cast
 from collections.abc import Sequence
+from typing import Any, cast
 
 import numpy as np
 from numpy.typing import ArrayLike, NDArray

@@ -8,18 +8,9 @@ repos:
         types: [python]
         # Define here once and then reference using YAML anchor
         exclude: &exclude_dirs ^xrayvision/(data|extern)/
-<<<<<<<
       - id: ruff-format
         types: [ python ]
         exclude: *exclude_dirs
-  - repo: https://github.com/PyCQA/isort
-    rev: 9.0.0a3
-    hooks:
-      - id: isort
-        types: [python]
-        exclude: *exclude_dirs
-=======
->>>>>>>
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
     hooks:
@@ -53,18 +44,12 @@ repos:
         args: [ "--write-changes" ]
         types_or: [python, rst]
         exclude: *exclude_dirs
-<<<<<<<
-=======
   - repo: https://github.com/sphinx-contrib/sphinx-lint
     rev: v1.0.2
     hooks:
       - id: sphinx-lint
         types_or: [python, rst]
         exclude: *exclude_dirs
-ci:
-  autofix_prs: false
-  autoupdate_schedule: "quarterly"
->>>>>>>
   - repo: https://github.com/pre-commit/mirrors-mypy
     rev: "v2.1.0"
     hooks:

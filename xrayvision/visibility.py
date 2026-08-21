@@ -8,8 +8,8 @@ certain spacecraft or instruments
 import abc
 import copy
 import numbers
-from typing import Any, cast
 from collections.abc import Iterable, Sequence
+from typing import Any, cast
 
 import numpy as np
 import xarray
