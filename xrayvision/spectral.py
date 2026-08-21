@@ -126,10 +126,21 @@ def vis_spectral_components(
     weights = 1.0 / sigma_t**2  # (n_vis, n_e)
 
     # Weighted normal equations, per uv point: gram = fractions.T @ diag(weights) @ fractions.
-    gram = np.einsum("ei,ue,ej->uij", fractions, weights, fractions)
-    gram_inv = np.linalg.inv(gram)
-    # coeffs = gram_inv @ fractions.T @ diag(weights), maps energies -> components, per uv point.
-    coeffs = np.einsum("uij,ej,ue->uie", gram_inv, fractions, weights)  # (n_vis, n_c, n_e)
+    gram = np.einsum("ei,ue,ej->uij", fractions, weights, fractions)  # (n_vis, n_c, n_c)
+    # rhs = fractions.T @ diag(weights), per uv point.
+    rhs = np.einsum("ej,ue->uje", fractions, weights)  # (n_vis, n_c, n_e)
+    # coeffs = gram^-1 @ rhs, maps energies -> components, per uv point. Solved directly rather
+    # than via an explicit matrix inverse for better numerical stability and performance.
+    try:
+        coeffs = np.linalg.solve(gram, rhs)  # (n_vis, n_c, n_e)
+    except np.linalg.LinAlgError as err:
+        raise ValueError(
+            "Could not solve for the spectral component visibilities: the weighted normal "
+            "equations are singular at one or more (u, v) points. This typically means "
+            "`fractions` is not full rank, e.g. one energy bin's fractional contributions are a "
+            "linear combination of the others, or there are fewer independent energy bins than "
+            "spectral components."
+        ) from err
 
     vis_comp = np.einsum("uie,ue->ui", coeffs, vis_t)  # (n_vis, n_c)
     sigma_comp = np.sqrt(np.einsum("uie,ue->ui", coeffs**2, sigma_t**2))  # (n_vis, n_c)

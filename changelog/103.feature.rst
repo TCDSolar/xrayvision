@@ -1,4 +1,1 @@
-Added `~xrayvision.spectral.vis_spectral_components` to decompose visibilities measured in
-multiple energy bins into visibilities of individual spectral components (e.g. thermal and
-non-thermal emission), following the method of `Stiefel et al. 2025
-<https://doi.org/10.1051/0004-6361/202557373>`__.
+Added `~xrayvision.spectral.vis_spectral_components` to decompose visibilities measured in multiple energy bins into visibilities of individual spectral components (e.g. thermal and non-thermal emission), following the method of `Stiefel et al. 2025 <https://doi.org/10.1051/0004-6361/202557373>`__.

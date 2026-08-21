@@ -120,3 +120,11 @@ def test_vis_spectral_components_too_many_components(two_components):
 
     with pytest.raises(ValueError, match="At least as many energy bins"):
         vis_spectral_components(vis_per_energy[:1], fractions[:1])
+
+
+def test_vis_spectral_components_singular_fractions(two_components):
+    vis_per_energy, fractions, _, _, _ = two_components
+    degenerate_fractions = np.repeat(fractions[:, [0]], 2, axis=1)
+
+    with pytest.raises(ValueError, match="singular"):
+        vis_spectral_components(vis_per_energy, degenerate_fractions)
