@@ -305,18 +305,19 @@ def ms_clean(
     cross_terms: dict[tuple[int, int], NDArray[np.float64]] = {}
 
     for i, scale in enumerate(scale_sizes):
-        scale_kernels[:, :, i] = _component(scale=scale, shape=dirty_map.shape)
+        kernel = _component(scale=scale, shape=dirty_map.shape)
+        scale_kernels[:, :, i] = kernel / kernel.sum()
         scaled_residuals[:, :, i] = signal.convolve(dirty_map, scale_kernels[:, :, i], mode="same")
         scaled_dirty_beams[:, :, i] = signal.convolve(dirty_beam, scale_kernels[:, :, i], mode="same")
         max_scaled_dirty_beams[i] = scaled_dirty_beams[:, :, i].max()
+
+    # Cross terms need every scale kernel to already exist, so this must be a separate pass
+    # from the one above (which is still populating scale_kernels one scale at a time).
+    for i in range(number_of_scales):
         for j in range(i, number_of_scales):
             cross_terms[(i, j)] = cast(
                 NDArray[np.float64],
-                signal.convolve(
-                    signal.convolve(dirty_beam, scale_kernels[:, :, i], mode="same"),
-                    scale_kernels[:, :, j],
-                    mode="same",
-                ),
+                signal.convolve(scaled_dirty_beams[:, :, i], scale_kernels[:, :, j], mode="same"),
             )
 
     # Clean loop
