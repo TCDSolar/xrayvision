@@ -8,6 +8,7 @@ Reference
    clean
    imaging
    mem
+   spectral
    transform
    utils
    visibility
