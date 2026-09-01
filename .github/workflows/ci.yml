@@ -86,17 +86,11 @@ jobs:
           - graphviz
       envs: |
         - linux: build_docs
-<<<<<<<
 
   online:
     if: "!startsWith(github.event.ref, 'refs/tags/v')"
     needs: [docs]
-    uses: OpenAstronomy/github-actions-workflows/.github/workflows/tox.yml@8c8bb6c6c962542921f993d47d26df38dccd50b1  # v3.0.2
-=======
-  type_check:
-    needs: [core]
     uses: OpenAstronomy/github-actions-workflows/.github/workflows/tox.yml@22ddf09dfabb443adddfb9f861b7d41a787d6b1a  # v3.0.3
->>>>>>>
     permissions:
       id-token: write
     with:
@@ -128,13 +122,8 @@ jobs:
         github.event_name == 'pull_request' &&
         contains(github.event.pull_request.labels.*.name, 'Run publish')
       )
-<<<<<<<
     needs: [test, docs, type_check]
-    uses: OpenAstronomy/github-actions-workflows/.github/workflows/publish_pure_python.yml@8c8bb6c6c962542921f993d47d26df38dccd50b1  # v3.0.2
-=======
-    needs: [test, docs]
     uses: OpenAstronomy/github-actions-workflows/.github/workflows/publish_pure_python.yml@22ddf09dfabb443adddfb9f861b7d41a787d6b1a  # v3.0.3
->>>>>>>
     with:
       python-version: '3.13'
       test_extras: 'tests,map'
