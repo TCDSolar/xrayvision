@@ -14,25 +14,15 @@ select = [
   "W",
   "UP",
   "PT",
-<<<<<<<
-=======
   "I",
   "B",
   "BLE",
   "A",
   "C4",
->>>>>>>
-  "I"
-]
-
-<<<<<<<
-extend-ignore = [
-=======
   "PERF",
   "RUF",
 ]
 ignore = [
->>>>>>>
   # pycodestyle (E, W)
   "E501",  # ignore line length will use a formatter instead                             # TODO! fix
   # pytest (PT)
@@ -40,14 +30,11 @@ ignore = [
   "PT007", # Parametrize should be lists of tuples  # TODO! fix
   "PT011", # Too broad exception assert             # TODO! fix
   "PT023", # Always use () on pytest decorators
-<<<<<<<
-=======
   "RUF012", # Mutable class attributes should be annotated with `typing.ClassVar`
   "RUF013", # PEP 484 prohibits implicit `Optional`
   "RUF015", # Prefer `next(iter(...))` over single element slice
   # Bugbear (B)
   "B9", # Very opinionated checks
->>>>>>>
 ]
 
 [lint.per-file-ignores]

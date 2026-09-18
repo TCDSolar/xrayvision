@@ -25,7 +25,7 @@ from xrayvision.imaging import vis_psf_image, vis_to_map
 from xrayvision.utils import get_logger
 from xrayvision.visibility import Visibilities
 
-__all__ = ["clean", "vis_clean", "ms_clean", "vis_ms_clean"]
+__all__ = ["clean", "ms_clean", "vis_clean", "vis_ms_clean"]
 
 
 logger = get_logger(__name__, "DEBUG")
@@ -180,7 +180,7 @@ def vis_clean(
     pixel_size: Quantity[u.arcsec / u.pix],
     clean_beam_width: Quantity[u.arcsec] | None = 4.0,
     niter: int = 5000,
-    map: bool | None = True,
+    map: bool | None = True,  # noqa: A002
     gain: float | None = 0.1,
     **kwargs: Any,
 ) -> Any:
@@ -415,7 +415,7 @@ def vis_ms_clean(
     scales: Sequence[int] | None,
     clean_beam_width: Quantity[u.arcsec] | None = 4.0,
     niter: int = 5000,
-    map: bool | None = True,
+    map: bool | None = True,  # noqa: A002
     gain: float = 0.1,
     thres: float = 0.01,
 ) -> Quantity | NDArray[np.float64]:

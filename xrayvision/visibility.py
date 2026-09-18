@@ -19,7 +19,7 @@ from astropy.coordinates import SkyCoord
 from astropy.time import Time
 from astropy.units import Quantity
 
-__all__ = ["Visibility", "Visibilities", "VisMeta", "VisibilitiesABC", "VisMetaABC"]
+__all__ = ["VisMeta", "VisMetaABC", "Visibilities", "VisibilitiesABC", "Visibility"]
 
 from sunpy.util import deprecated
 
@@ -444,7 +444,7 @@ class Visibilities(VisibilitiesABC):
             item = list(item) + [slice(None)] * (len(dims) - len(item))
         if all(isinstance(idx, numbers.Integral) for idx in item):
             ValueError("Slicing out single visibility not supported.")
-        ds_item = dict((key, idx) for key, idx in zip(dims, item))
+        ds_item = dict(zip(dims, item))
         new_data = self._data.isel(ds_item)
         new_data.attrs[self._meta_key][_VIS_LABELS_KEY] = new_data.coords[_VIS_LABELS_KEY].values
         new_vis = copy.deepcopy(self)
@@ -571,9 +571,7 @@ class Visibility:
         `boolean`
 
         """
-        props_equal = []
-        for key in self.__dict__.keys():
-            props_equal.append(np.array_equal(self.__dict__[key], other.__dict__[key]))
+        props_equal = [np.array_equal(self.__dict__[key], other.__dict__[key]) for key in self.__dict__.keys()]
 
         if all(props_equal):
             return True

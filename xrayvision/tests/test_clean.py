@@ -39,7 +39,7 @@ def test_clean_ideal():
     dirty_map = signal.convolve(clean_map, dirty_beam, mode="same")
 
     # Disable convolution of model with gaussian for testing
-    out_map, model, resid = clean(dirty_map, dirty_beam, clean_beam_width=None)
+    out_map, _model, _resid = clean(dirty_map, dirty_beam, clean_beam_width=None)
 
     # Within threshold default threshold of 0.1
     assert_allclose(out_map, clean_map, atol=dirty_beam.max() * 1e-12)
@@ -140,7 +140,7 @@ def test_clean_sim():
 
     dirty_map = idft_map(vis, weights=1 / 321, u=sub_uv[0, :], v=sub_uv[1, :], shape=(n, m) * u.pix)
 
-    clean_map, model, res = clean(
+    clean_map, _model, _res = clean(
         dirty_map, dirty_beam, pixel_size=[2, 2] * u.arcsec / u.pix, clean_beam_width=0.1 * u.arcsec, niter=500
     )
     assert_allclose(clean_map, data, atol=dirty_beam.max() * 0.1)
@@ -168,7 +168,7 @@ def test_vis_clean_sim():
 
     vis = image_to_vis(data * u.dimensionless_unscaled, u=sub_uv[0, :], v=sub_uv[1, :])
 
-    clean_map, model, res = vis_clean(
+    clean_map, _model, _res = vis_clean(
         vis,
         shape=(m, n) * u.pix,
         pixel_size=[2, 2] * u.arcsec / u.pix,

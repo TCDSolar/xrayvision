@@ -16,7 +16,7 @@ import astropy.units as apu
 from astropy.units import Quantity
 from astropy.units.core import UnitsError
 
-__all__ = ["generate_xy", "generate_uv", "dft_map", "idft_map"]
+__all__ = ["dft_map", "generate_uv", "generate_xy", "idft_map"]
 
 
 @apu.quantity_input()  # type: ignore[untyped-decorator]
