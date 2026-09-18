@@ -1,2 +1,0 @@
-Avoided repeating a convolution unnecessarily when precomputing the scale cross-terms in
-`~xrayvision.clean.ms_clean`.
