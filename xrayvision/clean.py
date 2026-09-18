@@ -389,17 +389,19 @@ def ms_clean(
 
     # Convolve model with clean beam B_G * I^M
     if clean_beam_width is not None:
-        x_stdev = ((clean_beam_width / pixel_size[0]).to_value(u.pix) / (2.0 * np.sqrt(2.0 * np.log(2.0)))).value
-        y_stdev = ((clean_beam_width / pixel_size[1]).to_value(u.pix) / (2.0 * np.sqrt(2.0 * np.log(2.0)))).value
+        x_stdev = (clean_beam_width / pixel_size[0]).to_value(u.pix) / (2.0 * np.sqrt(2.0 * np.log(2.0)))
+        y_stdev = (clean_beam_width / pixel_size[1]).to_value(u.pix) / (2.0 * np.sqrt(2.0 * np.log(2.0)))
         clean_beam = Gaussian2DKernel(x_stdev, y_stdev, x_size=dirty_beam.shape[1], y_size=dirty_beam.shape[0]).array
 
         # Normalise beam
         clean_beam = clean_beam / clean_beam.max()
 
-        clean_map = signal.convolve2d(model, clean_beam, mode="same") / (pixel_size[0] * pixel_size[1])
+        clean_map = signal.convolve2d(model, clean_beam / clean_beam.sum(), mode="same") / (
+            pixel_size[0].value * pixel_size[1].value
+        )
 
         # Scale residual map with model and scale
-        dirty_map = (scaled_residuals / clean_beam.sum() / (pixel_size[0] * pixel_size[1])).sum(axis=2)
+        dirty_map = (scaled_residuals / clean_beam.sum() / (pixel_size[0].value * pixel_size[1].value)).sum(axis=2)
 
         return clean_map + dirty_map, model, dirty_map
     # Add residuals B_G * I^M + I^R
