@@ -11,15 +11,15 @@ from xrayvision.transform import dft_map, idft_map
 from xrayvision.visibility import Visibilities
 
 __all__ = [
+    "generate_header",
     "get_weights",
+    "image_to_vis",
+    "map_to_vis",
     "validate_and_expand_kwarg",
     "vis_psf_image",
     "vis_psf_map",
     "vis_to_image",
     "vis_to_map",
-    "generate_header",
-    "image_to_vis",
-    "map_to_vis",
 ]
 
 ANGLE = apu.get_physical_type(apu.deg)

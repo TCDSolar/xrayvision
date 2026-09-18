@@ -7,10 +7,13 @@ try:
         from ._dev.scm_version import version
     except ImportError:
         from ._version import version
-except Exception:
+except Exception:  # noqa BLE001
     import warnings
 
-    warnings.warn(f"could not determine {__name__.split('.')[0]} package version; this indicates a broken installation")
+    warnings.warn(
+        f"could not determine {__name__.split('.')[0]} package version; this indicates a broken installation",
+        stacklevel=2,
+    )
     del warnings
 
     version = "0.0.0"

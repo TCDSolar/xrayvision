@@ -20,13 +20,13 @@ from xrayvision.utils import get_logger
 from xrayvision.visibility import Visibilities
 
 __all__ = [
+    "_estimate_flux",
     "_get_entropy",
     "_get_fourier_matrix",
-    "_estimate_flux",
     "_get_mean_visibilities",
+    "_optimise_fb",
     "_proximal_entropy",
     "_proximal_operator",
-    "_optimise_fb",
     "mem",
 ]
 
@@ -385,7 +385,7 @@ def _proximal_operator(z: Any, f: Any, m: Any, lamb: Any, Lip: Any, niter: int =
     q = np.zeros_like(x)
 
     i = 0
-    for i in range(niter):
+    for _i in range(niter):
         tmp = x + p
         # Projection on the hyperplane that represents the flux constraint
         y = tmp + (f - tmp.sum()) / tmp.size
@@ -591,7 +591,7 @@ def mem(
     percent_lambda: Quantity[apu.percent] | None = 0.02 * apu.percent,
     maxiter: int = 1000,
     tol: float = 1e-3,
-    map: bool = True,
+    map: bool = True,  # noqa: A002
     total_flux: Quantity | None = None,
 ) -> Quantity | NDArray[np.float64]:
     r"""
