@@ -132,19 +132,8 @@ def clean(
 
     {notes_clean}
     """
-    # Ensure both beam and map are even/odd on same axes
-    # if not [x % 2 == 0 for x in dirty_map.shape] == [x % 2 == 0 for x in dirty_beam.shape]:
-    #     raise ValueError('')
-    pad = [0 if x % 2 == 0 else 1 for x in dirty_map.shape]
-
-    # Assume beam, map phase_center is in middle
-    beam_center = (dirty_beam.shape[0] - 1) / 2.0, (dirty_beam.shape[1] - 1) / 2.0
-    map_center = (dirty_map.shape[0] - 1) / 2.0, (dirty_map.shape[1] - 1) / 2.0
-
-    # Work out size of map for slicing over-sized dirty beam
-    shape = dirty_map.shape
-    height = shape[0] // 2
-    width = shape[1] // 2
+    # Peak pixel of the (always odd-shaped, oversized) dirty beam
+    beam_peak = (dirty_beam.shape[0] - 1) // 2, (dirty_beam.shape[1] - 1) // 2
 
     # max_beam = dirty_beam.max()
 
@@ -162,10 +151,9 @@ def clean(
         if i % 25 == 0:
             logger.info(f"Iter: {i}, strength: {imax}, location: {mx, my}")
 
-        offset = map_center[0] - mx, map_center[1] - my
-        shifted_beam_center = int(beam_center[0] + offset[0]), int(beam_center[1] + offset[1])
-        xr = slice(shifted_beam_center[0] - height, shifted_beam_center[0] + height + pad[0])
-        yr = slice(shifted_beam_center[1] - width, shifted_beam_center[1] + width + pad[0])
+        # Window into the oversized dirty beam such that its peak lands exactly at (mx, my)
+        xr = slice(beam_peak[0] - mx, beam_peak[0] - mx + dirty_map.shape[0])
+        yr = slice(beam_peak[1] - my, beam_peak[1] - my + dirty_map.shape[1])
 
         shifted = dirty_beam[xr, yr]
 
@@ -175,7 +163,7 @@ def clean(
 
         dirty_map = np.subtract(dirty_map, comp)
 
-        if thres:
+        if thres is not None:
             if np.abs(dirty_map).max() <= thres:
                 logger.info("Threshold reached")
                 break
@@ -309,10 +297,13 @@ def ms_clean(
 
     model = np.zeros(dirty_map.shape)
 
-    map_center = (dirty_map.shape[0] - 1) / 2.0, (dirty_map.shape[1] - 1) / 2.0
-    height = dirty_map.shape[0] // 2
-    width = dirty_map.shape[1] // 2
-    pad = [0 if x % 2 == 0 else 1 for x in dirty_map.shape]
+    # Integer center pixel of dirty_map, matching _component()'s
+    # (and scipy.signal.convolve's `mode="same"` centering for an even-length kernel, which is
+    # `(L - 1) // 2`, not `L // 2`), used as the reference for placing scale_kernels via shift()
+    map_peak = (dirty_map.shape[0] - 1) // 2, (dirty_map.shape[1] - 1) // 2
+    # Peak pixel of the (always odd-shaped, oversized) dirty beam / cross terms -- the one
+    # well-defined integer reference pixel, regardless of whether dirty_map's even or odd size.
+    beam_peak = (dirty_beam.shape[0] - 1) // 2, (dirty_beam.shape[1] - 1) // 2
 
     # Pre-compute scales, residual maps and dirty beams at each scale and dirty beam cross terms
     scale_kernels: NDArray[np.float64] = np.zeros((dirty_map.shape[0], dirty_map.shape[1], number_of_scales))
@@ -379,21 +370,12 @@ def ms_clean(
         # Loop gain
         strength = strength * gain
 
-        beam_center = [
-            (scaled_dirty_beams[:, :, max_scale].shape[0] - 1) / 2.0,
-            (scaled_dirty_beams[:, :, max_scale].shape[1] - 1) / 2.0,
-        ]
+        # Window into the oversized dirty beam / cross terms such that their peak lands
+        # exactly at (max_x, max_y)
+        xr = slice(beam_peak[0] - max_x, beam_peak[0] - max_x + dirty_map.shape[0])
+        yr = slice(beam_peak[1] - max_y, beam_peak[1] - max_y + dirty_map.shape[1])
 
-        offset = map_center[0] - max_x, map_center[1] - max_y
-        shifted_beam_center = int(beam_center[0] + offset[0]), int(beam_center[1] + offset[1])
-        xr = slice(shifted_beam_center[0] - height, shifted_beam_center[0] + height + pad[0])
-        yr = slice(shifted_beam_center[1] - width, shifted_beam_center[1] + width + pad[0])
-
-        # shifted = dirty_beam[xr, yr]
-
-        comp = strength * shift(scale_kernels[:, :, max_scale], (max_x - map_center[0], max_y - map_center[1]), order=0)
-
-        # comp = strength * scale_kernels[xr, yr]
+        comp = strength * shift(scale_kernels[:, :, max_scale], (max_x - map_peak[0], max_y - map_peak[1]), order=0)
 
         # Add this component to current model
         model = np.add(model, comp)
@@ -404,9 +386,6 @@ def ms_clean(
                 cross_term = cross_terms[(max_scale, j)]
             else:
                 cross_term = cross_terms[(j, max_scale)]
-
-            # comp = strength * shift(cross_term[xr, yr],
-            #                         (max_x - beam_center[0], max_y - beam_center[1]), order=0)
 
             comp = strength * cross_term[xr, yr]
 
@@ -672,7 +651,13 @@ def _component(scale: float, shape: tuple[int, ...]) -> NDArray[np.float64]:
     # else:  # Odd so keep odd
     #     shape = np.array((2 * scale + 1, 2 * scale + 1), dtype=int)
 
-    refx, refy = (np.array(shape) - 1) / 2.0
+    # Integer center pixel (not the previous `(shape - 1) / 2.0`, which is a half-integer for
+    # even `shape` and left the kernel with no single, well-defined peak pixel to align with a
+    # target location). This must match scipy.signal.convolve's `mode="same"` centering
+    # convention for an even-length kernel, which is `(L - 1) // 2`, not `L // 2`.
+    # `(shape - 1) // 2` is unchanged from the previous convention for odd `shape`, so this only
+    # changes behaviour for even shapes.
+    refx, refy = (shape[0] - 1) // 2, (shape[1] - 1) // 2
 
     if scale == 0.0:
         wave_amp = np.zeros(shape)
