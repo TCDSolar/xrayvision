@@ -1,0 +1,1 @@
+Fix `~xrayvision.clean.ms_clean` producing incorrect flux when run with more than one scale and also avoided repeating a convolution unnecessarily when precomputing the scale cross-terms.
