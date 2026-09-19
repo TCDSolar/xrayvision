@@ -45,6 +45,66 @@ def test_clean_ideal():
     assert_allclose(out_map, clean_map, atol=dirty_beam.max() * 1e-12)
 
 
+def test_clean_even_shape():
+    def make_beam(n, m):
+        on, om = (3 * n) // 2 * 2 + 1, (3 * m) // 2 * 2 + 1
+        beam = np.zeros((on, om))
+        beam[(on - 1) // 2, (om - 1) // 2] = 1.0
+        return beam
+
+    for n, m in [(65, 65), (64, 65), (65, 64), (64, 64)]:
+        pos = (20, 30)
+        clean_map = np.zeros((n, m))
+        clean_map[pos] = 10.0
+        dirty_beam = make_beam(n, m)
+        dirty_map = signal.convolve(clean_map, dirty_beam, mode="same")
+
+        _out_map, model, resid = clean(dirty_map, dirty_beam, clean_beam_width=None, niter=200, thres=1e-8)
+
+        assert np.unravel_index(np.argmax(model), model.shape) == pos, f"shape=({n},{m})"
+        assert_allclose(model.sum(), 10.0, atol=1e-8, err_msg=f"shape=({n},{m})")
+        assert_allclose(np.abs(resid).max(), 0.0, atol=1e-8, err_msg=f"shape=({n},{m})")
+
+
+def test_ms_clean_even_shape():
+    pos1, pos2 = (15, 30), (40, 32)
+
+    def make_beam(n, m):
+        small = np.zeros((n, m))
+        small[(n - 1) // 4 : (n - 1) // 4 + (n - 1) // 2, (m - 1) // 2] = 0.75
+        small[(n - 1) // 2, (m - 1) // 4 : (m - 1) // 4 + (m - 1) // 2] = 0.75
+        small[(n - 1) // 2, (m - 1) // 2] = 1.0
+
+        on, om = (3 * n) // 2 * 2 + 1, (3 * m) // 2 * 2 + 1
+        big = np.zeros((on, om))
+        beam_peak = (on - 1) // 2, (om - 1) // 2
+        small_center = (n - 1) // 2, (m - 1) // 2
+        r0, c0 = beam_peak[0] - small_center[0], beam_peak[1] - small_center[1]
+        big[r0 : r0 + n, c0 : c0 + m] = small
+        return big
+
+    reference = None
+    for n, m in [(65, 65), (64, 65), (65, 64), (64, 64)]:
+        clean_map = np.zeros((n, m))
+        clean_map[pos1] = 10.0
+        clean_map[pos2] = 7.0
+        dirty_beam = make_beam(n, m)
+        dirty_map = signal.convolve2d(clean_map, dirty_beam, mode="same")
+
+        model, _res = ms_clean(
+            dirty_map,
+            dirty_beam,
+            pixel_size=[1, 1] * u.arcsec / u.pixel,
+            scales=[1, 2, 4],
+            clean_beam_width=None,
+            niter=3000,
+        )
+        result = (model[pos1], model[pos2], model.sum())
+        if reference is None:
+            reference = result
+        assert_allclose(result, reference, atol=1e-6, err_msg=f"shape=({n},{m}) vs odd-shape baseline")
+
+
 def test_component():
     comp = np.zeros((3, 3))
     comp[1, 1] = 1.0
@@ -58,7 +118,7 @@ def test_component():
     res = _component(scale=2, shape=(6, 6))
     assert np.all(res[0, :] == 0.0)
     assert np.all(res[:, 0] == 0.0)
-    assert np.all(res[2:4, 2:4] == res.max())
+    assert res[2, 2] == res.max() == 1.0
 
     res = _component(scale=3, shape=(7, 7))
     assert np.all(res[0, :] == 0.0)
@@ -113,14 +173,6 @@ def test_ms_clean_ideal():
 
 
 def test_ms_clean_multiscale_recovers_flux():
-    r"""
-    Regression test for a bug where ``ms_clean`` cross-terms between different scales were
-    computed before all scale kernels had been built, leaving them zero. This meant a component
-    found at one scale never updated the residuals at any other scale, so the model diverged to
-    several times the true flux whenever more than one scale was used. ``test_ms_clean_ideal``
-    only exercises ``scales=[1]``, where this cross-scale interaction never happens, so it could
-    not have caught the regression.
-    """
     n = m = 65
     pos1 = [15, 30]
     pos2 = [40, 32]
@@ -140,7 +192,7 @@ def test_ms_clean_multiscale_recovers_flux():
 
     dirty_map = signal.convolve2d(clean_map, dirty_beam, mode="same")
 
-    model, res = ms_clean(
+    model, _res = ms_clean(
         dirty_map,
         dirty_beam,
         pixel_size=[1, 1] * u.arcsec / u.pixel,
