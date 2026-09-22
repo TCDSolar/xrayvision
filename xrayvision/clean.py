@@ -20,6 +20,7 @@ from astropy.convolution import Gaussian2DKernel
 from astropy.units import Quantity
 
 from sunpy.map.map_factory import Map
+from sunpy.util.decorators import add_common_docstring
 
 from xrayvision.imaging import vis_psf_image, vis_to_map
 from xrayvision.utils import get_logger
@@ -31,43 +32,71 @@ __all__ = ["clean", "ms_clean", "vis_clean", "vis_ms_clean"]
 logger = get_logger(__name__, "DEBUG")
 
 
-__common_clean_doc__ = r"""
-    clean_beam_width :
-        The width of the gaussian to convolve the model with. If set to 0.0 \
-        the gaussian to convolution is disabled
-    gain :
-        The gain per loop or loop gain
-    thres :
-        Terminates clean when ``residual.max() <= thres``
-    niter :
-        Maximum number of iterations to perform
-
-    Returns
-    -------
-    :
-        The CLEAN image 2D
-
-    Notes
-    -----
-    The CLEAN algorithm can be summarised in pesudo code as follows:
-
-    .. math::
-       & \textrm{CLEAN} \left (I^{D}(l, m),\ B(l,m),\ \gamma,\ f_{Thresh},\ N \right ) \\
-       & I^{Res} = I^{D},\ M = \{\},\ i=0 \\
-       & \textbf{while} \ \operatorname{max} I^{Res} > f_{Thresh} \ \textrm{and} \ i \lt N \
-       \textbf{do:} \\
-       & \qquad l_{max}, m_{max} = \underset{l,m}{\operatorname{argmax}} I^{Res}(l,m) \\
-       & \qquad f_{max} = I^{Res}(l_{max}, m_{max}) \\
-       & \qquad I^{Res} = I^{Res} - \alpha \cdot f_{max} \cdot \operatorname{shift} \left
-       ( B(l,m), l_{max}, m_{max} \right ) \\
-       & \qquad M = M + \{ l_{max}, m_{max}: \alpha \cdot f_{max} \} \\
-       & \qquad i = i + 1 \\
-       & \textbf{done} \\
-       & \textbf{return}\  M,\ I^{Res}
-
+def _clean_parameters() -> dict[str, str]:
     """
+    Return formatting fragments to use with `~sunpy.util.decorators.add_common_docstring` to
+    populate the parts of the docstrings shared between the various clean functions.
+
+    Every fragment is substituted via ``str.format``, not appended, so that the whole assembled
+    docstring goes through a single `inspect.cleandoc` pass and ends up consistently indented
+    (mixing `add_common_docstring`'s ``append`` and ``**kwargs`` on the same function leaves the
+    appended text at its original source indentation while the rest gets dedented, which breaks
+    RST parsing).
+    """
+    return {
+        "scales": "scales : array-like, optional\n    The scales to use eg ``[1, 2, 4, 8]``",
+        "clean_beam_width": (
+            "clean_beam_width :\n"
+            "    The width of the gaussian to convolve the model with. If set to 0.0 \\\n"
+            "    the gaussian to convolution is disabled"
+        ),
+        "gain": "gain :\n    The gain per loop or loop gain",
+        "thres": "thres :\n    Terminates clean when ``residual.max() <= thres``",
+        "niter": "niter :\n    Maximum number of iterations to perform",
+        "returns_clean": "Returns\n-------\n:\n    The CLEAN image 2D",
+        "returns_ms_clean": "Returns\n-------\n:\n    Cleaned image",
+        "notes_clean": (
+            r"""Notes
+-----
+The CLEAN algorithm can be summarised in pesudo code as follows:
+
+.. math::
+   & \textrm{CLEAN} \left (I^{D}(l, m),\ B(l,m),\ \gamma,\ f_{Thresh},\ N \right ) \\
+   & I^{Res} = I^{D},\ M = \{\},\ i=0 \\
+   & \textbf{while} \ \operatorname{max} I^{Res} > f_{Thresh} \ \textrm{and} \ i \lt N \
+   \textbf{do:} \\
+   & \qquad l_{max}, m_{max} = \underset{l,m}{\operatorname{argmax}} I^{Res}(l,m) \\
+   & \qquad f_{max} = I^{Res}(l_{max}, m_{max}) \\
+   & \qquad I^{Res} = I^{Res} - \alpha \cdot f_{max} \cdot \operatorname{shift} \left
+   ( B(l,m), l_{max}, m_{max} \right ) \\
+   & \qquad M = M + \{ l_{max}, m_{max}: \alpha \cdot f_{max} \} \\
+   & \qquad i = i + 1 \\
+   & \textbf{done} \\
+   & \textbf{return}\  M,\ I^{Res}"""
+        ),
+        "notes_ms_clean": (
+            r"""Notes
+-----
+This is an implementation of the multiscale clean algorithm as outlined in [R1]_ adapted for \
+x-ray Fourier observations.
+
+It is based on the implementation in the CASA software which can be found here_ ~L956.
+
+.. _here: https://github.com/casacore/casacore/blob/f4dc1c36287c766796ce3375cebdfc8af797a388/lattices/LatticeMath/LatticeCleaner.tcc"""
+        ),
+        # Only attached to `ms_clean` itself, not `vis_ms_clean` too: both docstrings can't
+        # define the same `[R1]` citation without Sphinx raising a duplicate-citation warning,
+        "references_ms_clean": (
+            r"""References
+----------
+.. [R1] Cornwell, T. J., "Multiscale CLEAN Deconvolution of Radio Synthesis Images", IEEE Journal of Selected Topics in Signal Processing, vol 2, p793-801, Paper_ #noqa
+
+.. _Paper: https://ieeexplore.ieee.org/document/4703304/"""
+        ),
+    }
 
 
+@add_common_docstring(**_clean_parameters())  # type: ignore[untyped-decorator]
 @u.quantity_input  # type: ignore[untyped-decorator]
 def clean(
     dirty_map: Quantity,
@@ -94,6 +123,14 @@ def clean(
         The dirty beam or point spread function (PSF) 2D must
     pixel_size :
         The pixel size in arcsec
+    {clean_beam_width}
+    {gain}
+    {thres}
+    {niter}
+
+    {returns_clean}
+
+    {notes_clean}
     """
     # Ensure both beam and map are even/odd on same axes
     # if not [x % 2 == 0 for x in dirty_map.shape] == [x % 2 == 0 for x in dirty_beam.shape]:
@@ -170,9 +207,7 @@ def clean(
     return model + dirty_map, model, dirty_map
 
 
-clean.__doc__ = (clean.__doc__ or "") + __common_clean_doc__
-
-
+@add_common_docstring(**_clean_parameters())  # type: ignore[untyped-decorator]
 @u.quantity_input  # type: ignore[untyped-decorator]
 def vis_clean(
     vis: Visibilities,
@@ -199,6 +234,13 @@ def vis_clean(
         The pixel size in arcsec
     map :
         Return a `sunpy.map.Map` by default or array only if `False`
+    {clean_beam_width}
+    {gain}
+    {niter}
+
+    {returns_clean}
+
+    {notes_clean}
     """
 
     dirty_map = vis_to_map(vis, shape=shape, pixel_size=pixel_size, **kwargs)
@@ -218,43 +260,7 @@ def vis_clean(
     return [Map((data, dirty_map.meta)) for data in (clean_map, model, residual)]
 
 
-vis_clean.__doc__ = (vis_clean.__doc__ or "") + __common_clean_doc__
-
-__common_ms_clean_doc__ = r"""
-    scales : array-like, optional, optional
-        The scales to use eg ``[1, 2, 4, 8]``
-    clean_beam_width :
-        The width of the gaussian to convolve the model with. If set to 0.0 the gaussian \
-        convolution is disabled
-    gain :
-        The gain per loop or loop gain
-    thres :
-        Terminates clean when `residuals.max() <= thres``
-    niter :
-        Maximum number of iterations to perform
-
-    Returns
-    -------
-    :
-        Cleaned image
-
-    Notes
-    -----
-    This is an implementation of the multiscale clean algorithm as outlined in [R1]_ adapted for \
-    x-ray Fourier observations.
-
-    It is based on the on the implementation in the CASA software which can be found here_ ~L956.
-
-    .. _here: https://github.com/casacore/casacore/blob/f4dc1c36287c766796ce3375cebdfc8af797a388/lattices/LatticeMath/LatticeCleaner.tcc
-
-    References
-    ----------
-    .. [R1] Cornwell, T. J., "Multiscale CLEAN Deconvolution of Radio Synthesis Images", IEEE Journal of Selected Topics in Signal Processing, vol 2, p793-801, Paper_ #noqa
-
-    .. _Paper: https://ieeexplore.ieee.org/document/4703304/
-    """
-
-
+@add_common_docstring(**_clean_parameters())  # type: ignore[untyped-decorator]
 @u.quantity_input  # type: ignore[untyped-decorator]
 def ms_clean(
     dirty_map: Quantity,
@@ -277,6 +283,17 @@ def ms_clean(
         The 2D dirty beam should have the same dimensions as `dirty_map`
     pixel_size :
         The pixel size in arcsec
+    {scales}
+    {clean_beam_width}
+    {gain}
+    {thres}
+    {niter}
+
+    {returns_ms_clean}
+
+    {notes_ms_clean}
+
+    {references_ms_clean}
     """
     # Compute the number of dyadic scales, their sizes and scale biases
     number_of_scales: int = np.floor(np.log2(min(dirty_map.shape))).astype(int)
@@ -305,18 +322,19 @@ def ms_clean(
     cross_terms: dict[tuple[int, int], NDArray[np.float64]] = {}
 
     for i, scale in enumerate(scale_sizes):
-        scale_kernels[:, :, i] = _component(scale=scale, shape=dirty_map.shape)
+        kernel = _component(scale=scale, shape=dirty_map.shape)
+        scale_kernels[:, :, i] = kernel / kernel.sum()
         scaled_residuals[:, :, i] = signal.convolve(dirty_map, scale_kernels[:, :, i], mode="same")
         scaled_dirty_beams[:, :, i] = signal.convolve(dirty_beam, scale_kernels[:, :, i], mode="same")
         max_scaled_dirty_beams[i] = scaled_dirty_beams[:, :, i].max()
+
+    # Cross terms need every scale kernel to already exist, so this must be a separate pass
+    # from the one above (which is still populating scale_kernels one scale at a time).
+    for i in range(number_of_scales):
         for j in range(i, number_of_scales):
             cross_terms[(i, j)] = cast(
                 NDArray[np.float64],
-                signal.convolve(
-                    signal.convolve(dirty_beam, scale_kernels[:, :, i], mode="same"),
-                    scale_kernels[:, :, j],
-                    mode="same",
-                ),
+                signal.convolve(scaled_dirty_beams[:, :, i], scale_kernels[:, :, j], mode="same"),
             )
 
     # Clean loop
@@ -337,8 +355,29 @@ def ms_clean(
 
         logger.info(f"Iter: {i}, max scale: {max_scale}, strength: {strength}")
 
-        # Loop gain and scale dependent bias
-        strength = strength * scale_biases[max_scale] * gain
+        # Scale dependent bias, not yet including loop gain so `strength` here is comparable
+        # across iterations for the stopping checks below
+        strength = strength * scale_biases[max_scale]
+
+        # Fixed reference residual from the first iteration, used by the divergence check
+        # below
+        if i == 0:
+            reference_residual = np.abs(strength)
+
+        # Stop if the largest scale's found component is negative: a strong indication that
+        # scale is fitting noise/sidelobes rather than real large-scale structure
+        if number_of_scales > 1 and max_scale == number_of_scales - 1 and strength < 0:
+            logger.info("Reached negative on largest scale")
+            break
+
+        # Stop if this iteration's strength has grown by more than 50% over the first
+        # iteration's strength: clean is diverging rather than converging
+        if np.abs(strength) - reference_residual > reference_residual / 2.0:
+            logger.info("Diverging")
+            break
+
+        # Loop gain
+        strength = strength * gain
 
         beam_center = [
             (scaled_dirty_beams[:, :, max_scale].shape[0] - 1) / 2.0,
@@ -378,36 +417,31 @@ def ms_clean(
             logger.info("Threshold reached")
             break
 
-        # Largest scales largest residual is negative
-        if np.abs(scaled_residuals[:, :, 0].min()) > scaled_residuals[:, :, 0].max():
-            logger.info("Max scale residual negative")
-            break
-
     else:
         logger.info("Max iterations reached")
 
     # Convolve model with clean beam B_G * I^M
     if clean_beam_width is not None:
-        x_stdev = ((clean_beam_width / pixel_size[0]).to_value(u.pix) / (2.0 * np.sqrt(2.0 * np.log(2.0)))).value
-        y_stdev = ((clean_beam_width / pixel_size[1]).to_value(u.pix) / (2.0 * np.sqrt(2.0 * np.log(2.0)))).value
+        x_stdev = (clean_beam_width / pixel_size[0]).to_value(u.pix) / (2.0 * np.sqrt(2.0 * np.log(2.0)))
+        y_stdev = (clean_beam_width / pixel_size[1]).to_value(u.pix) / (2.0 * np.sqrt(2.0 * np.log(2.0)))
         clean_beam = Gaussian2DKernel(x_stdev, y_stdev, x_size=dirty_beam.shape[1], y_size=dirty_beam.shape[0]).array
 
         # Normalise beam
         clean_beam = clean_beam / clean_beam.max()
 
-        clean_map = signal.convolve2d(model, clean_beam, mode="same") / (pixel_size[0] * pixel_size[1])
+        clean_map = signal.convolve2d(model, clean_beam / clean_beam.sum(), mode="same") / (
+            pixel_size[0].value * pixel_size[1].value
+        )
 
         # Scale residual map with model and scale
-        dirty_map = (scaled_residuals / clean_beam.sum() / (pixel_size[0] * pixel_size[1])).sum(axis=2)
+        dirty_map = (scaled_residuals / clean_beam.sum() / (pixel_size[0].value * pixel_size[1].value)).sum(axis=2)
 
         return clean_map + dirty_map, model, dirty_map
     # Add residuals B_G * I^M + I^R
     return model, scaled_residuals.sum(axis=2)
 
 
-ms_clean.__doc__ = (ms_clean.__doc__ or "") + __common_ms_clean_doc__
-
-
+@add_common_docstring(**_clean_parameters())  # type: ignore[untyped-decorator]
 def vis_ms_clean(
     vis: Visibilities,
     shape: Quantity[u.pix],
@@ -432,25 +466,17 @@ def vis_ms_clean(
         Size of map
     pixel_size :
         The pixel size in arcsec
-    scales : array-like, optional, optional
-        The scales to use eg ``[1, 2, 4, 8]``
-    clean_beam_width :
-        The width of the gaussian to convolve the model with. If set to 0.0 the gaussian \
-        convolution is disabled
-    gain :
-        The gain per loop or loop gain
-    thres :
-        Terminates clean when `residuals.max() <= thres``
-    niter :
-        Maximum number of iterations to perform
     map :
         Return a `sunpy.map.Map` by default or array only if `False`
+    {scales}
+    {clean_beam_width}
+    {gain}
+    {thres}
+    {niter}
 
-    Returns
-    -------
-    :
-        Cleaned image
+    {returns_ms_clean}
 
+    {notes_ms_clean}
     """
     dirty_map = vis_to_map(vis, shape=shape, pixel_size=pixel_size)
     dirty_beam = vis_psf_image(vis, shape=shape * 3, pixel_size=pixel_size)
@@ -468,9 +494,6 @@ def vis_ms_clean(
         return clean_map, model, residual
 
     return [Map((data, dirty_map.meta)) for data in (clean_map, model, residual)]
-
-
-# vis_ms_clean.__doc__ += __common_ms_clean_doc__
 
 
 def _radial_prolate_sphereoidal(nu: float) -> float:  # pyright: ignore[reportUnusedFunction]

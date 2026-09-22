@@ -112,6 +112,51 @@ def test_ms_clean_ideal():
     assert np.allclose(clean_map, recovered, atol=dirty_beam.max() * 0.1)
 
 
+def test_ms_clean_multiscale_recovers_flux():
+    r"""
+    Regression test for a bug where ``ms_clean`` cross-terms between different scales were
+    computed before all scale kernels had been built, leaving them zero. This meant a component
+    found at one scale never updated the residuals at any other scale, so the model diverged to
+    several times the true flux whenever more than one scale was used. ``test_ms_clean_ideal``
+    only exercises ``scales=[1]``, where this cross-scale interaction never happens, so it could
+    not have caught the regression.
+    """
+    n = m = 65
+    pos1 = [15, 30]
+    pos2 = [40, 32]
+
+    clean_map = np.zeros((n, m))
+    clean_map[pos1[0], pos1[1]] = 10.0
+    clean_map[pos2[0], pos2[1]] = 7.0
+
+    dirty_beam = np.zeros((n, m))
+    dirty_beam[(n - 1) // 4 : (n - 1) // 4 + (n - 1) // 2, (m - 1) // 2] = 0.75
+    dirty_beam[
+        (n - 1) // 2,
+        (m - 1) // 4 : (m - 1) // 4 + (m - 1) // 2,
+    ] = 0.75
+    dirty_beam[(n - 1) // 2, (m - 1) // 2] = 1.0
+    dirty_beam = np.pad(dirty_beam, (65, 65), "constant")
+
+    dirty_map = signal.convolve2d(clean_map, dirty_beam, mode="same")
+
+    model, res = ms_clean(
+        dirty_map,
+        dirty_beam,
+        pixel_size=[1, 1] * u.arcsec / u.pixel,
+        scales=[1, 2, 4],
+        clean_beam_width=None,
+        niter=3000,
+    )
+
+    # The model should recover close to the true, injected flux at each source and overall.
+    # Without the fix these were inflated to several times the true value (e.g. ~78 total
+    # instead of 17).
+    assert_allclose(model[pos1[0], pos1[1]], 10.0, atol=0.1)
+    assert_allclose(model[pos2[0], pos2[1]], 7.0, atol=0.1)
+    assert_allclose(model.sum(), clean_map.sum(), atol=0.1)
+
+
 # @pytest.mark.skip(reason="Broken test")
 def test_clean_sim():
     n = m = 31
