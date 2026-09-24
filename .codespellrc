@@ -1,17 +1,18 @@
 [codespell]
 skip = *.asdf,*.fits,*.fts,*.header,*.json,*.xsh,*cache*,*egg*,*extern*,.git,.idea,.tox,_build,*truncated,*.svg,.asv_env,.history
 ignore-words-list =
+    afile,
     alog,
+    lamba,
     nd,
     nin,
     observ,
     ot,
-    te,
-    upto,
-    afile,
+    precess,
     precessed,
     process,
+    te,
     technik,
     thirdparty,
-    lamba,
-    precess
+    ue,
+    upto
