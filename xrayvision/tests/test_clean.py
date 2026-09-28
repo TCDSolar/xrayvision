@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 from numpy.testing import assert_allclose
 from scipy import signal
 
@@ -271,3 +272,18 @@ def test_vis_clean_sim():
         scheme="uniform",
     )
     np.allclose(data, clean_map.data, atol=0.1)
+
+
+def test_ms_clean_unsorted_scales_raises():
+    n = m = 65
+    dirty_map = np.zeros((n, m))
+    dirty_beam = _tapered_cross_beam(n, m)
+
+    with pytest.raises(ValueError, match="ascending order"):
+        ms_clean(
+            dirty_map,
+            dirty_beam,
+            pixel_size=[1, 1] * u.arcsec / u.pixel,
+            scales=[4, 1],
+            clean_beam_width=None,
+        )
