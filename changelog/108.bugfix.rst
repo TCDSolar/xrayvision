@@ -1,3 +1,1 @@
 Fix `~xrayvision.clean.ms_clean` producing incorrect flux when run with more than one scale, and avoid repeating a convolution unnecessarily when precomputing the scale cross-terms.
-Fix incorrect centering of the dirty beam and scale kernels in `~xrayvision.clean.clean` and `~xrayvision.clean.ms_clean` for even-sized maps or beams.
-`~xrayvision.clean.clean` and `~xrayvision.clean.ms_clean` now locate the largest deviation from zero, positive or negative, rather than only the largest positive value, and stop once the largest remaining residual is negative, matching the standard CLEAN convention.
