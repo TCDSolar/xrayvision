@@ -1,0 +1,1 @@
+Add a ``convolve_residual`` keyword to `~xrayvision.clean.clean`, `~xrayvision.clean.vis_clean`, `~xrayvision.clean.ms_clean` and `~xrayvision.clean.vis_ms_clean` to optionally convolve the residual map with the normalised clean beam before adding it to the restored image.
