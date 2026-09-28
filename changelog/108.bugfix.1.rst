@@ -1,0 +1,1 @@
+Fix incorrect centering of the dirty beam and scale kernels in `~xrayvision.clean.clean` and `~xrayvision.clean.ms_clean` for even-sized maps or beams.

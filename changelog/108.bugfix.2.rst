@@ -1,0 +1,1 @@
+`~xrayvision.clean.clean` and `~xrayvision.clean.ms_clean` now locate the largest deviation from zero, positive or negative, rather than only the largest positive value, and stop once the largest remaining residual is negative, matching the standard CLEAN convention.

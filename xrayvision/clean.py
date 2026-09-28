@@ -53,6 +53,11 @@ def _clean_parameters() -> dict[str, str]:
         "gain": "gain :\n    The gain per loop or loop gain",
         "thres": "thres :\n    Terminates clean when ``residual.max() <= thres``",
         "niter": "niter :\n    Maximum number of iterations to perform",
+        "convolve_residual": (
+            "convolve_residual :\n"
+            "    If `True`, convolve the residual with the normalised clean beam before adding\n"
+            "    it to the restored image."
+        ),
         "returns_clean": "Returns\n-------\n:\n    The CLEAN image 2D",
         "returns_ms_clean": "Returns\n-------\n:\n    Cleaned image",
         "notes_clean": (
@@ -106,6 +111,7 @@ def clean(
     gain: float | None = 0.1,
     thres: float | None = None,
     niter: int = 5000,
+    convolve_residual: bool = False,
 ) -> Quantity | NDArray[np.float64]:
     r"""
     Clean the image using Hogbom's original method.
@@ -127,6 +133,7 @@ def clean(
     {gain}
     {thres}
     {niter}
+    {convolve_residual}
 
     {returns_clean}
 
@@ -135,17 +142,18 @@ def clean(
     # Peak pixel of the (always odd-shaped, oversized) dirty beam
     beam_peak = (dirty_beam.shape[0] - 1) // 2, (dirty_beam.shape[1] - 1) // 2
 
-    # max_beam = dirty_beam.max()
-
     # Model for sources
     model = np.zeros(dirty_map.shape)
-    components = []
     for i in range(niter):
-        # Find max in dirty map and save to point source
-        mx, my = np.unravel_index(dirty_map.argmax(), dirty_map.shape)
+        # Find the largest deviation by absolute value, not just the largest positive value, so
+        # a negative sidelobe bowl can be recognised as the residual's dominant feature.
+        mx, my = np.unravel_index(np.abs(dirty_map).argmax(), dirty_map.shape)
         imax = dirty_map[mx, my]
-        # TODO check if correct and how to undo
-        # imax = imax * max_beam
+
+        if imax < 0:
+            logger.info("Largest residual is negative")
+            break
+
         model[mx, my] += gain * imax
 
         if i % 25 == 0:
@@ -159,8 +167,6 @@ def clean(
 
         comp = imax * gain * shifted
 
-        components.append((mx, my, comp[mx, my]))
-
         dirty_map = np.subtract(dirty_map, comp)
 
         if thres is not None:
@@ -168,12 +174,8 @@ def clean(
                 logger.info("Threshold reached")
                 break
 
-        if np.abs(dirty_map.min()) > dirty_map.max():
-            logger.info("Largest residual negative")
-            break
-
     else:
-        print("Max iterations reached")
+        logger.info("Max iterations reached")
 
     if clean_beam_width is not None:
         # Convert from FWHM to StDev   FWHM = sigma*(8ln2)**0.5 = 2.3548200450309493
@@ -190,6 +192,8 @@ def clean(
 
         # Scale residual map with model and scale
         dirty_map = dirty_map / clean_beam.sum() / (pixel_size[0].value * pixel_size[1].value)
+        if convolve_residual:
+            dirty_map = signal.convolve2d(dirty_map, clean_beam / clean_beam.sum(), mode="same")
         return clean_map + dirty_map, model, dirty_map
 
     return model + dirty_map, model, dirty_map
@@ -205,6 +209,7 @@ def vis_clean(
     niter: int = 5000,
     map: bool | None = True,  # noqa: A002
     gain: float | None = 0.1,
+    convolve_residual: bool = False,
     **kwargs: Any,
 ) -> Any:
     r"""
@@ -225,6 +230,7 @@ def vis_clean(
     {clean_beam_width}
     {gain}
     {niter}
+    {convolve_residual}
 
     {returns_clean}
 
@@ -241,6 +247,7 @@ def vis_clean(
         clean_beam_width=clean_beam_width,
         gain=gain,
         niter=niter,
+        convolve_residual=convolve_residual,
     )
     if not map:
         return clean_map, model, residual
@@ -259,6 +266,7 @@ def ms_clean(
     gain: float = 0.1,
     thres: float = 0.01,
     niter: int = 5000,
+    convolve_residual: bool = False,
 ) -> Quantity | NDArray[np.float64]:
     r"""
     Clean the map using a multiscale clean algorithm.
@@ -276,6 +284,7 @@ def ms_clean(
     {gain}
     {thres}
     {niter}
+    {convolve_residual}
 
     {returns_ms_clean}
 
@@ -330,10 +339,9 @@ def ms_clean(
 
     # Clean loop
     for i in range(niter):
-        # print(f'Clean loop {i}')
-        # For each scale find the strength and location of max residual
-        # Chose scale with has maximum strength
-        max_index: int = np.argmax(scaled_residuals).astype(int)
+        # For each scale find the strength and location of the largest deviation by absolute
+        # value
+        max_index: int = np.argmax(np.abs(scaled_residuals)).astype(int)
         max_x: int
         max_y: int
         max_scale: int
@@ -356,8 +364,10 @@ def ms_clean(
             reference_residual = np.abs(strength)
 
         # Stop if the largest scale's found component is negative: a strong indication that
-        # scale is fitting noise/sidelobes rather than real large-scale structure
-        if number_of_scales > 1 and max_scale == number_of_scales - 1 and strength < 0:
+        # scale is fitting noise/sidelobes rather than real large-scale structure. With a single
+        # scale this scale is trivially both the smallest and the largest, so the check reduces
+        # to clean()'s unconditional "stop on negative" -- which is the behaviour we want here too.
+        if max_scale == number_of_scales - 1 and strength < 0:
             logger.info("Reached negative on largest scale")
             break
 
@@ -392,7 +402,7 @@ def ms_clean(
             scaled_residuals[:, :, j] = np.subtract(scaled_residuals[:, :, j], comp)
 
         # End max(res(a)) or niter
-        if np.abs(scaled_residuals[:, :, max_scale].max()) <= thres:
+        if np.abs(scaled_residuals[:, :, max_scale]).max() <= thres:
             logger.info("Threshold reached")
             break
 
@@ -414,6 +424,8 @@ def ms_clean(
 
         # Scale residual map with model and scale
         dirty_map = (scaled_residuals / clean_beam.sum() / (pixel_size[0].value * pixel_size[1].value)).sum(axis=2)
+        if convolve_residual:
+            dirty_map = signal.convolve2d(dirty_map, clean_beam / clean_beam.sum(), mode="same")
 
         return clean_map + dirty_map, model, dirty_map
     # Add residuals B_G * I^M + I^R
@@ -431,6 +443,7 @@ def vis_ms_clean(
     map: bool | None = True,  # noqa: A002
     gain: float = 0.1,
     thres: float = 0.01,
+    convolve_residual: bool = False,
 ) -> Quantity | NDArray[np.float64]:
     r"""
     Clean the visibilities using a multiscale clean method.
@@ -452,6 +465,7 @@ def vis_ms_clean(
     {gain}
     {thres}
     {niter}
+    {convolve_residual}
 
     {returns_ms_clean}
 
@@ -459,7 +473,7 @@ def vis_ms_clean(
     """
     dirty_map = vis_to_map(vis, shape=shape, pixel_size=pixel_size)
     dirty_beam = vis_psf_image(vis, shape=shape * 3, pixel_size=pixel_size)
-    clean_map, model, residual = ms_clean(
+    result = ms_clean(
         dirty_map.data,
         dirty_beam,
         pixel_size=pixel_size,
@@ -468,7 +482,15 @@ def vis_ms_clean(
         gain=gain,
         thres=thres,
         niter=niter,
+        convolve_residual=convolve_residual,
     )
+    # ms_clean only returns (clean_map, model, residual) when clean_beam_width is set; with
+    # clean_beam_width=None it returns just (model, residual), so clean_map has to be derived.
+    if clean_beam_width is not None:
+        clean_map, model, residual = result
+    else:
+        model, residual = result
+        clean_map = model + residual
     if not map:
         return clean_map, model, residual
 
@@ -642,15 +664,6 @@ def _component(scale: float, shape: tuple[int, ...]) -> NDArray[np.float64]:
     -------
 
     """
-    # if scale == 0.0:
-    #     out = np.zeros((3, 3))
-    #     out[1,1] = 1.0
-    #     return out
-    # elif scale % 2 == 0:  # Even so keep output even
-    #     shape = np.array((2 * scale + 2, 2 * scale + 2), dtype=int)
-    # else:  # Odd so keep odd
-    #     shape = np.array((2 * scale + 1, 2 * scale + 1), dtype=int)
-
     # Integer center pixel (not the previous `(shape - 1) / 2.0`, which is a half-integer for
     # even `shape` and left the kernel with no single, well-defined peak pixel to align with a
     # target location). This must match scipy.signal.convolve's `mode="same"` centering
