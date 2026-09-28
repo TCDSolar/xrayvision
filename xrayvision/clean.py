@@ -44,7 +44,7 @@ def _clean_parameters() -> dict[str, str]:
     RST parsing).
     """
     return {
-        "scales": "scales : array-like, optional\n    The scales to use eg ``[1, 2, 4, 8]``",
+        "scales": ("scales : array-like, optional\n    The scales to use, in ascending order, eg ``[1, 2, 4, 8]``"),
         "clean_beam_width": (
             "clean_beam_width :\n"
             "    The width of the gaussian to convolve the model with. If set to 0.0 \\\n"
@@ -297,6 +297,8 @@ def ms_clean(
     scale_sizes: NDArray[np.int_] = 2 ** np.arange(number_of_scales)
 
     if scales:
+        if list(scales) != sorted(scales):
+            raise ValueError(f"scales must be in ascending order, got {list(scales)}")
         number_of_scales = len(scales)
         scale_sizes = np.array(scales)
 
@@ -305,6 +307,7 @@ def ms_clean(
     scale_biases = 1 - 0.6 * scale_sizes / scale_sizes.max()
 
     model = np.zeros(dirty_map.shape)
+    reference_residual: float | None = None
 
     # Integer center pixel of dirty_map, matching _component()'s
     # (and scipy.signal.convolve's `mode="same"` centering for an even-length kernel, which is
@@ -360,8 +363,8 @@ def ms_clean(
 
         # Fixed reference residual from the first iteration, used by the divergence check
         # below
-        if i == 0:
-            reference_residual = np.abs(strength)
+        if reference_residual is None:
+            reference_residual = float(np.abs(strength))
 
         # Stop if the largest scale's found component is negative: a strong indication that
         # scale is fitting noise/sidelobes rather than real large-scale structure. With a single
@@ -691,4 +694,4 @@ def _component(scale: float, shape: tuple[int, ...]) -> NDArray[np.float64]:
 
     wave_amp[amp_zero_indices] = 0.0
 
-    return cast(NDArray[np.float64], wave_amp)
+    return wave_amp
