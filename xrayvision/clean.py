@@ -68,14 +68,15 @@ The CLEAN algorithm can be summarised in pesudo code as follows:
 .. math::
    & \textrm{CLEAN} \left (I^{D}(l, m),\ B(l,m),\ \gamma,\ f_{Thresh},\ N \right ) \\
    & I^{Res} = I^{D},\ M = \{\},\ i=0 \\
-   & \textbf{while} \ \operatorname{max} I^{Res} > f_{Thresh} \ \textrm{and} \ i \lt N \
-   \textbf{do:} \\
-   & \qquad l_{max}, m_{max} = \underset{l,m}{\operatorname{argmax}} I^{Res}(l,m) \\
+   & \textbf{while} \ i \lt N \ \textbf{do:} \\
+   & \qquad l_{max}, m_{max} = \underset{l,m}{\operatorname{argmax}} \left| I^{Res}(l,m) \right| \\
    & \qquad f_{max} = I^{Res}(l_{max}, m_{max}) \\
+   & \qquad \textbf{if} \ f_{max} \lt 0 \ \textbf{break} \\
    & \qquad I^{Res} = I^{Res} - \alpha \cdot f_{max} \cdot \operatorname{shift} \left
    ( B(l,m), l_{max}, m_{max} \right ) \\
    & \qquad M = M + \{ l_{max}, m_{max}: \alpha \cdot f_{max} \} \\
    & \qquad i = i + 1 \\
+   & \qquad \textbf{if} \ \operatorname{max} \left| I^{Res} \right| \le f_{Thresh} \ \textbf{break} \\
    & \textbf{done} \\
    & \textbf{return}\  M,\ I^{Res}"""
         ),
