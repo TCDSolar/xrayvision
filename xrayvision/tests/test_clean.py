@@ -13,6 +13,7 @@ from xrayvision.clean import (
     clean,
     ms_clean,
     vis_clean,
+    vis_ms_clean,
 )
 from xrayvision.imaging import image_to_vis
 from xrayvision.transform import dft_map, idft_map
@@ -287,3 +288,147 @@ def test_ms_clean_unsorted_scales_raises():
             scales=[4, 1],
             clean_beam_width=None,
         )
+
+
+def test_clean_max_iterations(caplog):
+    n = m = 65
+    pos = (20, 30)
+    clean_map = np.zeros((n, m))
+    clean_map[pos] = 10.0
+    dirty_beam = _tapered_cross_beam(n, m)
+    dirty_map = signal.convolve2d(clean_map, dirty_beam, mode="same")
+
+    caplog.set_level("INFO")
+    # thres=None and a tiny niter: the loop always has positive residual left to clean, so it
+    # runs out the clock rather than converging or hitting the negative-residual guard.
+    _out_map, model, _resid = clean(dirty_map, dirty_beam, clean_beam_width=None, niter=3, thres=None)
+
+    assert "Max iterations reached" in caplog.text
+    assert model.sum() > 0
+
+
+def test_clean_convolve_residual():
+    n = m = 65
+    pos = (20, 30)
+    clean_map = np.zeros((n, m))
+    clean_map[pos] = 10.0
+    dirty_beam = _tapered_cross_beam(n, m)
+    dirty_map = signal.convolve2d(clean_map, dirty_beam, mode="same")
+
+    # A handful of iterations, well short of convergence, so a substantial residual remains for
+    # convolve_residual to visibly act on.
+    out_plain, _model, resid_plain = clean(
+        dirty_map, dirty_beam, pixel_size=[1, 1] * u.arcsec / u.pix, clean_beam_width=4.0 * u.arcsec, niter=20
+    )
+    out_convolved, _model, resid_convolved = clean(
+        dirty_map,
+        dirty_beam,
+        pixel_size=[1, 1] * u.arcsec / u.pix,
+        clean_beam_width=4.0 * u.arcsec,
+        niter=20,
+        convolve_residual=True,
+    )
+
+    assert out_plain.shape == out_convolved.shape
+    assert np.all(np.isfinite(out_convolved))
+    # Convolving the residual with the clean beam should smooth it, not leave it untouched.
+    assert not np.allclose(resid_plain, resid_convolved)
+
+
+def test_ms_clean_clean_beam_width():
+    n = m = 65
+    pos1, pos2 = (15, 30), (40, 32)
+    clean_map = np.zeros((n, m))
+    clean_map[pos1] = 10.0
+    clean_map[pos2] = 7.0
+    dirty_beam = _tapered_cross_beam(n, m)
+    dirty_map = signal.convolve2d(clean_map, dirty_beam, mode="same")
+
+    out_map, model, resid = ms_clean(
+        dirty_map,
+        dirty_beam,
+        pixel_size=[1, 1] * u.arcsec / u.pixel,
+        scales=[1, 2, 4],
+        clean_beam_width=4.0 * u.arcsec,
+        niter=3000,
+        convolve_residual=True,
+    )
+
+    assert out_map.shape == dirty_map.shape
+    assert model.shape == dirty_map.shape
+    assert resid.shape == dirty_map.shape
+    assert np.all(np.isfinite(out_map))
+
+
+def test_vis_ms_clean_sim():
+    n = m = 31
+    data = Gaussian2DKernel(3.0, x_size=n, y_size=m).array
+
+    half_log_space = np.logspace(np.log10(0.03030303), np.log10(0.48484848), 10)
+
+    theta = np.linspace(0, 2 * np.pi, 32)
+    theta = theta[np.newaxis, :]
+    theta = np.repeat(theta, 10, axis=0)
+
+    r = half_log_space
+    r = r[:, np.newaxis]
+    r = np.repeat(r, 32, axis=1)
+
+    x = r * np.sin(theta)
+    y = r * np.cos(theta)
+
+    sub_uv = np.vstack([x.flatten(), y.flatten()])
+    sub_uv = np.hstack([sub_uv, np.zeros((2, 1))]) / u.arcsec
+
+    vis = image_to_vis(data * u.dimensionless_unscaled, u=sub_uv[0, :], v=sub_uv[1, :])
+
+    clean_map, model, residual = vis_ms_clean(
+        vis,
+        shape=(m, n) * u.pix,
+        pixel_size=[2, 2] * u.arcsec / u.pix,
+        scales=[1, 2],
+        clean_beam_width=0.1 * u.arcsec,
+        niter=200,
+    )
+    assert clean_map.data.shape == data.shape
+    assert model.data.shape == data.shape
+    assert residual.data.shape == data.shape
+    assert_allclose(clean_map.data, data, atol=0.01)
+
+
+def test_vis_ms_clean_no_restore_no_map():
+    n = m = 31
+    data = Gaussian2DKernel(3.0, x_size=n, y_size=m).array
+
+    half_log_space = np.logspace(np.log10(0.03030303), np.log10(0.48484848), 10)
+
+    theta = np.linspace(0, 2 * np.pi, 32)
+    theta = theta[np.newaxis, :]
+    theta = np.repeat(theta, 10, axis=0)
+
+    r = half_log_space
+    r = r[:, np.newaxis]
+    r = np.repeat(r, 32, axis=1)
+
+    x = r * np.sin(theta)
+    y = r * np.cos(theta)
+
+    sub_uv = np.vstack([x.flatten(), y.flatten()])
+    sub_uv = np.hstack([sub_uv, np.zeros((2, 1))]) / u.arcsec
+
+    vis = image_to_vis(data * u.dimensionless_unscaled, u=sub_uv[0, :], v=sub_uv[1, :])
+
+    clean_map, model, residual = vis_ms_clean(
+        vis,
+        shape=(m, n) * u.pix,
+        pixel_size=[2, 2] * u.arcsec / u.pix,
+        scales=[1, 2],
+        clean_beam_width=None,
+        niter=200,
+        map=False,
+    )
+    assert isinstance(clean_map, np.ndarray)
+    assert clean_map.shape == data.shape
+    assert model.shape == data.shape
+    assert residual.shape == data.shape
+    assert_allclose(clean_map, model + residual)
