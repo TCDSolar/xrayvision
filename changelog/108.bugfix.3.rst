@@ -1,0 +1,1 @@
+Fix `~xrayvision.clean.ms_clean` not stopping on a negative residual when run with a single scale, so it now matches `~xrayvision.clean.clean`'s behaviour in that case.
