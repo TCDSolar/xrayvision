@@ -123,7 +123,7 @@ jobs:
         contains(github.event.pull_request.labels.*.name, 'Run publish')
       )
     needs: [test, docs, type_check]
-    ses: OpenAstronomy/github-actions-workflows/.github/workflows/publish_pure_python.yml@8d5ad7efc8e84a051639373f6ea0d10441eafee1  # v3.2.1
+    uses: OpenAstronomy/github-actions-workflows/.github/workflows/publish_pure_python.yml@8d5ad7efc8e84a051639373f6ea0d10441eafee1  # v3.2.1
     with:
       python-version: '3.13'
       test_extras: 'tests,map'
