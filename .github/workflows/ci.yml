@@ -89,14 +89,8 @@ jobs:
         - linux: build_docs
 
   online:
-<<<<<<<
-    if: "!startsWith(github.event.ref, 'refs/tags/v')"
     needs: [docs]
-    uses: OpenAstronomy/github-actions-workflows/.github/workflows/tox.yml@3a3dcf3ba6828dac29eba10334948ef38364ed14  # v3.1.0
-=======
-    needs: [core]
     uses: OpenAstronomy/github-actions-workflows/.github/workflows/tox.yml@8d5ad7efc8e84a051639373f6ea0d10441eafee1  # v3.2.1
->>>>>>>
     permissions:
       id-token: write
     with:
@@ -108,12 +102,7 @@ jobs:
           posargs: -n auto --dist loadgroup --color=yes
 
   type_check:
-<<<<<<<
-    uses: OpenAstronomy/github-actions-workflows/.github/workflows/tox.yml@3a3dcf3ba6828dac29eba10334948ef38364ed14  # v3.1.0
-=======
-    needs: [core]
     uses: OpenAstronomy/github-actions-workflows/.github/workflows/tox.yml@8d5ad7efc8e84a051639373f6ea0d10441eafee1  # v3.2.1
->>>>>>>
     permissions:
       id-token: write
     with:
@@ -133,13 +122,8 @@ jobs:
         github.event_name == 'pull_request' &&
         contains(github.event.pull_request.labels.*.name, 'Run publish')
       )
-<<<<<<<
     needs: [test, docs, type_check]
-    uses: OpenAstronomy/github-actions-workflows/.github/workflows/publish_pure_python.yml@3a3dcf3ba6828dac29eba10334948ef38364ed14  # v3.1.0
-=======
-    needs: [test, docs]
-    uses: OpenAstronomy/github-actions-workflows/.github/workflows/publish_pure_python.yml@8d5ad7efc8e84a051639373f6ea0d10441eafee1  # v3.2.1
->>>>>>>
+    ses: OpenAstronomy/github-actions-workflows/.github/workflows/publish_pure_python.yml@8d5ad7efc8e84a051639373f6ea0d10441eafee1  # v3.2.1
     with:
       python-version: '3.13'
       test_extras: 'tests,map'
