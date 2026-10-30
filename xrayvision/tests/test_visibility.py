@@ -1,4 +1,3 @@
-import astropy.units as apu
 import numpy as np
 import pytest
 from numpy.testing import assert_array_equal
@@ -7,6 +6,8 @@ import astropy.units as apu
 from astropy.coordinates import get_body
 from astropy.tests.helper import assert_quantity_allclose
 from astropy.time import Time
+
+from sunpy.util import SunpyDeprecationWarning
 
 import xrayvision.visibility as vm
 from xrayvision.visibility import Visibilities, Visibility

@@ -8,6 +8,7 @@ Reference
    clean
    imaging
    mem
+   simulation
    transform
    utils
    visibility

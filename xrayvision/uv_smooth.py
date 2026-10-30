@@ -6,18 +6,21 @@ from scipy.interpolate import RBFInterpolator
 
 from xrayvision.visibility import Visibilities
 
-__all__ = ["uv_smooth", "uv_smooth_new"]
+__all__ = ["uv_smooth_idl", "uv_smooth"]
 
 logger = logging.getLogger(__name__)
 
 
-def uv_smooth(vis: Visibilities, niter: int = 50):
+def uv_smooth_idl(vis: Visibilities, niter: int = 50):
     r"""
-    uv_smooth image reconstruction method.
+    uv_smooth image reconstruction method, a direct port of the RHESSI IDL ``uv_smooth``.
 
     This method reconstructs images from sparse Fourier-domain visibilities using an iterative Landweber scheme. It
     interpolates visibilities onto a regular uv grid, applies smoothing to stabilize the reconstruction, and
     iteratively refines the image while enforcing positivity.
+
+    The grid and image size are hard coded from the lowest subcollimator (``isc``) present, as in the IDL code, use
+    `~xrayvision.uv_smooth.uv_smooth` for a general version.
 
     Parameters
     ----------
@@ -99,28 +102,18 @@ def uv_smooth(vis: Visibilities, niter: int = 50):
     xpix = -Ulimit + np.arange(Nnew) * pixel
     ypix = xpix
 
-    # use np.pad ?
     intzpadd = np.zeros((Nnew, Nnew), dtype=np.complex128)
     intzpadd[(Nnew - N) // 2 : (Nnew - N) // 2 + N, (Nnew - N) // 2 : (Nnew - N) // 2 + N] = vis_interp
 
     im_new = Nnew // 15
-    intznew = np.zeros((im_new, im_new), dtype=np.complex128)
-    xpixnew = np.zeros(im_new)
-    ypixnew = np.zeros(im_new)
 
-    for i in range(im_new):
-        xpixnew[i] = xpix[15 * i + 7]
-        ypixnew[i] = ypix[15 * i + 7]
-        for j in range(im_new):
-            intznew[i, j] = intzpadd[15 * i + 7, 15 * j + 7]
-
-    xx, yy = np.meshgrid(np.arange(im_new), np.arange(im_new), indexing="xy")
-    intznew = intzpadd[(15 * xx) + 7, (15 * yy) + 7]
-    xpixnew = xpix[(15 * xx[0, :]) + 7]
-    ypixnew = ypix[(15 * yy[:, 0]) + 7]
+    idx = 15 * np.arange(im_new) + 7
+    intznew = intzpadd[np.ix_(idx, idx)]
+    xpixnew = xpix[idx]
+    ypixnew = ypix[idx]
 
     OMEGA = (xpixnew[im_new - 1] - xpixnew[0]) / 2
-    X = im_new // (4 * OMEGA)
+    X = im_new / (4 * OMEGA)
     deltaomega = (xpixnew[im_new - 1] - xpixnew[0]) / im_new
     deltax = 2 * X / im_new
 
@@ -187,7 +180,7 @@ def uv_smooth(vis: Visibilities, niter: int = 50):
     return map_solution, F_Trasf, deltax
 
 
-def uv_smooth_new(
+def uv_smooth(
     vis: Visibilities, shape=128, pixel_size: float = 1.0, uv_pixel_size: float | None = None, niter: int = 50, **kwargs
 ):
     r"""
@@ -314,9 +307,7 @@ def uv_smooth_new(
 
     """
     # Zero-padding and downsampling constants
-    # PADDED_GRID_SIZE = 1920
     DOWNSAMPLE_FACTOR = 15
-    # DOWNSAMPLE_OFFSET = 7
     PADDING_FACTOR = 6
 
     r = np.sqrt(vis.u**2 + vis.v**2).value
@@ -431,15 +422,17 @@ def _sinc_interpolate_to_final_grid(
     Parameters
     ----------
     vis_gridded : np.ndarray
-        Input gridded visibilities, shape (grid_size, grid_size).
-    grid_size : int
+        Input gridded visibilities, shape (uv_grid_size, uv_grid_size).
+    uv_grid_size : int
         Original grid size.
-    pixel_size : float
+    uv_pixel_size : float
         Pixel spacing (same in padded and final grids).
-    padded_size : int, optional
-        Intermediate padded grid size (default: 1920).
+    padded_uv_grid_size : int
+        Intermediate padded grid size.
     downsample_factor : int, optional
         Downsampling factor for final grid (default: 15).
+    downsample_offset : int, optional
+        Centered sampling offset within each downsampling block (default: 7).
 
     Returns
     -------
@@ -474,9 +467,6 @@ def _sinc_interpolate_to_final_grid(
     pad_start = (padded_uv_grid_size - uv_grid_size) // 2
     pad_end = pad_start + uv_grid_size
     vis_zero_padded[pad_start:pad_end, pad_start:pad_end] = vis_gridded
-
-    # pad_width = (padded_uv_grid_size - uv_grid_size) // 2
-    # vis_zero_padded_new = np.pad(vis_gridded, pad_width, mode='constant', constant_values=0j)
 
     # Downsample to final image grid
     downsampled_size = padded_uv_grid_size // downsample_factor
@@ -590,15 +580,15 @@ def interpolate_visibilities_to_grid(u, v, vis, ugrid, vgrid, **kwargs):
     Parameters
     ----------
     u :
-        Sparse ``v`` coordinates.
-    v :
         Sparse ``u`` coordinates.
+    v :
+        Sparse ``v`` coordinates.
     vis :
         Sparse complex visibilities corresponding to ``u`` and ``v``.
     ugrid :
-        Regular grid of ``v``
-    vgrid :
         Regular grid of ``u``
+    vgrid :
+        Regular grid of ``v``
 
     Returns
     -------

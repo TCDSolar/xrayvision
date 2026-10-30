@@ -1,18 +1,18 @@
-import astropy.units as apu
-import hissw
 import numpy as np
 import pytest
-from astropy.io import fits
 from numpy.testing import assert_allclose
 
+import astropy.units as apu
+from astropy.io import fits
+
 from xrayvision.simulation.instruments import rhessi_like_uv_coverage
-from xrayvision.uv_smooth import uv_smooth, uv_smooth_new
+from xrayvision.uv_smooth import uv_smooth, uv_smooth_idl
 from xrayvision.visibility import Visibilities, VisMeta
 
 
-# @pytest.mark.skip("needs local files")
+@pytest.mark.remote_data
 def test_uv_smooth():
-    hdul = fits.open("~/Downloads/hsi_vis_20020221_2357_0054_46tx3e.fits")
+    hdul = fits.open("https://umbra.nascom.nasa.gov/rhessi/rhessi_extras/visibility_fits_v2/2002/02/21/hsi_vis_20020221_2357_0054_46tx3e.fits")
     times = np.unique(hdul[-1].data["TRANGE"], axis=0)
 
     index = np.argwhere(
@@ -42,9 +42,9 @@ def test_uv_smooth():
         amplitude_uncertainty=vis_data["sigamp"] * vunit,
     )
 
-    image_orig, vis_orig, ps_orig = uv_smooth(vis)
-    iamge_new, vis_new, ps_new = uv_smooth_new(vis, shape=128, pixel_size=1)
-    print("here")
+    image_orig, vis_orig, ps_orig = uv_smooth_idl(vis)
+    image_new, vis_new, ps_new = uv_smooth(vis, shape=128, uv_pixel_size=0.0005)
+    assert_allclose(image_new, image_orig, atol=5e-5)
 
 
 @pytest.fixture
@@ -87,7 +87,7 @@ def rhessi_like_gaussian_vis():
 def test_uv_smooth_peak_at_origin(rhessi_like_gaussian_vis):
     vis, flux, sigma = rhessi_like_gaussian_vis
 
-    image, *_ = uv_smooth(vis, niter=50)
+    image, *_ = uv_smooth_idl(vis, niter=50)
     # For a source centered at (0, 0) the peak should lie at the image center
     peak_idx = np.unravel_index(np.argmax(image), image.shape)
     center = np.array(image.shape) // 2
@@ -100,9 +100,9 @@ def test_uv_smooth_matches_gaussian(rhessi_like_gaussian_vis):
     vis, flux, sigma = rhessi_like_gaussian_vis
     sigma = sigma.value
 
-    image_orig, *og = uv_smooth(vis, niter=50)
-    image_new, *nw = uv_smooth_new(vis, shape=128, uv_pixel_size=0.0005, niter=50)
-    image_auto, *au = uv_smooth_new(vis, shape=128, pixel_size=1.0)
+    image_orig, *og = uv_smooth_idl(vis, niter=50)
+    image_new, *nw = uv_smooth(vis, shape=128, uv_pixel_size=0.0005, niter=50)
+    image_auto, *au = uv_smooth(vis, shape=128, pixel_size=1.0)
 
     im_new = image_orig.shape[0]
 
@@ -117,26 +117,38 @@ def test_uv_smooth_matches_gaussian(rhessi_like_gaussian_vis):
     np.testing.assert_allclose(image_auto, ref_image, atol=0.024)
 
 
-def test_uv_smooth_idl(rhessi_like_gaussian_vis):
+@pytest.mark.idl
+@pytest.mark.parametrize("offset", [(0.0, 0.0), (12.0, 0.0), (0.0, 12.0)], ids=["centre", "x-offset", "y-offset"])
+def test_uv_smooth_idl(rhessi_like_gaussian_vis, offset):
+    hissw = pytest.importorskip("hissw")
     vis, flux, sigma = rhessi_like_gaussian_vis
+    # Offset sources break the transpose symmetry a centred Gaussian hides
+    phase = np.exp(2j * np.pi * (offset[0] * vis.u.value + offset[1] * vis.v.value))
+    vis = Visibilities(visibilities=vis.visibilities * phase, u=vis.u, v=vis.v, meta=vis.meta)
 
     ssw = hissw.Environment(ssw_packages=["hessi"])
+    # force_double_precision as IDL parses plain literals as single precision
     script = """
-visin = {u:{{u | list }}, v:{{v | list }}, obsvis:{{obsvis | list}}, isc:{{isc|list}}, xyoffset:[0,0], trange:[0,0]}
+obsvis = complex({{re | force_double_precision}}, {{im | force_double_precision}})
+visin = {u:{{u | force_double_precision}}, v:{{v | force_double_precision}}, obsvis:obsvis, isc:{{isc | list}}, xyoffset:[0,0], trange:[0,0]}
 uv_smooth, visin, map, reconstructed_map_visibilities=visout
     """
     out = ssw.run(
         script=script,
         args={
-            "u": vis.u.value.tolist(),
-            "v": vis.v.value.tolist(),
-            "obsvis": vis.visibilities.value.tolist(),
+            "u": vis.u.value,
+            "v": vis.v.value,
+            "re": vis.visibilities.value.real,
+            "im": vis.visibilities.value.imag,
             "isc": vis.meta["isc"].tolist(),
         },
     )
-    image_orig, *info = uv_smooth(vis, niter=50)
-    image_new, *_ = uv_smooth_new(vis, shape=128, uv_pixel_size=0.0005, niter=50)
-    image_auto, *_ = uv_smooth_new(vis)
+    image_orig, _, pixel_orig = uv_smooth_idl(vis, niter=50)
+    image_new, _, pixel_new = uv_smooth(vis, shape=128, uv_pixel_size=0.0005, niter=50)
     image_idl = out["map"]["data"][0]
-    assert_allclose(image_orig, image_idl, atol=5e-5)
-    assert_allclose(image_new, image_idl, atol=5e-5)
+    # IDL's GRID_TPS differs from the exact thin plate spline by ~4e-5 (of a 0.6 peak) on the 320x320 grid
+    assert_allclose(image_orig, image_idl, atol=1e-4)
+    assert_allclose(image_new, image_idl, atol=1e-4)
+    dx = np.ravel(out["map"]["dx"])[0]
+    assert_allclose(pixel_orig, dx, rtol=1e-5)
+    assert_allclose(pixel_new, dx, rtol=1e-5)
