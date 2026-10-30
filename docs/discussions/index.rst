@@ -2,5 +2,3 @@ Discussions
 ============
 
 .. toctree::
-
-   imaging/
