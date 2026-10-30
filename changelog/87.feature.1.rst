@@ -1,0 +1,1 @@
+Add `~xrayvision.simulation.instruments.rhessi_like_uv_coverage` and `~xrayvision.simulation.instruments.stix_like_uv_coverage` to generate RHESSI-like and STIX-like u, v sampling patterns for simulations and testing.

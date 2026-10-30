@@ -1,0 +1,1 @@
+Add the ``uv_smooth`` image reconstruction method, which interpolates sparse visibilities onto a regular uv grid and reconstructs the image with positivity constrained Landweber iterations, as `~xrayvision.uv_smooth.uv_smooth` for arbitrary image shapes and pixel sizes and as `~xrayvision.uv_smooth.uv_smooth_idl`, a port which reproduces the RHESSI IDL ``uv_smooth`` output.

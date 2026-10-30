@@ -8,8 +8,11 @@ Reference
    clean
    imaging
    mem
+   simulation
    transform
    utils
    visibility
+   uv-smooth
+   bibliography
 
    ../whatsnew/index
