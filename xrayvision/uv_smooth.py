@@ -1,6 +1,8 @@
 import logging
+from typing import Any
 
 import numpy as np
+import numpy.typing as npt
 from numpy.fft import fft2, fftshift, ifft2, ifftshift
 from scipy.interpolate import RBFInterpolator
 
@@ -11,7 +13,7 @@ __all__ = ["uv_smooth_idl", "uv_smooth"]
 logger = logging.getLogger(__name__)
 
 
-def uv_smooth_idl(vis: Visibilities, niter: int = 50):
+def uv_smooth_idl(vis: Visibilities, niter: int = 50) -> tuple[npt.NDArray[Any], npt.NDArray[Any], float]:
     r"""
     uv_smooth image reconstruction method, a direct port of the RHESSI IDL ``uv_smooth``.
 
@@ -59,21 +61,10 @@ def uv_smooth_idl(vis: Visibilities, niter: int = 50):
     reconstruction is consistent with the measured visibilities.
     """
 
-    pixel = 0.0005
-    detmin = min(vis.meta["isc"])
-    if detmin == 0:
-        # fov = 0.45
-        pixel = pixel * 2.0
-        N = 450
-
-    if detmin == 1:
-        # fov = 0.26
-        pixel = pixel * 2.0
-        N = 260
-
-    if detmin >= 2:
-        # fov = 0.16
-        N = 320
+    detmin = min(vis.meta["isc"])  # type: ignore[index]
+    # Pixel scale factor and grid size set by the lowest subcollimator: fov = 0.45, 0.26 and 0.16 respectively
+    pixel_scale, N = {0: (2.0, 450), 1: (2.0, 260)}.get(int(detmin), (1.0, 320))
+    pixel = 0.0005 * pixel_scale
 
     r = np.sqrt(vis.u**2 + vis.v**2).value
 
@@ -139,6 +130,7 @@ def uv_smooth_idl(vis: Visibilities, niter: int = 50):
     F_Trasf_shifted = ifft2(map_shifted) / (4 * np.pi**2 * deltaomega * deltaomega)
     F_Trasf = fftshift(F_Trasf_shifted)
 
+    converged = False
     for iter in range(niter):
         # Update rule
         F_Trasf_up = F_Trasf + tau * (g - chi * F_Trasf)
@@ -165,24 +157,30 @@ def uv_smooth_idl(vis: Visibilities, niter: int = 50):
                 descent[iter - 1] = (normAf_g[iter - 1] - normAf_g[iter]) / normAf_g[iter - 1]
             if descent[iter - 1] < 0.02:
                 logger.info("Converged at iteration %d", iter)
+                converged = True
                 break
-    else:
-        logger.info("Max iterations reached %d", iter)
+    if not converged:
+        logger.info("Max iterations reached %d", niter)
 
     # output
     F_Trasf = 4 * np.pi**2 * F_Trasf
 
-    if iter == niter - 1:
-        map_solution[:, :] = map_iteration[14, :, :].real
-    else:
+    if converged:
         map_solution = map_actual.real
+    else:
+        map_solution[:, :] = map_iteration[14, :, :].real
 
     return map_solution, F_Trasf, deltax
 
 
 def uv_smooth(
-    vis: Visibilities, shape=128, pixel_size: float = 1.0, uv_pixel_size: float | None = None, niter: int = 50, **kwargs
-):
+    vis: Visibilities,
+    shape: int = 128,
+    pixel_size: float = 1.0,
+    uv_pixel_size: float | None = None,
+    niter: int = 50,
+    **kwargs: Any,
+) -> tuple[npt.NDArray[Any], npt.NDArray[Any], float]:
     r"""
     uv_smooth image reconstruction method.
 
@@ -407,7 +405,7 @@ def _sinc_interpolate_to_final_grid(
     padded_uv_grid_size: int,
     downsample_factor: int = 15,
     downsample_offset: int = 7,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+) -> tuple[npt.NDArray[Any], npt.NDArray[Any], npt.NDArray[Any], float, float]:
     """
     Resample visibility grid using sinc interpolation (zero-pad + downsample).
 
@@ -490,8 +488,14 @@ def _sinc_interpolate_to_final_grid(
 
 
 def landweber_iteration(
-    target_visibilities, downsampled_size, uv_coverage_mask, delta_omega, niter=50, tau=0.2, convergence_threshold=0.02
-):
+    target_visibilities: npt.NDArray[Any],
+    downsampled_size: int,
+    uv_coverage_mask: npt.NDArray[Any],
+    delta_omega: float,
+    niter: int = 50,
+    tau: float = 0.2,
+    convergence_threshold: float = 0.02,
+) -> tuple[npt.NDArray[Any], npt.NDArray[Any]]:
     r"""
     Perform Landweber iterative reconstruction with positivity constraint.
 
@@ -514,7 +518,11 @@ def landweber_iteration(
 
     Returns
     -------
-
+    final_image :
+        The reconstructed image, if the maximum number of iterations was reached without converging this is the image
+        from iteration 15 (index 14).
+    fourier_transform :
+        The Fourier transform of the final image.
     """
     FOURIER_NORMALIZATION = 4 * np.pi**2
     # Initialize Landweber iteration
@@ -529,6 +537,7 @@ def landweber_iteration(
     fourier_transform = fftshift(ifft2(ifftshift(current_image)) / (FOURIER_NORMALIZATION * delta_omega * delta_omega))
 
     # Landweber iterations
+    converged = False
     for iteration in range(niter):
         # Update Fourier transform using Landweber scheme
         fourier_transform = fourier_transform + tau * (target_visibilities - uv_coverage_mask * fourier_transform)
@@ -557,23 +566,26 @@ def landweber_iteration(
                 ) / residual_norms[iteration - 1]
             if descent_rates[iteration - 1] < convergence_threshold:
                 logger.info("Converged at iteration %d", iteration)
+                converged = True
                 break
-    else:
-        logger.info("Max iterations reached %d", iteration)
+    if not converged:
+        logger.info("Max iterations reached %d", niter)
 
     # Prepare final output
     fourier_transform = FOURIER_NORMALIZATION * fourier_transform
 
-    if iteration == niter - 1:
+    if converged:
+        final_image = current_image.real
+    else:
         # Use iteration 14 if max iterations reached (maintains original behavior)
         final_image[:, :] = iteration_history[14, :, :].real
-    else:
-        final_image = current_image.real
 
     return final_image, fourier_transform
 
 
-def interpolate_visibilities_to_grid(u, v, vis, ugrid, vgrid, **kwargs):
+def interpolate_visibilities_to_grid(
+    u: Any, v: Any, vis: Any, ugrid: npt.NDArray[Any], vgrid: npt.NDArray[Any], **kwargs: Any
+) -> npt.NDArray[Any]:
     r"""
     Interpolate sparse visibilities to regular grid using `~RBFInterpolator`.
 
@@ -606,6 +618,6 @@ def interpolate_visibilities_to_grid(u, v, vis, ugrid, vgrid, **kwargs):
     imag_interpolator = RBFInterpolator(uv_observed, vis.imag / norm, **kwargs)
     imag_interpolated = imag_interpolator(uv_grid_points)
 
-    vis_gridded = (real_interpolated + 1j * imag_interpolated).reshape(ugrid.shape)
+    vis_gridded: npt.NDArray[Any] = (real_interpolated + 1j * imag_interpolated).reshape(ugrid.shape)
 
     return vis_gridded
