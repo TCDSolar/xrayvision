@@ -8,7 +8,7 @@ from scipy.interpolate import RBFInterpolator
 
 from xrayvision.visibility import Visibilities
 
-__all__ = ["uv_smooth_idl", "uv_smooth"]
+__all__ = ["uv_smooth", "uv_smooth_idl"]
 
 logger = logging.getLogger(__name__)
 
@@ -131,7 +131,7 @@ def uv_smooth_idl(vis: Visibilities, niter: int = 50) -> tuple[npt.NDArray[Any],
     F_Trasf = fftshift(F_Trasf_shifted)
 
     converged = False
-    for iter in range(niter):
+    for iteration in range(niter):
         # Update rule
         F_Trasf_up = F_Trasf + tau * (g - chi * F_Trasf)
         F_Trasf = F_Trasf_up
@@ -143,7 +143,7 @@ def uv_smooth_idl(vis: Visibilities, niter: int = 50) -> tuple[npt.NDArray[Any],
 
         # Project solution onto subset of positive solutions (positivity constraint)
         map_actual[map_actual.real < 0] = 0 + 0j
-        map_iteration[iter, :, :] = map_actual.real
+        map_iteration[iteration, :, :] = map_actual.real
 
         map_shifted = ifftshift(map_actual)
         F_Trasf_shifted = ifft2(map_shifted) / (4 * np.pi**2 * deltaomega * deltaomega)
@@ -151,12 +151,12 @@ def uv_smooth_idl(vis: Visibilities, niter: int = 50) -> tuple[npt.NDArray[Any],
 
         # Stopping criterion based on the descent of ||Af - g||
         Af_g = chi * F_Trasf - g
-        normAf_g[iter] = np.sqrt(np.sum(np.abs(Af_g) * np.abs(Af_g)))
-        if iter >= 1:
+        normAf_g[iteration] = np.sqrt(np.sum(np.abs(Af_g) * np.abs(Af_g)))
+        if iteration >= 1:
             with np.errstate(divide="ignore", invalid="ignore"):
-                descent[iter - 1] = (normAf_g[iter - 1] - normAf_g[iter]) / normAf_g[iter - 1]
-            if descent[iter - 1] < 0.02:
-                logger.info("Converged at iteration %d", iter)
+                descent[iteration - 1] = (normAf_g[iteration - 1] - normAf_g[iteration]) / normAf_g[iteration - 1]
+            if descent[iteration - 1] < 0.02:
+                logger.info("Converged at iteration %d", iteration)
                 converged = True
                 break
     if not converged:

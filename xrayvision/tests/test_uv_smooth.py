@@ -12,7 +12,9 @@ from xrayvision.visibility import Visibilities, VisMeta
 
 @pytest.mark.remote_data
 def test_uv_smooth():
-    hdul = fits.open("https://umbra.nascom.nasa.gov/rhessi/rhessi_extras/visibility_fits_v2/2002/02/21/hsi_vis_20020221_2357_0054_46tx3e.fits")
+    hdul = fits.open(
+        "https://umbra.nascom.nasa.gov/rhessi/rhessi_extras/visibility_fits_v2/2002/02/21/hsi_vis_20020221_2357_0054_46tx3e.fits"
+    )
     times = np.unique(hdul[-1].data["TRANGE"], axis=0)
 
     index = np.argwhere(
@@ -42,8 +44,8 @@ def test_uv_smooth():
         amplitude_uncertainty=vis_data["sigamp"] * vunit,
     )
 
-    image_orig, vis_orig, ps_orig = uv_smooth_idl(vis)
-    image_new, vis_new, ps_new = uv_smooth(vis, shape=128, uv_pixel_size=0.0005)
+    image_orig, *_ = uv_smooth_idl(vis)
+    image_new, *_ = uv_smooth(vis, shape=128, uv_pixel_size=0.0005)
     assert_allclose(image_new, image_orig, atol=5e-5)
 
 
@@ -72,7 +74,7 @@ def rhessi_like_gaussian_vis():
     flux = 100.0  # ph/cm^2/s
     sigma = 5.0 * apu.arcsec
 
-    # V(u,v) = flux * exp(-2π²σ²(u²+v²))  [source at origin, so no phase term]
+    # V(u,v) = flux * exp(-2 pi^2 sigma^2 (u^2 + v^2))  [source at origin, so no phase term]
     vis_vals = flux * np.exp(-2 * np.pi**2 * sigma**2 * (u**2 + v**2))
 
     vis = Visibilities(
@@ -85,7 +87,7 @@ def rhessi_like_gaussian_vis():
 
 
 def test_uv_smooth_peak_at_origin(rhessi_like_gaussian_vis):
-    vis, flux, sigma = rhessi_like_gaussian_vis
+    vis, *_ = rhessi_like_gaussian_vis
 
     image, *_ = uv_smooth_idl(vis, niter=50)
     # For a source centered at (0, 0) the peak should lie at the image center
@@ -97,12 +99,12 @@ def test_uv_smooth_peak_at_origin(rhessi_like_gaussian_vis):
 
 
 def test_uv_smooth_matches_gaussian(rhessi_like_gaussian_vis):
-    vis, flux, sigma = rhessi_like_gaussian_vis
+    vis, _, sigma = rhessi_like_gaussian_vis
     sigma = sigma.value
 
-    image_orig, *og = uv_smooth_idl(vis, niter=50)
+    image_orig, *_ = uv_smooth_idl(vis, niter=50)
     image_new, *nw = uv_smooth(vis, shape=128, uv_pixel_size=0.0005, niter=50)
-    image_auto, *au = uv_smooth(vis, shape=128, pixel_size=1.0)
+    image_auto, *_ = uv_smooth(vis, shape=128, pixel_size=1.0)
 
     im_new = image_orig.shape[0]
 
@@ -121,7 +123,7 @@ def test_uv_smooth_matches_gaussian(rhessi_like_gaussian_vis):
 @pytest.mark.parametrize("offset", [(0.0, 0.0), (12.0, 0.0), (0.0, 12.0)], ids=["centre", "x-offset", "y-offset"])
 def test_uv_smooth_idl(rhessi_like_gaussian_vis, offset):
     hissw = pytest.importorskip("hissw")
-    vis, flux, sigma = rhessi_like_gaussian_vis
+    vis, *_ = rhessi_like_gaussian_vis
     # Offset sources break the transpose symmetry a centred Gaussian hides
     phase = np.exp(2j * np.pi * (offset[0] * vis.u.value + offset[1] * vis.v.value))
     vis = Visibilities(visibilities=vis.visibilities * phase, u=vis.u, v=vis.v, meta=vis.meta)
