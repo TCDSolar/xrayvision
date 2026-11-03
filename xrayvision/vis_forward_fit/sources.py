@@ -3,7 +3,7 @@ from collections import UserList
 from collections.abc import Sequence
 from dataclasses import dataclass, fields
 from itertools import chain
-from typing import Any, ClassVar, cast
+from typing import Any, ClassVar, Self, cast
 
 import numpy as np
 from numpy.typing import NDArray
@@ -27,6 +27,7 @@ __all__ = [
     "Circular",
     "Elliptical",
     "GenericSource",
+    "Loop",
     "Source",
     "SourceFactory",
     "SourceList",
@@ -898,6 +899,8 @@ class GenericSource(ABC):
     floats in the canonical units.
     """
 
+    amp: FloatOrQuantity
+
     _registry: dict[str, "type[GenericSource]"] = {}
     _param_units: ClassVar[tuple[Any, ...]] = ()
 
@@ -925,33 +928,47 @@ class GenericSource(ABC):
         return tuple(canonical)
 
     @classmethod
-    def _from_canonical(cls, *values: float) -> "GenericSource":
-        r"""Construct directly from already-canonical plain floats, bypassing validation."""
+    def _from_canonical(cls, *values: FloatOrQuantity) -> Self:
+        r"""Construct from numeric canonical values or equivalent quantities."""
+        if len(values) != len(cls._param_units):
+            raise ValueError(f"{cls.__name__} requires {len(cls._param_units)} parameters, got {len(values)}.")
         obj = cls.__new__(cls)
-        for name, value in zip((f.name for f in fields(cls)), values):  # type: ignore[arg-type]
+        for name, unit, value in zip((f.name for f in fields(cls)), cls._param_units, values):  # type: ignore[arg-type]
+            if unit is not None and isinstance(value, Quantity):
+                value = value.to_value(unit)  # pyright: ignore[reportAttributeAccessIssue]
             setattr(obj, name, value)
         return obj
 
-    def to_quantities(self) -> "GenericSource":
+    def to_canonical(self, flux_unit: Any = None) -> Self:
+        """Return a numeric-coordinate copy, optionally converting its amplitude.
+
+        There is no fixed flux unit. When ``flux_unit`` is supplied by a fitting
+        observation, quantity amplitudes are converted to it and bare amplitudes
+        are interpreted in it. Incompatible quantities raise a units error.
+        """
+        obj = type(self)._from_canonical(*self.param_list)
+        if flux_unit is not None and isinstance(obj.amp, Quantity):
+            obj.amp = obj.amp.to_value(flux_unit)  # pyright: ignore[reportAttributeAccessIssue]
+        return obj
+
+    def to_quantities(self) -> Self:
         r"""Return a copy with every unit-constrained field as a `Quantity` in its canonical unit.
 
         Useful for presenting a result (e.g. a fitted source) to a caller: internal code
         works with plain floats, but a value handed back across the public API should
-        carry its unit rather than leaving the caller to guess it. The copy bypasses
-        `__init__` (which would immediately strip the unit straight back off again), so
-        it is for display/inspection only - do not feed it back into fitting machinery
-        such as `SourceList.from_params` or `.bounds`.
+        carry its unit rather than leaving the caller to guess it. The result can be
+        reused in predictions, bounds, and fitting. Repeated conversion is idempotent.
         """
-        obj = self.__class__.__new__(self.__class__)
+        obj = self.to_canonical()
         for name, unit in zip((f.name for f in fields(self)), self._param_units):  # type: ignore[arg-type]
-            value = getattr(self, name)
+            value = getattr(obj, name)
             setattr(obj, name, value if unit is None else value * unit)
         return obj
 
     @property
     def n_params(self) -> int:
         r"""The number of parameters"""
-        return len(self.__dict__.keys())
+        return len(self.param_list)
 
     @property
     @abstractmethod
@@ -999,10 +1016,11 @@ class Circular(GenericSource):
 
     @property
     def bounds(self) -> list[list[float]]:
-        amp = _strip_unit(self.amp)
+        source = self.to_canonical()
+        amp = _strip_unit(source.amp)
         return [
-            [amp / 4, self.x0 - 5 * np.abs(self.sigma), self.y0 - 5 * np.abs(self.sigma), self.sigma / 4],
-            [amp * 4, self.x0 + 5 * np.abs(self.sigma), self.y0 + 5 * np.abs(self.sigma), self.sigma * 4],
+            [amp / 4, source.x0 - 5 * np.abs(source.sigma), source.y0 - 5 * np.abs(source.sigma), source.sigma / 4],
+            [amp * 4, source.x0 + 5 * np.abs(source.sigma), source.y0 + 5 * np.abs(source.sigma), source.sigma * 4],
         ]
 
     @property
@@ -1066,23 +1084,24 @@ class Elliptical(GenericSource):
 
     @property
     def bounds(self) -> list[list[float]]:
-        amp = _strip_unit(self.amp)
+        source = self.to_canonical()
+        amp = _strip_unit(source.amp)
         return [
             [
                 amp / 4,
-                self.x0 - (5 * np.abs(self.sigmax)),
-                self.y0 - (5 * np.abs(self.sigmay)),
-                self.sigmax / 4,
-                self.sigmay / 4,
-                self.theta - self._THETA_WINDOW,
+                source.x0 - (5 * np.abs(source.sigmax)),
+                source.y0 - (5 * np.abs(source.sigmay)),
+                source.sigmax / 4,
+                source.sigmay / 4,
+                source.theta - self._THETA_WINDOW,
             ],
             [
                 amp * 4,
-                self.x0 + (5 * np.abs(self.sigmax)),
-                self.y0 + (5 * np.abs(self.sigmay)),
-                self.sigmax * 4,
-                self.sigmay * 4,
-                self.theta + self._THETA_WINDOW,
+                source.x0 + (5 * np.abs(source.sigmax)),
+                source.y0 + (5 * np.abs(source.sigmay)),
+                source.sigmax * 4,
+                source.sigmay * 4,
+                source.theta + self._THETA_WINDOW,
             ],
         ]
 
@@ -1152,23 +1171,32 @@ class Loop(GenericSource):
 
     @property
     def bounds(self) -> list[list[float]]:
-        amp = _strip_unit(self.amp)
+        source = self.to_canonical()
+        amp = _strip_unit(source.amp)
+        # Keep the sigma_min and sigma_max boxes from overlapping, split at their initial
+        # guess's midpoint, so no scipy.optimize.minimize method (only PSO enforces this via
+        # an explicit inequality constraint) can propose sigma_min > sigma_max - that regime
+        # makes _compute_loop_geometry take a sqrt of a negative number, producing NaN/bumpy
+        # loop models.
+        boundary = (source.sigma_min + source.sigma_max) / 2
+        sigma_min_lo, sigma_min_hi = source.sigma_min / 2, min(source.sigma_min * 2, boundary)
+        sigma_max_lo, sigma_max_hi = max(source.sigma_max / 2, boundary), source.sigma_max * 2
         return [
             [
                 amp / 2,
-                self.x0 - (2 * np.abs(self.sigma_max)),
-                self.y0 - (2 * np.abs(self.sigma_max)),
-                self.sigma_min / 2,
-                self.sigma_max / 2,
+                source.x0 - (2 * np.abs(source.sigma_max)),
+                source.y0 - (2 * np.abs(source.sigma_max)),
+                sigma_min_lo,
+                sigma_max_lo,
                 -np.pi / 2,
                 0,
             ],
             [
                 amp * 2,
-                self.x0 + (2 * np.abs(self.sigma_max)),
-                self.y0 + (2 * np.abs(self.sigma_max)),
-                self.sigma_min * 2,
-                self.sigma_max * 2,
+                source.x0 + (2 * np.abs(source.sigma_max)),
+                source.y0 + (2 * np.abs(source.sigma_max)),
+                sigma_min_hi,
+                sigma_max_hi,
                 np.pi / 2,
                 np.pi,
             ],
@@ -1199,6 +1227,17 @@ class SourceList(UserList[GenericSource]):
         super().__init__(sources)
 
     @property
+    def flux_unit(self) -> Any:
+        """The first explicit amplitude unit, or ``None`` for numeric sources."""
+        return next(
+            (getattr(source.amp, "unit", None) for source in self.data if isinstance(source.amp, Quantity)), None
+        )
+
+    def to_canonical(self, flux_unit: Any = None) -> "SourceList":
+        """Return a copy in canonical coordinates and, optionally, a common flux unit."""
+        return type(self)([source.to_canonical(flux_unit) for source in self.data])
+
+    @property
     def params(self) -> list[float]:
         r"""Flat list of all parameters for all sources"""
         return list(chain.from_iterable([source.param_list for source in self.data]))
@@ -1209,7 +1248,9 @@ class SourceList(UserList[GenericSource]):
         return np.hstack([s.bounds for s in self.data]).tolist()  # type: ignore[no-any-return]
 
     @classmethod
-    def from_params(cls, sources: "SourceList", params: Sequence[float] | NDArray[np.float64]) -> "SourceList":
+    def from_params(
+        cls, sources: "SourceList", params: Sequence[FloatOrQuantity] | NDArray[np.float64]
+    ) -> "SourceList":
         r"""
         Create a source list from given parameters and sources.
 
@@ -1220,13 +1261,15 @@ class SourceList(UserList[GenericSource]):
         params
             Flat list of all parameters for all sources.
         """
+        expected = sum(source.n_params for source in sources)
+        if len(params) != expected:
+            raise ValueError(f"Expected {expected} source parameters, got {len(params)}.")
         j = 0
         new_sources = cls()
         for source in sources:
             n_params = source.n_params
-            # Bypasses unit validation: these params are already plain floats in
-            # canonical units, produced by a previous call to `.params`/`.bounds` or by
-            # the optimiser, so there is nothing left to convert.
+            # Numeric coordinates are canonical; quantity-valued fitted results
+            # are converted by the same reconstruction path before reuse.
             new_sources.append(
                 type(source)._from_canonical(*list(params[j : j + n_params]))  # pyright: ignore[reportPrivateUsage]
             )

@@ -1,0 +1,1 @@
+Support visibility forward fits with a shared complex-residual error model, conversion of source amplitudes to the observation unit, and fitted sources that can be reused directly for prediction and refitting. Expose fit diagnostics, including reduced chi-square based on two real measurements per complex visibility, and support batched PSO evaluation and parallel restarts.

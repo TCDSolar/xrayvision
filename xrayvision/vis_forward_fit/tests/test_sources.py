@@ -216,3 +216,57 @@ def test_loop_vis_oldvnew():
     vis = loop_vis(flux, u, v, x0, y0, sigmin, sigmaj, rotatiion, loopw)
 
     assert_allclose(vis, vis_old)
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        Source("circular", 2 * apu.Jy, 0.1 * apu.arcmin, 2 * apu.arcsec, 3 * apu.arcsec),
+        Source("elliptical", 2 * apu.Jy, 1 * apu.arcsec, 2 * apu.arcsec, 3 * apu.arcsec, 4 * apu.arcsec, 30 * apu.deg),
+        Source(
+            "loop",
+            2 * apu.Jy,
+            1 * apu.arcsec,
+            2 * apu.arcsec,
+            3 * apu.arcsec,
+            7 * apu.arcsec,
+            30 * apu.deg,
+            45 * apu.deg,
+        ),
+    ],
+)
+def test_source_quantity_roundtrip(source):
+    quantities = source.to_quantities()
+    restored = SourceList.from_params(SourceList([quantities]), quantities.param_list)[0]
+    assert restored == source
+    assert quantities.to_quantities() == quantities
+    assert_allclose(quantities.bounds, source.bounds)
+    # Cached, non-parameter attributes must not change the fit dimension.
+    source.cached_geometry = None
+    assert source.n_params == len(source.param_list)
+
+
+@pytest.mark.parametrize("n_params", [3, 5])
+def test_source_list_rejects_wrong_parameter_count(n_params):
+    sources = SourceList([Source("circular", 2, 1 * apu.arcsec, 2 * apu.arcsec, 3 * apu.arcsec)])
+    with pytest.raises(ValueError, match="Expected 4 source parameters"):
+        SourceList.from_params(sources, np.ones(n_params))
+
+
+@pytest.mark.parametrize("sigma_min, sigma_max", [(3, 7), (7, 3), (5, 5)])
+def test_loop_bounds_keep_sigma_min_below_sigma_max(sigma_min, sigma_max):
+    # Regardless of the initial guess, the sigma_min and sigma_max boxes must not overlap,
+    # otherwise an unconstrained scipy method can land in the sigma_min > sigma_max regime
+    # where _compute_loop_geometry's sqrt goes negative (NaN/bumpy loop models).
+    source = Source(
+        "loop",
+        2 * apu.ct,
+        1 * apu.arcsec,
+        2 * apu.arcsec,
+        sigma_min * apu.arcsec,
+        sigma_max * apu.arcsec,
+        30 * apu.deg,
+        45 * apu.deg,
+    )
+    lower, upper = source.bounds
+    assert upper[3] <= lower[4]
