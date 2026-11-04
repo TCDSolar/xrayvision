@@ -3,7 +3,10 @@
 Vis Forward Fit ('xrayvision.vis_forward_fit')
 **********************************************
 
-The ``vis_forward_fit`` submodule contains the visibility forward fitting methods
+The ``vis_forward_fit`` submodule contains visibility forward fitting methods
+for parametric source imaging. See :cite:t:`Aschwanden2002_forward_fit` for
+RHESSI forward fitting and :cite:t:`Volpara2022_forward_fit` for STIX forward
+fitting with particle swarm optimisation.
 
 Units and reusable sources
 ==========================
@@ -68,7 +71,7 @@ are free: a circle has four, an ellipse six, and a loop seven. Conjugate copies
 of measured visibilities do not supply independent observations and should not
 be added to fitting input. The denominator follows the stacked real/imaginary
 data count used by IDL, rather than ``N_v - N_free`` printed in Equation 4 of
-`Volpara et al. (2022) <https://doi.org/10.1051/0004-6361/202243907>`_.
+:cite:t:`Volpara2022_forward_fit`.
 The IDL PSO loop parameter-count discrepancy is not reproduced.
 
 Set ``return_result=True`` to access statistics and the native optimiser result:

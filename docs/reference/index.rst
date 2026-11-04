@@ -5,15 +5,15 @@ Reference
 .. toctree::
    :maxdepth: 1
 
-   clean
-   imaging
-   mem
-   simulation
-   transform
-   utils
    visibility
+   transform
+   imaging
+   clean
+   mem
    uv-smooth
-   bibliography
    forward_fit
+   simulation
+   utils
+   bibliography
 
    ../whatsnew/index
