@@ -1238,6 +1238,23 @@ class SourceList(UserList[GenericSource]):
         return type(self)([source.to_canonical(flux_unit) for source in self.data])
 
     @property
+    def parameter_names(self) -> tuple[str, ...]:
+        """Unique names in the same order as the flat parameter vector."""
+        return tuple(
+            f"source[{i}].{field.name}"
+            for i, source in enumerate(self.data)
+            for field in fields(source)[: source.n_params]  # type: ignore[arg-type]
+        )
+
+    def parameter_units(self, flux_unit: Any) -> tuple[Any, ...]:
+        """Units of the flat vector, using the observation's amplitude unit."""
+        return tuple(
+            flux_unit if unit is None else unit
+            for source in self.data
+            for unit in source._param_units  # pyright: ignore[reportPrivateUsage]
+        )
+
+    @property
     def params(self) -> list[float]:
         r"""Flat list of all parameters for all sources"""
         return list(chain.from_iterable([source.param_list for source in self.data]))

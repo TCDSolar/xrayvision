@@ -6,6 +6,7 @@ import numpy as np
 from numpy.typing import NDArray
 from pymoo.algorithms.soo.nonconvex.pso import PSO
 from pymoo.core.problem import Problem
+from pymoo.core.result import Result
 from pymoo.optimize import minimize as moo_minimize
 from scipy.optimize import minimize
 
@@ -28,6 +29,11 @@ from xrayvision.vis_forward_fit.sources import (
     elliptical_gaussian_vis,
     loop_img,
     loop_vis,
+)
+from xrayvision.vis_forward_fit.uncertainty import (
+    ParameterUncertainty,
+    _fit_succeeded,  # pyright: ignore[reportPrivateUsage]
+    estimate_parameter_uncertainty,
 )
 from xrayvision.visibility import Visibilities
 
@@ -192,12 +198,19 @@ def _sources_to_vis_batch(
     return vis
 
 
-def _run_one_pso(visobs: Visibilities, sources: SourceList, seed: int, pop: int, weighting: str) -> Any:
+def _run_one_pso(
+    visobs: Visibilities,
+    sources: SourceList,
+    seed: int,
+    pop: int,
+    weighting: str,
+    bounds: NDArray[np.float64],
+) -> Result:
     r"""Run a single PSO optimisation. A module-level function so it can be pickled and
     sent to worker processes by `_vis_forward_fit_minimise`'s multi-restart path.
     """
-    problem = VisForwardFitProblem(visobs.u, visobs.v, visobs, sources, weighting=weighting)
-    algo = PSO(pop=pop)
+    problem = VisForwardFitProblem(visobs.u, visobs.v, visobs, sources, weighting=weighting, bounds=bounds)
+    algo = PSO(pop_size=pop)
     return moo_minimize(problem, algo, seed=seed)
 
 
@@ -210,6 +223,7 @@ def _vis_forward_fit_minimise(
     pop: int = 100,
     *,
     weighting: str = "auto",
+    bounds: NDArray[np.float64] | None = None,
 ) -> tuple[SourceList, Any]:
     r"""
     Internal minimisation function
@@ -238,6 +252,9 @@ def _vis_forward_fit_minimise(
         PSO only. Number of particles per run. Default 100.
     weighting :
         Error convention; see `VisibilityFitData`.
+    bounds :
+        Optional numeric lower/upper bounds in canonical units, shape (2, n_params).
+        Reused unchanged during Monte Carlo refitting.
 
     """
     if not sources:
@@ -245,11 +262,16 @@ def _vis_forward_fit_minimise(
     data = VisibilityFitData(visobs, weighting=weighting)
     # The observation chooses the numerical amplitude scale, not a fixed flux unit.
     sources = sources.to_canonical(data.flux_unit)
+    fit_bounds = np.asarray(sources.bounds if bounds is None else bounds, dtype=float).copy()
+    if fit_bounds.shape != (2, len(sources.params)) or np.any(np.isnan(fit_bounds)):
+        raise ValueError("bounds must have shape (2, n_params) and contain no NaNs.")
+    if np.any(fit_bounds[0] >= fit_bounds[1]):
+        raise ValueError("Every lower bound must be strictly below its upper bound.")
     if method.casefold() == "pso":
         if n_runs < 1 or n_jobs < 1 or pop < 1:
             raise ValueError("n_runs, n_jobs, and pop must be positive.")
         if n_runs == 1 or n_jobs == 1:
-            results = [_run_one_pso(visobs, sources, seed, pop, weighting) for seed in range(n_runs)]
+            results = [_run_one_pso(visobs, sources, seed, pop, weighting, fit_bounds) for seed in range(n_runs)]
         else:
             with ProcessPoolExecutor(max_workers=n_jobs) as executor:
                 results = list(
@@ -260,6 +282,7 @@ def _vis_forward_fit_minimise(
                         range(n_runs),
                         [pop] * n_runs,
                         [weighting] * n_runs,
+                        [fit_bounds] * n_runs,
                     )
                 )
         res = min(results, key=lambda r: r.F[0])
@@ -275,11 +298,15 @@ def _vis_forward_fit_minimise(
             objective,
             sources.params,
             method=method,
-            bounds=[(x, y) for x, y in zip(*sources.bounds)],
+            bounds=[(x, y) for x, y in zip(*fit_bounds)],
         )
         sources_fit = sources.from_params(sources, res.x)
     prediction = sources_to_vis(sources_fit, data.u, data.v)
     res.fit_statistics = data.statistics(prediction, sum(source.n_params for source in sources))
+    res.fit_bounds = fit_bounds
+    res.parameter_names = sources.parameter_names
+    res.parameter_units = sources.parameter_units(data.flux_unit)
+    res.parameter_uncertainty = None
     return sources_fit, res
 
 
@@ -297,6 +324,8 @@ def vis_forward_fit(
     *,
     weighting: str = "auto",
     return_result: bool = False,
+    uncertainty: str | None = None,
+    uncertainty_options: dict[str, Any] | None = None,
 ) -> GenericMap | tuple[Quantity | NDArray[np.float64], SourceList] | tuple[Any, SourceList, Any]:
     r"""
     Visibility forward fit method.
@@ -334,12 +363,51 @@ def vis_forward_fit(
         If `True`, return ``(image_or_map, sources_out, result)``. The native
         optimiser result carries a `FitStatistics` object as ``fit_statistics``.
         Otherwise, preserve the normal map or ``(image, sources_out)`` return.
+    uncertainty :
+        Optional ``'monte_carlo'`` or ``'gauss_newton'`` parameter errors. Requires
+        known observation errors and ``return_result=True``. The common estimate
+        is attached as ``result.parameter_uncertainty``; by default it is `None`.
+    uncertainty_options :
+        Keyword options for `estimate_parameter_uncertainty`, e.g.
+        ``{'n_samples': 200, 'seed': 42, 'n_jobs': 2}`` for Monte Carlo or
+        ``{'relative_step': 1e-5}`` for Gauss-Newton. Refits keep the original
+        fitting bounds, weighting convention, and optimiser method.
     """
+    if uncertainty not in {None, "monte_carlo", "gauss_newton"}:
+        raise ValueError("uncertainty must be None, 'monte_carlo', or 'gauss_newton'.")
+    if uncertainty is None and uncertainty_options is not None:
+        raise ValueError("uncertainty_options requires an uncertainty method.")
+    if uncertainty is not None:
+        if not return_result:
+            raise ValueError("Set return_result=True to retrieve parameter uncertainties.")
+        if VisibilityFitData(vis, weighting=weighting).sigma_ri is None:
+            raise ValueError("Parameter uncertainty estimation requires known measurement standard deviations.")
     if method is None:
         method = "Nelder-Mead"
     sources_out, res = _vis_forward_fit_minimise(
         vis, sources, method=method, n_runs=n_runs, n_jobs=n_jobs, pop=pop, weighting=weighting
     )
+    if uncertainty is not None:
+        options: dict[str, Any] = {"n_runs": n_runs, "pop": pop, **(uncertainty_options or {})}
+        if _fit_succeeded(res):
+            res.parameter_uncertainty = estimate_parameter_uncertainty(
+                vis,
+                sources_out,
+                method=uncertainty,
+                fit_method=method,
+                weighting=weighting,
+                bounds=res.fit_bounds,
+                **options,
+            )
+        else:
+            res.parameter_uncertainty = ParameterUncertainty(
+                uncertainty,
+                res.parameter_names,
+                res.parameter_units,
+                options.get("confidence_level", 0.6826894921370859),
+                status="fit_failed",
+                diagnostics={"message": "The original optimisation did not return a successful finite feasible fit."},
+            )
     # Optimisation amplitudes are numeric in the observation's unit. Restore that
     # unit rather than the possibly differently scaled initial-guess amplitude unit.
     for source in sources_out:
@@ -358,7 +426,14 @@ def vis_forward_fit(
 
 class VisForwardFitProblem(Problem):  # type: ignore[misc]
     def __init__(
-        self, u: Quantity, v: Quantity, visobs: Visibilities, sources: SourceList, *, weighting: str = "auto"
+        self,
+        u: Quantity,
+        v: Quantity,
+        visobs: Visibilities,
+        sources: SourceList,
+        *,
+        weighting: str = "auto",
+        bounds: NDArray[np.float64] | None = None,
     ) -> None:
         self.fit_data = VisibilityFitData(visobs, weighting=weighting)
         self.u = u.to_value(apu.arcsec**-1)
@@ -375,7 +450,7 @@ class VisForwardFitProblem(Problem):  # type: ignore[misc]
                 self._loop_sigma_offsets.append((offset + 3, offset + 4))
             offset += source.n_params
 
-        xl, xu = self.sources.bounds
+        xl, xu = self.sources.bounds if bounds is None else bounds
         super().__init__(n_var=n_var, n_obj=1, n_ieq_constr=len(self._loop_sigma_offsets), xl=xl, xu=xu)
 
     def _evaluate(self, x: NDArray[np.float64], out: dict[str, Any], *args: Any, **kwargs: Any) -> None:
