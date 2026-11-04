@@ -137,7 +137,6 @@ def _estimate_flux(vis: Any, shape: Quantity, pixel: Quantity, maxiter: int = 10
     Estimated total flux
 
     """
-
     Hv, Lip, Visib = _prepare_for_optimise(pixel, shape, vis)
 
     # PROJECTED LANDWEBER
@@ -241,7 +240,6 @@ def _get_mean_visibilities(vis: Any, shape: Quantity, pixel: Quantity) -> Any:
     -------
     Mean Visibilities
     """
-
     if vis.amplitude_uncertainty is None:
         amplitude_uncertainty = np.ones_like(vis.visibilities)
     else:
@@ -378,7 +376,6 @@ def _proximal_operator(z: Any, f: Any, m: Any, lamb: Any, Lip: Any, niter: int =
     -------
 
     """
-
     # INITIALIZATION OF THE DYKSTRA - LIKE SPLITTING
     x = z[:]
     p = np.zeros_like(x)
@@ -441,11 +438,11 @@ def _optimise_fb(
         Maximum number of iterations
     tol :
         Tolerance value used in the stopping rule ( || x - x_old || <= tol || x_old ||)
+
     Returns
     -------
     MEM Image
     """
-
     # 'f': value of the total flux of the image (taking into account the area of the pixel)
     f = flux / (pixel[0] * pixel[1])
     # 'm': total flux divided by the number of pixels of the image

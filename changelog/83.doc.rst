@@ -1,0 +1,1 @@
+Extend the STIX and RHESSI imaging examples with SciPy and PSO visibility forward fits. Document the flux-per-pixel Fourier-transform convention and the pixel-area conversion needed when working with continuous source brightness densities.

@@ -3,10 +3,10 @@ import pytest
 # Force MPL to use non-gui backends for testing.
 try:
     import matplotlib
+
+    matplotlib.use("Agg")
 except ImportError:
     pass
-else:
-    matplotlib.use("Agg")
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:

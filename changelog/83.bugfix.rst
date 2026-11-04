@@ -1,0 +1,1 @@
+Raise `ValueError` when integer indexing of `~xrayvision.visibility.Visibilities` would select a single visibility, instead of failing later during slicing.

@@ -5,6 +5,16 @@ There are two implementations one a standard DFT `dft` and IDFT `idft` in terms 
 the input has no positional information other than an arbitrary 0 origin and a length. The second
 takes inputs which have positional information `dft_map` and the inverse `idft_map`
 
+Unit convention: `dft_map`/`idft_map` treat the image as already being in flux-*per-pixel* units -
+each pixel value is summed directly, with no multiplication or division by pixel area. A caller
+working with a surface-brightness (flux-per-unit-area) image - e.g. `xrayvision.vis_forward_fit`'s
+`circular_gaussian_img`/`sources_to_image`, or `mem.py`'s own independent `_get_fourier_matrix`,
+both of which sample a continuous density function at each pixel center - must multiply that image
+by the pixel area (`pixel_size[0] * pixel_size[1]`) before passing it to `dft_map`, or divide
+`idft_map`'s output by that same area, to recover a properly calibrated flux. Round-tripping
+`dft_map` then `idft_map` (or vice versa) needs no such scaling, since both are unscaled and
+therefore already mutually inverse.
+
 """
 
 from typing import Any
@@ -153,6 +163,12 @@ def dft_map(
     :
         Array of N `complex` visibilities evaluated at the given `u`, `v` coordinates.
 
+    Notes
+    -----
+    ``input_array`` is summed directly with no pixel-area scaling - see the module-level
+    docstring's "Unit convention" note for a surface-brightness image (e.g. one sampled
+    from a continuous model, such as a Gaussian density function).
+
     """
     m, n = input_array.shape * apu.pix
     # python array index in row, column hence y, x
@@ -217,6 +233,11 @@ def idft_map(
     -------
     :
         2D image obtained from the visibilities evaluated at the given `u`, `v` coordinates.
+
+    Notes
+    -----
+    The returned image is in flux-per-pixel units, with no pixel-area scaling applied - see
+    the module-level docstring's "Unit convention" note to recover a surface-brightness image.
 
     """
     m, n = shape

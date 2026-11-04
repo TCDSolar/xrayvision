@@ -17,6 +17,8 @@ import astropy.units as apu
 from xrayvision.clean import vis_clean
 from xrayvision.imaging import vis_psf_map, vis_to_map
 from xrayvision.mem import mem, resistant_mean
+from xrayvision.vis_forward_fit.forward_fit import vis_forward_fit
+from xrayvision.vis_forward_fit.sources import Source, SourceList
 
 ###############################################################################
 # Create images from STIX visibility data.
@@ -65,15 +67,40 @@ percent_lambda = 2 / (snr_value**2 + 90) * apu.percent
 mem_map = mem(
     stix_vis, shape=[129, 129] * apu.pixel, pixel_size=[2, 2] * apu.arcsec / apu.pix, percent_lambda=percent_lambda
 )
-mem_map.plot()
+
+###############################################################################
+# VIS_FWD_FIT
+
+sources = SourceList(
+    [
+        Source(
+            "elliptical",
+            15 * stix_vis.visibilities.unit,
+            1 * apu.arcsec,
+            2 * apu.arcsec,
+            5 * apu.arcsec,
+            2 * apu.arcsec,
+            1 * apu.rad,
+        )
+    ]
+)
+
+vis_fwd_map = vis_forward_fit(stix_vis, sources, shape=[129, 129] * apu.pixel, pixel_size=[2, 2] * apu.arcsec / apu.pix)
+
+vis_fwd_pso_map = vis_forward_fit(
+    stix_vis, sources, method="PSO", shape=[129, 129] * apu.pixel, pixel_size=[2, 2] * apu.arcsec / apu.pix
+)
 
 ###############################################################################
 # Comparison
 fig = plt.figure(figsize=(10, 10))
-fig.add_subplot(221, projection=psf_map)
-fig.add_subplot(222, projection=backproj_map)
-fig.add_subplot(223, projection=clean_map)
-fig.add_subplot(224, projection=mem_map)
+fig.add_subplot(231, projection=psf_map)
+fig.add_subplot(232, projection=backproj_map)
+fig.add_subplot(233, projection=clean_map)
+fig.add_subplot(234, projection=mem_map)
+fig.add_subplot(235, projection=vis_fwd_map)
+fig.add_subplot(236, projection=vis_fwd_pso_map)
+
 axs = fig.get_axes()
 psf_map.plot(axes=axs[0])
 axs[0].set_title("PSF")
@@ -83,4 +110,9 @@ clean_map.plot(axes=axs[2])
 axs[2].set_title("Clean")
 mem_map.plot(axes=axs[3])
 axs[3].set_title("MEM")
+vis_fwd_map.plot(axes=axs[4])
+axs[4].set_title("VIS_FWRDFIT")
+vis_fwd_pso_map.plot(axes=axs[5])
+axs[5].set_title("VIS_FWRDFIT_PSO")
+
 plt.show()
