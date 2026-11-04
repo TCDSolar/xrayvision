@@ -40,15 +40,30 @@ def test_circular_ft_equivalence_fft(x0, y0, sigma, size, shape):
     v = v.flatten()
 
     image = circular_gaussian_img(1, x, y, x0 * apu.arcsec, y0 * apu.arcsec, sigma * size * apu.arcsec)
+    # circular_gaussian_img samples a continuous surface-brightness density at each pixel
+    # center (see xrayvision.vis_forward_fit.sources' GenericSource docstring and the
+    # `circular_gaussian_vis` FT it must match), but dft_map/idft_map sum pixels directly
+    # with no area scaling (see xrayvision.transform's module docstring "Unit convention").
+    # Multiplying by the pixel area here converts to the flux-per-pixel convention dft_map
+    # expects, so the DFT of the rendered image matches the analytic visibility formula.
+    pixel_area = size * size
+    image_flux = image * pixel_area
 
-    vis_obs = image_to_vis(image, u=u, v=v, pixel_size=[size, size] * apu.arcsec / apu.pixel)
+    vis_obs = image_to_vis(image_flux, u=u, v=v, pixel_size=[size, size] * apu.arcsec / apu.pixel)
     # by definition map center on phase 0,0
     vis_func = Visibilities(
         circular_gaussian_vis(1, u, v, x0 * apu.arcsec, y0 * apu.arcsec, sigma * size * apu.arcsec).flatten(), u, v
     )
 
-    image_func = vis_to_image(vis_func, [shape, shape] * apu.pixel, pixel_size=[size, size] * apu.arcsec / apu.pixel)
-    image_vis = vis_to_image(vis_obs, [shape, shape] * apu.pixel, pixel_size=[size, size] * apu.arcsec / apu.pixel)
+    # idft_map likewise returns flux-per-pixel; divide by the same pixel area to compare
+    # against the surface-brightness `image` that circular_gaussian_img produced.
+    image_func = (
+        vis_to_image(vis_func, [shape, shape] * apu.pixel, pixel_size=[size, size] * apu.arcsec / apu.pixel)
+        / pixel_area
+    )
+    image_vis = (
+        vis_to_image(vis_obs, [shape, shape] * apu.pixel, pixel_size=[size, size] * apu.arcsec / apu.pixel) / pixel_area
+    )
 
     assert_allclose(vis_obs.visibilities.value, vis_func.visibilities, atol=1e-8)
     assert_allclose(image.value, image_func.value, atol=1e-9)

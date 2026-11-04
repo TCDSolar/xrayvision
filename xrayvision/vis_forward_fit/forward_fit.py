@@ -270,10 +270,13 @@ def _vis_forward_fit_minimise(
     if method.casefold() == "pso":
         if n_runs < 1 or n_jobs < 1 or pop < 1:
             raise ValueError("n_runs, n_jobs, and pop must be positive.")
+        results: list[Result]
         if n_runs == 1 or n_jobs == 1:
             results = [_run_one_pso(visobs, sources, seed, pop, weighting, fit_bounds) for seed in range(n_runs)]
         else:
             with ProcessPoolExecutor(max_workers=n_jobs) as executor:
+                # Executor.map's typeshed overloads only cover up to 5 positional iterables;
+                # with 6 here it falls back to an untyped Iterator[Any], hence the annotation above.
                 results = list(
                     executor.map(
                         _run_one_pso,
@@ -285,7 +288,8 @@ def _vis_forward_fit_minimise(
                         [fit_bounds] * n_runs,
                     )
                 )
-        res = min(results, key=lambda r: r.F[0])
+        # pymoo's Result has no type stubs
+        res = min(results, key=lambda r: r.F[0])  # pyright: ignore[reportUnknownLambdaType]
         sources_fit = sources.from_params(sources, res.X)
     else:
 

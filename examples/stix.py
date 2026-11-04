@@ -36,13 +36,13 @@ stix_vis = stix_data["stix_visibilities"]
 ###############################################################################
 # Lets have a look at the point spread function (PSF) or dirty beam
 
-psf_map = vis_psf_map(stix_vis, shape=(129, 129) * apu.pixel, pixel_size=1 * apu.arcsec / apu.pix, scheme="uniform")
+psf_map = vis_psf_map(stix_vis, shape=(129, 129) * apu.pixel, pixel_size=2 * apu.arcsec / apu.pix, scheme="uniform")
 psf_map.plot()
 
 ###############################################################################
 # Back projection
 
-backproj_map = vis_to_map(stix_vis, shape=(129, 129) * apu.pixel, pixel_size=1 * apu.arcsec / apu.pix, scheme="uniform")
+backproj_map = vis_to_map(stix_vis, shape=(129, 129) * apu.pixel, pixel_size=2 * apu.arcsec / apu.pix, scheme="uniform")
 backproj_map.plot()
 
 ###############################################################################
@@ -51,7 +51,7 @@ backproj_map.plot()
 clean_map, model_map, resid_map = vis_clean(
     stix_vis,
     shape=[129, 129] * apu.pixel,
-    pixel_size=[1, 1] * apu.arcsec / apu.pix,
+    pixel_size=[2, 2] * apu.arcsec / apu.pix,
     clean_beam_width=20 * apu.arcsec,
     niter=100,
 )
@@ -65,7 +65,7 @@ snr_value, _ = resistant_mean((np.abs(stix_vis.visibilities) / stix_vis.amplitud
 percent_lambda = 2 / (snr_value**2 + 90) * apu.percent
 
 mem_map = mem(
-    stix_vis, shape=[129, 129] * apu.pixel, pixel_size=[1, 1] * apu.arcsec / apu.pix, percent_lambda=percent_lambda
+    stix_vis, shape=[129, 129] * apu.pixel, pixel_size=[2, 2] * apu.arcsec / apu.pix, percent_lambda=percent_lambda
 )
 
 ###############################################################################
@@ -85,10 +85,10 @@ sources = SourceList(
     ]
 )
 
-vis_fwd_map = vis_forward_fit(stix_vis, sources, shape=[129, 129] * apu.pixel, pixel_size=[1, 1] * apu.arcsec / apu.pix)
+vis_fwd_map = vis_forward_fit(stix_vis, sources, shape=[129, 129] * apu.pixel, pixel_size=[2, 2] * apu.arcsec / apu.pix)
 
 vis_fwd_pso_map = vis_forward_fit(
-    stix_vis, sources, method="PSO", shape=[129, 129] * apu.pixel, pixel_size=[1, 1] * apu.arcsec / apu.pix
+    stix_vis, sources, method="PSO", shape=[129, 129] * apu.pixel, pixel_size=[2, 2] * apu.arcsec / apu.pix
 )
 
 ###############################################################################

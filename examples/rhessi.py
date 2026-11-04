@@ -16,6 +16,8 @@ from astropy.io import fits
 from xrayvision.clean import vis_clean
 from xrayvision.imaging import vis_psf_map, vis_to_map
 from xrayvision.mem import mem, resistant_mean
+from xrayvision.vis_forward_fit.forward_fit import vis_forward_fit
+from xrayvision.vis_forward_fit.sources import Source, SourceList
 from xrayvision.visibility import Visibilities, VisMeta
 
 ###############################################################################
@@ -117,14 +119,43 @@ percent_lambda = 11.0 / (snr_value**2 + 383.0)
 mem_map = mem(vis, shape=[101, 101] * apu.pixel, pixel_size=[1.5, 1.5] * apu.arcsec / apu.pix)
 mem_map.plot()
 
+###############################################################################
+# VIS_FWD_FIT
+#
+# Forward fitting assumes the source is a parametric shape (here a single
+# elliptical Gaussian) and fits its parameters directly to the visibilities.
+# Source position is relative to the visibility's own phase center.
+
+sources = SourceList(
+    [
+        Source(
+            "elliptical",
+            1000 * vunit,
+            0 * apu.arcsec,
+            0 * apu.arcsec,
+            15 * apu.arcsec,
+            15 * apu.arcsec,
+            0 * apu.rad,
+        )
+    ]
+)
+
+vis_fwd_map = vis_forward_fit(vis, sources, shape=[101, 101] * apu.pixel, pixel_size=[1.5, 1.5] * apu.arcsec / apu.pix)
+
+vis_fwd_pso_map = vis_forward_fit(
+    vis, sources, method="PSO", shape=[101, 101] * apu.pixel, pixel_size=[1.5, 1.5] * apu.arcsec / apu.pix
+)
 
 ###############################################################################
 # Comparison
 fig = plt.figure(figsize=(10, 10))
-fig.add_subplot(221, projection=psf_map)
-fig.add_subplot(222, projection=backproj_map)
-fig.add_subplot(223, projection=clean_map)
-fig.add_subplot(224, projection=mem_map)
+fig.add_subplot(231, projection=psf_map)
+fig.add_subplot(232, projection=backproj_map)
+fig.add_subplot(233, projection=clean_map)
+fig.add_subplot(234, projection=mem_map)
+fig.add_subplot(235, projection=vis_fwd_map)
+fig.add_subplot(236, projection=vis_fwd_pso_map)
+
 axs = fig.get_axes()
 psf_map.plot(axes=axs[0])
 axs[0].set_title("PSF")
@@ -134,4 +165,9 @@ clean_map.plot(axes=axs[2])
 axs[2].set_title("Clean")
 mem_map.plot(axes=axs[3])
 axs[3].set_title("MEM")
+vis_fwd_map.plot(axes=axs[4])
+axs[4].set_title("VIS_FWRDFIT")
+vis_fwd_pso_map.plot(axes=axs[5])
+axs[5].set_title("VIS_FWRDFIT_PSO")
+
 plt.show()

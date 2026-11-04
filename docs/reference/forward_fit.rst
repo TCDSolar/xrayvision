@@ -69,7 +69,7 @@ of measured visibilities do not supply independent observations and should not
 be added to fitting input. The denominator follows the stacked real/imaginary
 data count used by IDL, rather than ``N_v - N_free`` printed in Equation 4 of
 `Volpara et al. (2022) <https://doi.org/10.1051/0004-6361/202243907>`_.
-The installed legacy PSO loop parameter-count discrepancy is not reproduced.
+The IDL PSO loop parameter-count discrepancy is not reproduced.
 
 Set ``return_result=True`` to access statistics and the native optimiser result:
 
