@@ -1,0 +1,1 @@
+Fix `~xrayvision.clean.ms_clean` favouring point components over extended components by accounting for each scale's dirty beam response and bias when selecting a scale.
