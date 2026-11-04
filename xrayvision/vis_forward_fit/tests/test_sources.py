@@ -16,9 +16,7 @@ from xrayvision.vis_forward_fit.sources import (
     elliptical_gaussian_img,
     elliptical_gaussian_vis,
     loop_img,
-    loop_img_old,
     loop_vis,
-    loop_vis_old,
 )
 from xrayvision.visibility import Visibilities
 
@@ -96,10 +94,7 @@ def test_equivalence_elliptical_to_circular_vis(x0, y0, sigma):
 
 @pytest.mark.parametrize("size", (65, 79))
 def test_loop_ft_equivalence_fft(size):
-    # So unless the array is sufficiently large this test fails
-    # I think has to do with the fact no taking into account the sampleing and implicit windowing
-    # TODO: How does this affect algo where the vis derived from map are compare to the observed?
-    # sigma = 4 * apu.arcsec
+    # Keep the loop inside the sampled field to limit finite-window truncation.
     xx = generate_xy(size * apu.pix)
     x, y = np.meshgrid(xx, xx)
     uu = generate_uv(size * apu.pix)
@@ -107,20 +102,20 @@ def test_loop_ft_equivalence_fft(size):
     u = u.flatten()
     v = v.flatten()
 
-    image = loop_img_old(
-        80, x, y, 0 * apu.arcsec, 0 * apu.arcsec, 9.0 * apu.arcsec, 22.5 * apu.arcsec, np.deg2rad(90), np.deg2rad(70)
-    )
+    # The active loop functions take standard deviations rather than FWHM.
+    sigma_minor, sigma_major = np.array([9.0, 22.5]) / np.sqrt(8 * np.log(2))
+    image = loop_img(80, x.value, y.value, 0, 0, sigma_minor, sigma_major, np.deg2rad(90), np.deg2rad(70))
 
     vis_obs = image_to_vis(image * apu.ph, u=u, v=v)
     vis_func = Visibilities(
-        loop_vis_old(
+        loop_vis(
             80,
-            u,
-            v,
-            0 * apu.arcsec,
-            0 * apu.arcsec,
-            9.0 * apu.arcsec,
-            22.5 * apu.arcsec,
+            u.value,
+            v.value,
+            0,
+            0,
+            sigma_minor,
+            sigma_major,
             np.deg2rad(90),
             np.deg2rad(70),
         ).flatten()
@@ -189,48 +184,6 @@ def test_source_list():
     assert_allclose(params, [1, 2, 3, 4, 1, 2, 3, 4, 5, np.radians(6)])
     new_sources = SourceList.from_params(orig_sources, params)
     assert orig_sources == new_sources
-
-
-def test_loop_image_oldvnew():
-    x = generate_xy(65 * apu.pixel).value
-    y = generate_xy(65 * apu.pixel).value
-    x, y = np.meshgrid(x, y)
-
-    flux = 100
-    x0 = 0
-    y0 = 0
-    sigmaj = 20
-    sigmin = 10
-    rotatiion = np.pi / 4
-    loopw = np.deg2rad(110)
-
-    sigma_to_fwhm = 2 * np.sqrt(2 * np.log(2))
-
-    image_old = loop_img_old(flux, x, y, x0, y0, sigmin * sigma_to_fwhm, sigmaj * sigma_to_fwhm, rotatiion, loopw)
-    image = loop_img(flux, x, y, x0, y0, sigmin, sigmaj, rotatiion, loopw)
-
-    assert_allclose(image, image_old)
-
-
-def test_loop_vis_oldvnew():
-    u = generate_uv(65 * apu.pixel).value
-    v = generate_uv(65 * apu.pixel).value
-    u, v = np.meshgrid(u, v)
-
-    flux = 100
-    x0 = 0
-    y0 = 0
-    sigmaj = 20
-    sigmin = 10
-    rotatiion = np.pi / 4
-    loopw = np.deg2rad(110)
-
-    sigma_to_fwhm = 2 * np.sqrt(2 * np.log(2))
-
-    vis_old = loop_vis_old(flux, u, v, x0, y0, sigmin * sigma_to_fwhm, sigmaj * sigma_to_fwhm, rotatiion, loopw)
-    vis = loop_vis(flux, u, v, x0, y0, sigmin, sigmaj, rotatiion, loopw)
-
-    assert_allclose(vis, vis_old)
 
 
 @pytest.mark.parametrize(

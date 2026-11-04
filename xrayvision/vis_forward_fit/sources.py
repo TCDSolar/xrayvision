@@ -7,7 +7,7 @@ from typing import Any, ClassVar, Self, cast
 
 import numpy as np
 from numpy.typing import NDArray
-from scipy.special import binom, factorial
+from scipy.special import binom
 
 import astropy.units as apu
 from astropy.units import Quantity
@@ -214,249 +214,6 @@ def elliptical_gaussian_vis(
     )
 
 
-def loop_img_old(
-    amp: float,
-    x: NDArray[np.float64],
-    y: NDArray[np.float64],
-    x0: float,
-    y0: float,
-    fwhm_min: float,
-    fwhm_max: float,
-    rotation: float,
-    loopwidth: float,
-    max_comps: int = 21,
-) -> NDArray[np.float64]:
-    r"""
-    Loop source in image space sampled at x, y.
-
-    The loop source is approximated with a series of equispaced circular Gaussians.
-
-    Parameters
-    ----------
-    amp :
-        Total flux
-    x :
-        x coordinates
-    y :
-        y coordinates
-    x0 :
-        Center x coordinate
-    y0 :
-        Center y coordinate
-    fwhm_min :
-        FWHM of the semiminor axis
-    fwhm_max :
-        FWHM of the semimajor axis
-    rotation :
-        Position angle of the loop major axis in radians
-    loopwidth :
-        Arc extent parameter (related to opening angle)
-    max_comps : int
-        Upper limit on the number of equispaced circular Gaussians used to approximate the loop
-
-    Returns
-    -------
-    image : ndarray
-        2D image of the loop source
-
-    See Also
-    --------
-    loop_img
-    """
-    sig2fwhm = np.sqrt(8 * np.log(2))
-
-    # Calculate the relative strengths of the  sources to reproduce a gaussian and their collective stddev.
-    iseq0 = np.arange(max_comps)
-    relflux0 = factorial(max_comps - 1) / (factorial(iseq0) * factorial(max_comps - 1 - iseq0)) / 2 ** (max_comps - 1)
-    ok = np.flatnonzero(relflux0 > 0.01)  # Just keep; circles that contain; at least 1 % of flux
-    ncirc = ok.size
-    relflux = relflux0[ok] / relflux0[ok].sum()
-    iseq = np.arange(ncirc)
-    reltheta = iseq / (ncirc - 1.0) - 0.5  # locations of circles for arclength=1
-    factor = np.sqrt((reltheta**2 * relflux).sum()) * sig2fwhm  # FWHM of binomial distribution for arclength=1
-
-    loopangle = loopwidth / factor
-    if np.abs(loopangle) >= 2 * np.pi:
-        raise ValueError(f"Internal parameterization error - Loop arc {loopangle} exceeds 2 pi.")
-
-    if loopangle == 0.0:
-        loopangle = 0.01  # Avoid problems if loopangle = 0
-
-    theta = np.abs(loopangle) * (iseq / (ncirc - 1.0) - 0.5)  # equispaced between + - loopangle / 2
-    xloop = np.sin(theta)  # for unit radius of curvature, R
-    yloop = np.cos(theta)  # relative to center of curvature
-
-    if loopangle < 0:
-        yloop = -yloop  # Sign of loopangle determines sense of loop curvature
-
-    # Determine the size and location of the equivalent separated components in a coord system where x is an axis
-    # parallel to the line joining the footpoints. Note that there are combinations of loop angle, sigminor and
-    # sigmajor that cannot occur with radius > 1arcsec. In such a case circle radius is set to 1. Such cases will lead
-    # to bad solutions and be flagged as such at the end.
-
-    sigminor = fwhm_min / sig2fwhm
-    sigmajor = fwhm_max / sig2fwhm
-    fsumx2 = (xloop**2 * relflux).sum()  # scale - free factors describing loop moments for endpoint separation=1
-    fsumy = (yloop * relflux).sum()
-    fsumy2 = (yloop**2 * relflux).sum()
-    loopradius = np.sqrt((sigmajor**2 - sigminor**2) / (fsumx2 - fsumy2 + fsumy**2))
-    sgm_unti = getattr(sigmajor, "unit", 1)
-    term = max((sigmajor**2 - loopradius**2 * fsumx2), 1 * sgm_unti**2)  # > 0 condition avoids problems in next step.
-    circfwhm = max(sig2fwhm * np.sqrt(term), 1 * sgm_unti)  # Set minimum to avoid display problems
-
-    cgshift = loopradius * fsumy  # will enable emission centroid location to be unchanged
-    relx = xloop * loopradius  # x is axis joining 'footpoints'
-    rely = yloop * loopradius - cgshift
-
-    # Calculate source structures for each circle.
-    pasep = rotation
-    sinus = np.sin(pasep)
-    cosinus = np.cos(pasep)
-
-    image = None
-    pixel = [1, 1]
-    for i in range(iseq.size):
-        flux_new = amp * relflux[i]  #  Split the flux between components.
-
-        x_loc_new = x0 - relx[i] * sinus + rely[i] * cosinus
-        y_loc_new = y0 + relx[i] * cosinus + rely[i] * sinus
-
-        x_tmp = ((x - x_loc_new) * cosinus) + ((y - y_loc_new) * sinus)
-        y_tmp = -((x - x_loc_new) * sinus) + ((y - y_loc_new) * cosinus)
-        x_tmp = 2.0 * np.sqrt(2.0 * np.log(2.0)) * x_tmp / circfwhm
-        y_tmp = 2.0 * np.sqrt(2.0 * np.log(2.0)) * y_tmp / circfwhm
-        im_tmp = np.exp(-(x_tmp**2.0 + y_tmp**2.0) / 2.0)
-        # Accumulate via None rather than np.zeros_like: amp/x,y may be Quantity, and a
-        # zeros array started from a Quantity's shape would wrongly inherit its unit.
-        if image is None:
-            image = im_tmp / (im_tmp.sum() * pixel[0] * pixel[1]) * flux_new
-        else:
-            image += im_tmp / (im_tmp.sum() * pixel[0] * pixel[1]) * flux_new
-
-    return cast(NDArray[np.float64], image)
-
-
-def loop_vis_old(
-    amp: float,
-    u: NDArray[np.float64],
-    v: NDArray[np.float64],
-    x0: float,
-    y0: float,
-    fwhm_minor: float,
-    fwhm_major: float,
-    rotation: float,
-    loopwidth: float,
-    max_comps: int = 21,
-) -> NDArray[np.complex128]:
-    r"""
-    Loop source in Fourier space sampled at u, v.
-
-    Parameters
-    ----------
-    amp :
-        Total flux
-    u :
-        u coordinates
-    v :
-        v coordinates
-    x0 :
-        Center x coordinate
-    y0 :
-        Center y coordinate
-    fwhm_minor :
-        FWHM of the semiminor axis
-    fwhm_major :
-        FWHM of the semimajor axis
-    rotation :
-        Position angle of the loop major axis in radians
-    loopwidth :
-        Arc extent parameter (related to opening angle)
-    max_comps : int
-        Upper limit on the number of equispaced circular Gaussians used to approximate the loop
-
-    Returns
-    -------
-    vis : ndarray (complex128)
-        Complex visibilities evaluated at (u, v)
-
-    See Also
-    --------
-    loop_vis
-    """
-
-    sig2fwhm = np.sqrt(8 * np.log(2.0))
-
-    # Calculate the relative strengths of the sources to reproduce a gaussian and their collective stddev.
-    iseq0 = np.arange(max_comps)
-    relflux0 = (
-        factorial(max_comps - 1) / (factorial(iseq0) * factorial(max_comps - 1 - iseq0)) / 2 ** (max_comps - 1)
-    )  # TOTAL(relflux)=1
-    ok = np.flatnonzero(relflux0 > 0.01)  # Just keep circles that contain at least 1% of flux
-    ncirc = ok.size
-    relflux = relflux0[ok] / (relflux0[ok]).sum()
-    iseq = np.arange(ncirc)
-    reltheta = iseq / (ncirc - 1.0) - 0.5  # locations of circles for arclength=1
-    factor = np.sqrt((reltheta**2 * relflux).sum()) * sig2fwhm  # FWHM of binomial distribution for arclength=1
-
-    loopangle = loopwidth / factor
-    if np.abs(loopangle).sum() >= 2 * np.pi:
-        raise ValueError(f"Internal parameterization error - Loop arc {loopangle} exceeds 2pi.")
-
-    if loopangle == 0:
-        loopangle = 0.01  # Avoids problems if loopangle = 0
-
-    theta = np.abs(loopangle) * (iseq / (ncirc - 1.0) - 0.5)  # equispaced between +- loopangle/2
-    xloop = np.sin(theta)  # for unit radius of curvature, R
-    yloop = np.cos(theta)  # relative to center of curvature
-
-    if loopangle < 0:
-        # Sign of loopangle determines sense of loop curvature # Sign of loopangle determines sense of loop curvature
-        yloop = -yloop
-
-    # Determine the size and location of the equivalent separated components in a coord system where...
-    # x is an axis parallel to the line joining the footpoints
-    # Note that there are combinations of loop angle, sigminor and sigmajor that cannot occur with radius>1arcsec.
-    # In such a case circle radius is set to 1.  Such cases will lead to bad solutions and be flagged as such at the end.
-
-    # eccen = np.sqrt(1 - (sigma_min**2 / sigma_max**2))
-    # sigminor = sigma_min * (1 - eccen ** 2) ** 0.25 / sig2fwhm
-    # sigmajor = sigma_max / (1 - eccen ** 2) ** 0.25 / sig2fwhm
-
-    sigminor = fwhm_minor / sig2fwhm
-    sigmajor = fwhm_major / sig2fwhm
-    fsumx2 = (xloop**2 * relflux).sum()  # scale-free factors describing loop moments for endpoint separation=1
-    fsumy = (yloop * relflux).sum()
-    fsumy2 = (yloop**2 * relflux).sum()
-    loopradius = np.sqrt((sigmajor**2 - sigminor**2) / (fsumx2 - fsumy2 + fsumy**2))
-    sgm_unti = getattr(sigmajor, "unit", 1)
-    term = max((sigmajor**2 - loopradius**2 * fsumx2), 1 * sgm_unti**2)  # >0 condition avoids problems in next step.
-    circfwhm = max(sig2fwhm * np.sqrt(term), 1 * sgm_unti)  # Set minimum to avoid display problems
-
-    cgshift = loopradius * fsumy
-    relx = xloop * loopradius  # x is axis joining 'footpoints'
-    rely = yloop * loopradius - cgshift  # will enable emission centroid location to be unchanged
-
-    # Calculate source structures for each circle.
-    pasep = rotation  # position angle of line joining arc endpoints
-    x_loc_new = x0 - relx * np.sin(pasep) + rely * np.cos(pasep)
-    y_loc_new = y0 + relx * np.cos(pasep) + rely * np.sin(pasep)
-
-    flux_new = amp * relflux  # Split the flux between components.
-
-    arg = (-(np.pi**2) * circfwhm**2) / (4 * np.log(2)) * (u**2 + v**2)
-    relvis = np.exp(arg)
-
-    # Accumulate via None rather than np.zeros_like: u/amp may be Quantity, and a zeros
-    # array started from a Quantity's shape would wrongly inherit its unit.
-    vis = None
-    for j in range(ncirc):
-        if vis is None:
-            vis = flux_new[j] * relvis * np.exp(2j * np.pi * (x_loc_new[j] * u + y_loc_new[j] * v))
-        else:
-            vis += flux_new[j] * relvis * np.exp(2j * np.pi * (x_loc_new[j] * u + y_loc_new[j] * v))
-    return cast(NDArray[np.complex128], vis)
-
-
 def loop_img(
     flux: float,
     x: NDArray[np.float64],
@@ -508,7 +265,7 @@ def loop_img(
 
     See Also
     --------
-    loop_vis, loop_img_old
+    loop_vis
     """
     component_fluxes, n_components = _compute_binomial_weights(max_comps, min_fraction)
 
@@ -573,7 +330,7 @@ def loop_vis(
 
     See Also
     --------
-    loop_img, loop_vis_old
+    loop_img
     """
     component_fluxes, n_components = _compute_binomial_weights(max_comps, min_fraction)
 
