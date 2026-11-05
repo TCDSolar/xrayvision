@@ -94,10 +94,26 @@ With ``return_result=True`` the return is always
 ``(image_or_map, fitted_sources, result)``. Without it the existing return
 convention is preserved. ``chi2`` and ``reduced_chi2`` are ``None`` for
 unweighted fits, which still report ``objective``. ``reduced_chi2`` is also
-``None`` for non-positive degrees of freedom. A future Gaussian log likelihood
-must use the unreduced chi-square and its noise normalization, without dividing
-by degrees of freedom. Initial-guess-dependent optimisation bounds are not
-implicitly Bayesian priors.
+``None`` for non-positive degrees of freedom. Initial-guess-dependent
+optimisation bounds are not implicitly Bayesian priors.
+
+``VisibilityFitData.log_likelihood(prediction)`` evaluates the normalised
+Gaussian log likelihood using the same independent component errors:
+
+.. math::
+
+   \log L = -\frac{1}{2}\left[\chi^2
+       + 2\sum_{j=1}^{2N_v}\log\sigma_j + 2N_v\log(2\pi)\right].
+
+It requires known measurement standard deviations and rejects unweighted data;
+the existing optimiser objective is unchanged. Predictions may be quantities
+or numeric arrays, including batches. Non-finite predictions receive negative
+infinity, while invalid shapes and incompatible units raise exceptions.
+
+The likelihood is a density in the numerical real and imaginary visibility
+values expressed in the observation's flux unit. Changing that unit changes
+the absolute log density by the unit-conversion Jacobian. Model comparisons
+must use the same observation unit and noise convention for every model.
 
 Parameter uncertainties
 =======================

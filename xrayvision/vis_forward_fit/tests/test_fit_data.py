@@ -1,6 +1,7 @@
 import numpy as np
 import pytest
 from numpy.testing import assert_allclose
+from scipy.stats import multivariate_normal
 
 import astropy.units as apu
 
@@ -99,3 +100,67 @@ def test_loop_statistics_count_seven_parameters():
     assert stats.dof == 41
     assert stats.chi2 == 24
     assert_allclose(stats.reduced_chi2, 24 / 41)
+
+
+@pytest.mark.parametrize("weighting", ["components", "amplitude"])
+def test_log_likelihood_matches_multivariate_gaussian(weighting):
+    obs = make_observations(
+        uncertainty=np.array([1 + 2j, 3 + 4j, 5 + 6j]) * apu.Jy,
+        amplitude_uncertainty=np.array([2, 3, 4]) * apu.Jy,
+    )
+    data = VisibilityFitData(obs, weighting=weighting)
+    prediction = data.values - np.array([0.5 + 1j, -2 + 3j, 4 - 2j])
+    sigma = [1, 3, 5, 2, 4, 6] if weighting == "components" else [2, 3, 4, 2, 3, 4]
+    expected = multivariate_normal.logpdf(
+        np.concatenate([obs.visibilities.value.real, obs.visibilities.value.imag]),
+        mean=np.concatenate([prediction.real, prediction.imag]),
+        cov=np.diag(np.square(sigma)),
+    )
+    actual = data.log_likelihood(prediction)
+    assert isinstance(actual, float)
+    assert_allclose(actual, expected)
+
+
+def test_log_likelihood_batch_and_prediction_units():
+    obs = make_observations(uncertainty=np.full(3, 1 + 2j) * apu.Jy)
+    data = VisibilityFitData(obs)
+    predictions = np.stack([obs.visibilities, obs.visibilities - (1 + 2j) * apu.Jy]).to(apu.mJy)
+    likelihood = data.log_likelihood(predictions)
+    assert_allclose(likelihood, [data.log_likelihood(predictions[0]), data.log_likelihood(predictions[1])])
+    # Six component residuals of one sigma reduce log likelihood by three.
+    assert_allclose(likelihood[1] - likelihood[0], -3)
+
+
+def test_log_likelihood_observation_unit_jacobian():
+    obs = make_observations(uncertainty=np.full(3, 1 + 2j) * apu.Jy)
+    converted = Visibilities(obs.visibilities.to(apu.mJy), obs.u, obs.v, uncertainty=obs.uncertainty.to(apu.mJy))
+    prediction = obs.visibilities - (1 + 2j) * apu.Jy
+    jy = VisibilityFitData(obs).log_likelihood(prediction)
+    mjy = VisibilityFitData(converted).log_likelihood(prediction)
+    assert_allclose(mjy - jy, -6 * np.log(1000))
+
+
+@pytest.mark.parametrize("with_errors", [False, True])
+def test_log_likelihood_rejects_unweighted_data(with_errors):
+    kwargs = {"uncertainty": np.ones(3) * apu.Jy} if with_errors else {}
+    data = VisibilityFitData(make_observations(**kwargs), weighting="none")
+    with pytest.raises(ValueError, match="requires known measurement standard deviations"):
+        data.log_likelihood(data.values)
+
+
+@pytest.mark.parametrize("invalid", [np.nan, np.inf, 1e308])
+def test_log_likelihood_invalid_prediction_does_not_contaminate_batch(invalid):
+    data = VisibilityFitData(make_observations(uncertainty=np.ones(3) * apu.Jy))
+    predictions = np.stack([data.values, data.values.copy()])
+    predictions[1, 0] = invalid
+    actual = data.log_likelihood(predictions)
+    assert_allclose(actual[0], data.log_likelihood(data.values))
+    assert actual[1] == -np.inf
+
+
+def test_log_likelihood_validates_prediction_shape_and_units():
+    data = VisibilityFitData(make_observations(uncertainty=np.ones(3) * apu.Jy))
+    with pytest.raises(ValueError, match="final dimension"):
+        data.log_likelihood(np.ones(2, dtype=complex))
+    with pytest.raises(apu.UnitConversionError):
+        data.log_likelihood(np.ones(3) * apu.s)
