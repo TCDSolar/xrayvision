@@ -199,6 +199,61 @@ intended model domain; it is not enough to discard invalid draws and assume
 that the remaining distribution is normalised. Source labels and orientations
 are retained as supplied, without bootstrap-style relabelling.
 
+Emcee posterior sampling
+------------------------
+
+Install the optional sampler with ``pip install 'xrayvisim[bayes]'``.
+``sample_emcee`` takes an existing ``BayesianVisibilityProblem`` and an initial
+ensemble of numeric parameter vectors. Positions have shape
+``(n_walkers, problem.ndim)`` and use ``problem.parameter_units``. Each walker
+must have a finite posterior density, and the default stretch move requires
+at least twice as many walkers as parameters. Emcee also checks the numerical
+independence of the initial ensemble.
+
+For the single circular-source example above, the columns are flux, x, y,
+and sigma. Choose an initial spread appropriate to those units:
+
+.. code-block:: python
+
+   import numpy as np
+   from xrayvision.vis_forward_fit.bayesian import sample_emcee
+
+   rng = np.random.default_rng(42)
+   spread = np.array([0.05, 0.2, 0.2, 0.1])
+   positions = problem.initial_params + rng.normal(size=(32, problem.ndim)) * spread
+   posterior = sample_emcee(
+       problem, positions, n_steps=2000, burn_in=500, seed=42,
+   )
+   flux_samples = posterior.parameter_samples("source[0].amp")
+   x_interval = posterior.credible_interval("source[0].x0", level=0.95)
+   draw_sources = posterior.sources_from_sample(step=-1, walker=0)
+   print(posterior.autocorrelation_status, posterior.diagnostics)
+
+``BayesianFitResult.chain`` contains production draws only, with shape
+``(n_steps, n_walkers, n_parameters)``; ``samples`` is a flattened view of
+these draws. ``log_prob`` stores the matching log posterior values.
+Acceptance fractions describe production sampling after the burn-in reset.
+A seed reproduces the chain for the same starting positions and software
+versions, without resetting NumPy's global random state.
+
+``parameter_samples`` returns quantity-valued columns, and
+``credible_interval`` returns marginal equal-tailed intervals. Reconstruct
+individual draws to obtain source lists for visibility or image predictions.
+No image is generated automatically. Source labels and angles remain as
+sampled, so label switching and angular wrapping require consideration before
+interpreting marginal intervals. These are Bayesian credible intervals,
+separate from the frequentist parameter-error API below.
+
+Autocorrelation status is ``"estimated"``, ``"chain_too_short"``, or
+``"unavailable"``. Short-chain estimates are retained as provisional values;
+invalid estimates are returned as ``None``. The ``"estimated"`` status means
+that emcee's chain-length criterion is met, not that convergence or exploration
+of every mode has been demonstrated. Inspect traces, acceptance fractions, and
+the diagnostic message, then choose burn-in and production lengths for the
+problem. Walkers within one ensemble are dependent and must not be treated as
+independent chains for convergence statistics. See
+`emcee's autocorrelation guide <https://emcee.readthedocs.io/en/stable/tutorials/autocorr/>`_.
+
 Parameter uncertainties
 =======================
 

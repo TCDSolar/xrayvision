@@ -1,3 +1,5 @@
+import sys
+
 import numpy as np
 import pytest
 from numpy.testing import assert_allclose
@@ -6,7 +8,7 @@ from scipy.stats import norm, randint, uniform
 
 import astropy.units as apu
 
-from xrayvision.vis_forward_fit.bayesian import BayesianVisibilityProblem, ParameterPrior
+from xrayvision.vis_forward_fit.bayesian import BayesianVisibilityProblem, ParameterPrior, sample_emcee
 from xrayvision.vis_forward_fit.forward_fit import sources_to_vis
 from xrayvision.vis_forward_fit.sources import InvalidSourceParameters, Source, SourceList
 from xrayvision.visibility import Visibilities
@@ -21,6 +23,13 @@ def test_prior_density_normalises_after_unit_conversion():
     assert_allclose(integral, 1)
     assert_allclose(prior.logpdf(120, unit=apu.arcsec), -np.log(120))
     assert prior.logpdf(30, unit=apu.arcsec) == -np.inf
+
+
+def test_emcee_is_optional(problem_inputs, monkeypatch):
+    problem = BayesianVisibilityProblem(*problem_inputs)
+    monkeypatch.setitem(sys.modules, "emcee", None)
+    with pytest.raises(ImportError, match=r"xrayvisim\[bayes\]"):
+        sample_emcee(problem, np.tile(problem.initial_params, (2 * problem.ndim, 1)))
 
 
 @pytest.mark.parametrize("probability", [0.01, 0.5, 0.99])

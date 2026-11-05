@@ -1,6 +1,8 @@
 """Priors and sampler-independent problems for Bayesian visibility fitting."""
 
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
+from operator import index
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -21,7 +23,7 @@ if TYPE_CHECKING:
 
     type _ScalarDistribution = rv_continuous_frozen[rv_continuous, float | np.float64]
 
-__all__ = ["BayesianVisibilityProblem", "ParameterPrior"]
+__all__ = ["BayesianFitResult", "BayesianVisibilityProblem", "ParameterPrior", "sample_emcee"]
 
 
 class ParameterPrior:
@@ -230,3 +232,158 @@ class BayesianVisibilityProblem:
             ],
             dtype=np.float64,
         )
+
+
+@dataclass
+class BayesianFitResult:
+    """Production samples and diagnostics from Bayesian visibility fitting.
+
+    ``chain`` has shape ``(n_steps, n_walkers, n_parameters)`` and contains no
+    burn-in steps. ``log_prob`` has shape ``(n_steps, n_walkers)``. Numeric
+    parameter ordering and units follow the supplied problem. Raw source
+    labels and angles are retained; no source matching or unwrapping occurs.
+
+    Autocorrelation status is ``'estimated'``, ``'chain_too_short'``, or
+    ``'unavailable'``. Estimates retained for short chains are provisional.
+    Even ``'estimated'`` does not establish convergence or exploration of all
+    posterior modes. Walkers in one ensemble are not independent chains.
+    """
+
+    problem: BayesianVisibilityProblem
+    chain: NDArray[np.float64]
+    log_prob: NDArray[np.float64]
+    acceptance_fraction: NDArray[np.float64]
+    autocorrelation_time: NDArray[np.float64] | None
+    autocorrelation_status: str
+    diagnostics: dict[str, object]
+
+    @property
+    def parameter_names(self) -> tuple[str, ...]:
+        """Parameter labels in the order used by ``chain``."""
+        return self.problem.parameter_names
+
+    @property
+    def parameter_units(self) -> tuple[UnitBase, ...]:
+        """Parameter units, including the observation's flux unit."""
+        return self.problem.parameter_units
+
+    @property
+    def samples(self) -> NDArray[np.float64]:
+        """A flat view of all production draws; rows are correlated samples."""
+        return self.chain.reshape(-1, self.chain.shape[-1])
+
+    def parameter_samples(self, name: str) -> Quantity:
+        """Return a named sample column with its parameter unit."""
+        try:
+            column = self.parameter_names.index(name)
+        except ValueError as error:
+            raise KeyError(f"Unknown parameter: {name}.") from error
+        return self.samples[:, column] * self.parameter_units[column]
+
+    def credible_interval(self, name: str, *, level: float = 0.6826894921370859) -> Quantity:
+        """Return a marginal equal-tailed credible interval, with units.
+
+        Raw labels and angles are used. For angular wrapping or source-label
+        ambiguity these marginal percentiles may not be useful summaries.
+        """
+        if not np.isfinite(level) or not 0 < level < 1:
+            raise ValueError("Credible interval level must be finite and strictly between zero and one.")
+        samples = self.parameter_samples(name)
+        tail = (1 - level) / 2
+        return np.quantile(samples.value, [tail, 1 - tail]) * samples.unit
+
+    def sources_from_sample(self, step: int, walker: int) -> SourceList:
+        """Reconstruct one actual production draw as quantity-valued sources."""
+        return self.problem.sources_from_params(self.chain[step, walker])
+
+
+def sample_emcee(
+    problem: BayesianVisibilityProblem,
+    initial_positions: NDArray[np.float64],
+    *,
+    n_steps: int = 1000,
+    burn_in: int = 0,
+    seed: int | None = None,
+    progress: bool = False,
+) -> BayesianFitResult:
+    """Sample a visibility posterior with emcee's default stretch move.
+
+    Requires the optional ``xrayvisim[bayes]`` extra. Initial positions must be
+    a real numeric array of shape ``(n_walkers, problem.ndim)`` in the problem's
+    parameter units. Every walker must have a finite log posterior. At least
+    ``2 * ndim`` walkers and an independent initial ensemble are required.
+    No optimiser bounds, automatic initialisation, or source relabelling are
+    applied. Emcee checks the initial ensemble's numerical conditioning.
+
+    ``burn_in`` steps are run and discarded before ``n_steps`` production
+    steps. Acceptance fractions and autocorrelation diagnostics describe the
+    production run. A seed reproduces the chain for the same initial positions
+    and software versions, without changing NumPy's global random state.
+    """
+    try:
+        import emcee
+    except ModuleNotFoundError as error:
+        if error.name != "emcee":
+            raise
+        raise ImportError("Emcee sampling requires the optional dependency: pip install 'xrayvisim[bayes]'.") from error
+
+    n_steps, burn_in = index(n_steps), index(burn_in)
+    if n_steps < 1 or burn_in < 0:
+        raise ValueError("n_steps must be positive and burn_in must be non-negative.")
+    if isinstance(initial_positions, Quantity):
+        raise TypeError("Initial positions must be numeric in parameter_units, not a Quantity array.")
+    if np.iscomplexobj(initial_positions):
+        raise ValueError("Initial positions must be real.")
+    positions = np.array(initial_positions, dtype=np.float64, copy=True)
+    if positions.ndim != 2 or positions.shape[1] != problem.ndim:
+        raise ValueError(f"Initial positions must have shape (n_walkers, {problem.ndim}).")
+    n_walkers = positions.shape[0]
+    if n_walkers < 2 * problem.ndim:
+        raise ValueError("The stretch move requires at least twice as many walkers as parameters.")
+    initial_log_prob = np.array([problem.log_posterior(position) for position in positions])
+    if not np.all(np.isfinite(initial_log_prob)):
+        raise ValueError("Each initial walker must have a finite log posterior.")
+
+    sampler = emcee.EnsembleSampler(n_walkers, problem.ndim, problem.log_posterior)
+    sampler.random_state = np.random.RandomState(seed).get_state()
+    state = emcee.State(positions, log_prob=initial_log_prob)
+    if burn_in:
+        state = sampler.run_mcmc(state, burn_in, progress=progress)
+        sampler.reset()
+    sampler.run_mcmc(state, n_steps, progress=progress)
+
+    tau: NDArray[np.float64] | None = None
+    status = "unavailable"
+    message = "At least two production steps are needed for autocorrelation estimation."
+    if n_steps >= 2:
+        with np.errstate(invalid="ignore", divide="ignore"):
+            try:
+                tau = np.asarray(sampler.get_autocorr_time(), dtype=np.float64)
+                status = "estimated"
+                message = "Emcee's chain-length criterion is met; convergence is not established."
+            except emcee.autocorr.AutocorrError as error:
+                tau = np.asarray(error.tau, dtype=np.float64)
+                status = "chain_too_short"
+                message = str(error)
+        if not np.all(np.isfinite(tau)) or np.any(tau <= 0):
+            tau = None
+            status = "unavailable"
+            message = "Autocorrelation estimates are not finite and strictly positive."
+
+    acceptance = np.asarray(sampler.acceptance_fraction, dtype=np.float64)
+    return BayesianFitResult(
+        problem=problem,
+        chain=np.array(sampler.get_chain(), dtype=np.float64, copy=True),
+        log_prob=np.array(sampler.get_log_prob(), dtype=np.float64, copy=True),
+        acceptance_fraction=acceptance.copy(),
+        autocorrelation_time=tau,
+        autocorrelation_status=status,
+        diagnostics={
+            "n_steps": n_steps,
+            "n_walkers": n_walkers,
+            "burn_in": burn_in,
+            "seed": seed,
+            "autocorrelation_message": message,
+            "zero_acceptance_walkers": np.flatnonzero(acceptance == 0).tolist(),
+        },
+    )

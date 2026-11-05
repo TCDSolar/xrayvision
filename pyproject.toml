@@ -43,7 +43,10 @@ map = [
 pso = [
         "pymoo>=0.6.1.3"
 ]
-all = ["xrayvisim[map,pso]"]
+bayes = [
+    "emcee>=3.1.6"
+]
+all = ["xrayvisim[map,pso,bayes]"]
 tests = [
     "pytest-astropy>=0.11.0",
     "pytest-mpl>=0.18.0",
