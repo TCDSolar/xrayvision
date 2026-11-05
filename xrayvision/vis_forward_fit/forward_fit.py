@@ -1,10 +1,10 @@
 from collections.abc import Callable
 from concurrent.futures import ProcessPoolExecutor
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
 from numpy.typing import NDArray
-from scipy.optimize import minimize
+from scipy.optimize import OptimizeResult, minimize
 
 import astropy.units as apu
 from astropy.units import Quantity, quantity_input
@@ -35,6 +35,7 @@ from xrayvision.visibility import Visibilities
 
 if TYPE_CHECKING:
     from pymoo.core.result import Result
+    from scipy.optimize._typing import MethodMimimize  # pyright: ignore[reportMissingModuleSource]
 
 __all__ = [
     "SOURCE_TO_IMAGE",
@@ -259,24 +260,32 @@ def _vis_forward_fit_minimise(
         sources_fit = sources.from_params(sources, res.X)
     else:
 
-        def objective(x: NDArray[np.float64]) -> float | NDArray[np.float64]:
+        def objective(x: NDArray[np.float64]) -> float:
             cur_sources = sources.from_params(sources, x)
             vispred = sources_to_vis(cur_sources, data.u, data.v)
-            return data.objective(vispred)
+            return float(data.objective(vispred))
 
         res = minimize(
             objective,
             sources.params,
-            method=method,
+            # SciPy validates this public string argument; its stubs use literal names.
+            method=cast("MethodMimimize", method),
             bounds=[(x, y) for x, y in zip(*fit_bounds)],
         )
         sources_fit = sources.from_params(sources, res.x)
     prediction = sources_to_vis(sources_fit, data.u, data.v)
-    res.fit_statistics = data.statistics(prediction, sum(source.n_params for source in sources))
-    res.fit_bounds = fit_bounds
-    res.parameter_names = sources.parameter_names
-    res.parameter_units = sources.parameter_units(data.flux_unit)
-    res.parameter_uncertainty = None
+    metadata = {
+        "fit_statistics": data.statistics(prediction, sum(source.n_params for source in sources)),
+        "fit_bounds": fit_bounds,
+        "parameter_names": sources.parameter_names,
+        "parameter_units": sources.parameter_units(data.flux_unit),
+        "parameter_uncertainty": None,
+    }
+    if isinstance(res, OptimizeResult):
+        res.update(metadata)
+    else:
+        for name, value in metadata.items():
+            setattr(res, name, value)
     return sources_fit, res
 
 

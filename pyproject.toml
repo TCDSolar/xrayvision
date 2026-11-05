@@ -63,7 +63,7 @@ docs = [
     "pydata-sphinx-theme>=0.16.0",
     "xrayvisim[all]"
 ]
-dev = ["xrayvisim[tests,docs]"]
+dev = ["xrayvisim[tests,docs]", "scipy-stubs>=1.15"]
 
 
 [project.urls]
@@ -103,7 +103,7 @@ exclude = "(^|/)tests/"
 pythonVersion = "3.12"
 typeCheckingMode = "strict"
 
-# Don't infer types from unstubbed library source (astropy/scipy/sunpy have no py.typed);
+# Don't infer types from unstubbed library source (e.g. astropy/sunpy);
 # treat them as untyped like mypy's ignore_missing_imports does, rather than statically
 # analysing their implementation.
 useLibraryCodeForTypes = false

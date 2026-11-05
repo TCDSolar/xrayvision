@@ -115,6 +115,40 @@ values expressed in the observation's flux unit. Changing that unit changes
 the absolute log density by the unit-conversion Jacobian. Model comparisons
 must use the same observation unit and noise convention for every model.
 
+Explicit prior specifications
+=============================
+
+``ParameterPrior`` wraps a scalar continuous SciPy distribution with an
+explicit unit. Distribution parameters such as ``loc`` and ``scale`` are
+numerical values in that unit. Priors can be named using the keys returned by
+``SourceList.parameter_names``:
+
+.. code-block:: python
+
+   import astropy.units as u
+   from scipy.stats import norm, uniform
+   from xrayvision.vis_forward_fit.bayesian import ParameterPrior
+
+   photon_flux_unit = u.ph / (u.s * u.cm**2 * u.keV)
+   priors = {
+       "source[0].amp": ParameterPrior(uniform(loc=1, scale=3), photon_flux_unit),
+       "source[0].x0": ParameterPrior(norm(loc=0, scale=0.1), u.arcmin),
+   }
+   log_density = priors["source[0].x0"].logpdf(2, unit=u.arcsec)
+   position = priors["source[0].x0"].ppf(0.75, unit=u.arcsec)
+
+Here the source amplitude is differential photon flux integrated over the
+source's angular extent. Surface brightness would additionally be per unit
+angular area, for example photons per second, square centimetre, keV, and
+square arcsecond. No particular flux unit is imposed by ``ParameterPrior``.
+
+``logpdf`` includes the Jacobian for conversion to the numeric parameter's
+unit, and ``ppf`` returns values in that unit. These are prior distributions,
+separate from optimisation bounds and measurement errors. SciPy supplies the
+distributions; a posterior sampler consumes their log densities together with
+the visibility log likelihood. Correlated and conditional priors are not
+represented by this scalar wrapper.
+
 Parameter uncertainties
 =======================
 
@@ -258,5 +292,7 @@ number of particles through pymoo's ``pop_size`` option.
    :include-all-objects:
 
 .. automodapi:: xrayvision.vis_forward_fit.fit_data
+
+.. automodapi:: xrayvision.vis_forward_fit.bayesian
 
 .. automodapi:: xrayvision.vis_forward_fit.uncertainty

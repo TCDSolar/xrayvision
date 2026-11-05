@@ -59,7 +59,7 @@ repos:
     hooks:
       - id: mypy
         exclude: ^.*/tests/
-        additional_dependencies: [ "types-setuptools", "numpy>=2.0" ]
+        additional_dependencies: [ "types-setuptools", "numpy>=2.0", "scipy-stubs>=1.15" ]
         pass_filenames: false
         args: [ --config-file=pyproject.toml, xrayvision ]
 ci:
