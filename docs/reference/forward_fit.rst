@@ -97,6 +97,29 @@ unweighted fits, which still report ``objective``. ``reduced_chi2`` is also
 ``None`` for non-positive degrees of freedom. Initial-guess-dependent
 optimisation bounds are not implicitly Bayesian priors.
 
+Assign ``source.bounds`` to override that source's optimisation limits for
+both SciPy and PSO. Supply two rows (lower, upper) in ``source.param_list``
+order. Numeric positions and widths use arcseconds, angles use radians, and
+amplitudes use the source amplitude unit (the observation unit for bare
+amplitudes). Equivalent quantity-valued limits are also accepted. For example:
+
+.. code-block:: python
+
+   sources[0].bounds = [
+       [0, -128, -128, 0.5, 0.5, -np.pi / 2],
+       [100, 128, 128, 64, 64, np.pi / 2],
+   ]
+   image, fitted, result = vis_forward_fit(
+       vis, sources, shape, pixel_size, method="PSO", return_result=True,
+   )
+
+Custom bounds survive source reconstruction, fitting and unit conversion.
+``SourceList.bounds`` combines each source's limits, and the result records
+those used in ``fit_bounds`` for uncertainty refits. Reading ``source.bounds``
+returns an independent copy; assign the edited rows back to apply changes.
+Set ``source.bounds = None`` to restore the defaults calculated from its current
+parameters. Bounds remain separate from Bayesian priors.
+
 ``VisibilityFitData.log_likelihood(prediction)`` evaluates the normalised
 Gaussian log likelihood using the same independent component errors:
 
@@ -150,7 +173,7 @@ the visibility log likelihood. Correlated and conditional priors are not
 represented by this scalar wrapper.
 
 Sampler-independent Bayesian problem
------------------------------------
+------------------------------------
 
 ``BayesianVisibilityProblem`` connects observations, an existing ``SourceList``,
 and a complete set of named priors. It requires measurement errors, validates
@@ -253,6 +276,30 @@ the diagnostic message, then choose burn-in and production lengths for the
 problem. Walkers within one ensemble are dependent and must not be treated as
 independent chains for convergence statistics. See
 `emcee's autocorrelation guide <https://emcee.readthedocs.io/en/stable/tutorials/autocorr/>`_.
+
+The :ref:`sphx_glr_generated_gallery_bayesian_visibility_fit.py` example shows
+injected images, the initial SciPy fit, a highest-posterior sampled image,
+production traces, visibility predictions, and
+a final corner plot using the public posterior results. It also reports
+whether each injected parameter lies within its marginal 95% credible interval.
+The plotting example uses ``corner``, included in the ``bayes`` extra and
+the documentation dependencies.
+
+The :ref:`sphx_glr_generated_gallery_stix.py` and
+:ref:`sphx_glr_generated_gallery_rhessi.py` examples apply the same interface
+to observed visibilities, initialising walkers near a PSO fit. They use explicit
+illustrative priors and amplitude-error weighting, show a sampled source image
+alongside the other reconstructions, and finish with posterior corner plots.
+The reported sampling diagnostics must be checked before interpreting intervals.
+Their corner plots express each ellipse using major and minor widths and a
+major-axis angle modulo pi. This removes apparent width-label bimodality at
+the original angle boundary without altering stored samples or the prior.
+It does not remove physical multimodality; an angle crossing the display
+boundary still requires circular summaries, and circular sources have no
+identifiable orientation.
+The STIX example also places its sampling angle cut away from the fitted
+orientation. With identical width priors, shifting that half-pi interval
+changes the coordinate representation without changing the physical prior.
 
 Parameter uncertainties
 =======================

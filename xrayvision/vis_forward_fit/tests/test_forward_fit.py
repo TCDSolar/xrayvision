@@ -307,6 +307,42 @@ def test_fit_flux_units_and_reuse(method, flux_unit):
 
 
 @pytest.mark.parametrize("method", ["Nelder-Mead", "PSO"])
+def test_explicit_bounds_recover_source_outside_initial_bounds(method):
+    flux_unit = apu.ph / (apu.s * apu.cm**2 * apu.keV)
+    u, v = np.meshgrid(np.linspace(-0.06, 0.06, 7), np.linspace(-0.05, 0.05, 7))
+    u, v = u.ravel() / apu.arcsec, v.ravel() / apu.arcsec
+    truth = SourceList([Source("circular", 2 * flux_unit, -1.5 * apu.arcsec, 0.8 * apu.arcsec, 4 * apu.arcsec)])
+    scaled_unit = apu.Unit(1000 * flux_unit)
+    initial = SourceList(
+        [Source("circular", (1.8 * flux_unit).to(scaled_unit), -1 * apu.arcsec, 0.5 * apu.arcsec, 0.8 * apu.arcsec)]
+    )
+    vis = sources_to_vis(truth, u, v)
+    obs = Visibilities(vis, u, v, uncertainty=np.full(vis.size, 0.03 + 0.06j) * flux_unit)
+    default_upper_width = initial.bounds[1][-1]
+    bounds = np.array([[0.1, -10, -10, 0.5], [4, 10, 10, 6]])
+    source_bounds = bounds.copy()
+    source_bounds[:, 0] /= 1000
+    initial[0].bounds = source_bounds
+    _, fitted, result = vis_forward_fit(
+        obs,
+        initial,
+        [17, 17] * apu.pix,
+        [1, 1] * apu.arcsec / apu.pix,
+        method=method,
+        map=False,
+        return_result=True,
+        uncertainty="gauss_newton",
+    )
+    assert fitted[0].sigma.to_value(apu.arcsec) > default_upper_width
+    assert_allclose(sources_to_vis(fitted, u, v).to_value(flux_unit), vis.value, atol=1e-4)
+    assert_allclose(result.fit_bounds, bounds)
+    assert_allclose(fitted[0].bounds, bounds)
+    assert_allclose(initial[0].bounds, source_bounds)
+    assert result.parameter_uncertainty.covariance is not None
+    assert result.parameter_uncertainty.status == "ok"
+
+
+@pytest.mark.parametrize("method", ["Nelder-Mead", "PSO"])
 def test_fit_rejects_incompatible_flux_units(method):
     sources = SourceList([Source("circular", 2 * apu.s, 0 * apu.arcsec, 0 * apu.arcsec, 2 * apu.arcsec)])
     obs = Visibilities(np.ones(3) * apu.Jy, np.arange(3) / apu.arcsec, np.arange(3) / apu.arcsec)

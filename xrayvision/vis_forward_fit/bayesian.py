@@ -10,7 +10,6 @@ from numpy.typing import NDArray
 
 import astropy.units as apu
 from astropy.units import Quantity, UnitBase
-from astropy.units.typing import UnitLike
 
 from xrayvision.vis_forward_fit.fit_data import VisibilityFitData
 from xrayvision.vis_forward_fit.forward_fit import SOURCE_TO_VIS, sources_to_vis
@@ -20,6 +19,8 @@ from xrayvision.visibility import Visibilities
 if TYPE_CHECKING:
     from scipy.stats import rv_continuous
     from scipy.stats._distn_infrastructure import rv_continuous_frozen
+
+    from astropy.units.typing import UnitLike
 
     type _ScalarDistribution = rv_continuous_frozen[rv_continuous, float | np.float64]
 
@@ -43,7 +44,7 @@ class ParameterPrior:
     distribution: "_ScalarDistribution"
     unit: UnitBase
 
-    def __init__(self, distribution: "_ScalarDistribution", unit: UnitLike) -> None:
+    def __init__(self, distribution: "_ScalarDistribution", unit: "UnitLike") -> None:
         self.distribution = distribution
         self.unit = apu.Unit(unit)
         if not all(callable(getattr(self.distribution, name, None)) for name in ("logpdf", "ppf", "support")):
@@ -52,7 +53,7 @@ class ParameterPrior:
         if np.ndim(lower) != 0 or np.ndim(upper) != 0 or not float(lower) < float(upper):
             raise ValueError("Prior distribution must have valid, non-empty scalar support.")
 
-    def logpdf(self, value: float, *, unit: UnitLike) -> float:
+    def logpdf(self, value: float, *, unit: "UnitLike") -> float:
         """Log density in the numeric parameter's unit, including its Jacobian.
 
         ``value`` is a bare number in the supplied ``unit``. Non-finite values
@@ -66,7 +67,7 @@ class ParameterPrior:
             raise ValueError("Prior distribution returned a NaN log density.")
         return float(density + np.log(factor))
 
-    def ppf(self, probability: float, *, unit: UnitLike) -> float:
+    def ppf(self, probability: float, *, unit: "UnitLike") -> float:
         """Inverse CDF as a bare numeric parameter in the supplied unit.
 
         Also know as the percent point or quantile function
