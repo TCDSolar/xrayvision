@@ -290,6 +290,15 @@ The :ref:`sphx_glr_generated_gallery_stix.py` and
 to observed visibilities, initialising walkers near a PSO fit. They use explicit
 illustrative priors and amplitude-error weighting, show a sampled source image
 alongside the other reconstructions, and finish with posterior corner plots.
+Each uses one ensemble with 1,000 burn-in steps and 10,000 production steps,
+and reports acceptance fractions, autocorrelation estimates and marginal
+credible intervals.
+Green lines and square markers in the corner plots identify the production
+draw with the highest sampled log posterior, also used for the sampled image.
+The instrument plots apply their major/minor conversion to this draw too.
+It is a joint parameter vector, not a separate maximum of each marginal or a
+proven global posterior maximum. Histogram titles still report marginal
+medians and intervals; the synthetic example also retains red injected values.
 The reported sampling diagnostics must be checked before interpreting intervals.
 Their corner plots express each ellipse using major and minor widths and a
 major-axis angle modulo pi. This removes apparent width-label bimodality at
@@ -300,6 +309,15 @@ identifiable orientation.
 The STIX example also places its sampling angle cut away from the fitted
 orientation. With identical width priors, shifting that half-pi interval
 changes the coordinate representation without changing the physical prior.
+
+An elliptical Gaussian with equal widths is exactly a circular Gaussian,
+independently of its angle. Its flux, location and size can be well determined
+while orientation remains unidentifiable. Near equal widths, broad angular
+uncertainty is expected; major/minor reporting cannot remove that degeneracy.
+Synthetic sampler tests cover both a noisy elongated ellipse with identifiable
+orientation and a noiseless circular ellipse with balanced angular sampling.
+The circular test isolates the geometric degeneracy; a noisy realisation can
+favour a small apparent elongation and a particular angle.
 
 Parameter uncertainties
 =======================

@@ -81,6 +81,10 @@ mem_map = mem(
 
 ###############################################################################
 # VIS_FWD_FIT
+#
+# Forward fitting assumes the source is a parametric shape (here a single
+# elliptical Gaussian) and fits its parameters directly to the visibilities.
+# Source position is relative to the visibility's own phase center.
 
 sources = SourceList(
     [
@@ -123,19 +127,11 @@ vis_fwd_pso_map, fitted_sources, pso_result = vis_forward_fit(
 # Bayesian visibility fitting
 # ---------------------------
 #
-# Priors describe a source inside the displayed field, with positive flux and
-# widths. For this comparison their physical support matches the optimisation
-# bounds, but they remain explicit scientific choices and should be revisited.
-# Amplitude uncertainties are used for both complex components, as in the
-# preceding PSO fit; this assumes independent real and imaginary errors with
-# equal standard deviations.
-#
-# Ellipse axes can be exchanged while adding pi/2 to the angle. Use a single
-# equivalent orientation interval [-pi/2, 0), with identical priors on both
-# widths, to avoid duplicate axis labels without excluding source orientations.
-# Its cut is away from this source's fitted orientation, around -40 degrees.
-# Shifting this interval does not change the physical prior when the widths
-# have identical priors, but avoids a discontinuity through the sampled region.
+# Bayesian fitting uses the same parametric source model (here a single
+# elliptical Gaussian), combining a complex-visibility likelihood with explicit
+# parameter priors. Starting near the PSO fit, emcee samples the posterior
+# distribution to estimate parameter uncertainty and correlations.
+# Source position is relative to the visibility's own phase center.
 
 flux_unit = stix_vis.visibilities.unit
 initial_sources = fitted_sources.to_canonical(flux_unit)
@@ -165,7 +161,7 @@ for _ in range(2400):
         break
 if len(positions) != 24:
     raise RuntimeError("Could not initialise 24 valid walkers; inspect the fit and priors.")
-posterior = sample_emcee(problem, np.asarray(positions), n_steps=3000, burn_in=500, seed=42)
+posterior = sample_emcee(problem, np.asarray(positions), n_steps=10000, burn_in=1000, seed=42)
 print("STIX reduced chi-square (initial PSO fit):", pso_result.fit_statistics.reduced_chi2)
 print("STIX autocorrelation status:", posterior.autocorrelation_status)
 print("Autocorrelation times:", posterior.autocorrelation_time)
@@ -182,12 +178,11 @@ bayesian_image = sources_to_image(sampled_sources, [129, 129] * apu.pixel, [2, 2
 bayesian_map = Map((bayesian_image, vis_fwd_pso_map.meta))
 
 ###############################################################################
-# Comparison on shared map axes
-# -----------------------------
+# Comparison plot
+# ---------------
 #
-# Every map has the same pixel grid and WCS. Show coordinate labels and ticks
-# only on the lower-left panel, so repeated solar-coordinate labels do not
-# overlap. The Bayesian panel is the highest-posterior production draw.
+# Every map has the same pixel grid and WCS.
+# The Bayesian panel is the highest-posterior production draw.
 
 comparison_maps = (
     (psf_map, "PSF"),
@@ -222,15 +217,12 @@ plt.show()
 # Posterior corner plot
 # ---------------------
 #
-# Real observations have no injected truth markers. Inspect sampling diagnostics
-# before interpreting the intervals; the example run length is not a convergence
-# guarantee. For display, express every ellipse using its major and minor
-# widths and the major-axis angle modulo pi. This reconciles the apparent
-# width/angle lobes where the original angle interval swaps axis labels.
-# Stored parameter samples are unchanged. This transformation does not merge
-# genuinely distinct source shapes or establish sampling convergence. Near
-# circular shapes still have poorly defined orientation; angles crossing the
-# display boundary at +/- pi/2 need circular summaries instead of percentiles.
+# Green lines and squares mark the same highest-posterior draw as the image.
+# It is a joint sampled point, not the peak of each marginal distribution.
+# Plot every ellipse using its major and minor widths and the major-axis
+# angle modulo pi. This reconciles the apparent width/angle lobes where the
+# original angle interval swaps axis labels.
+
 
 display_samples = posterior.samples.copy()
 swap_axes = display_samples[:, 3] < display_samples[:, 4]
@@ -241,7 +233,7 @@ names = ["amp", "x0", "y0", "sigma_major", "sigma_minor", "theta_major"]
 labels = [f"{name}\n{unit.to_string('latex_inline')}" for name, unit in zip(names, posterior.parameter_units)]
 spread = display_samples.std(axis=0, ddof=1)
 plot_ranges = list(zip(display_samples.min(axis=0) - spread, display_samples.max(axis=0) + spread))
-corner.corner(
+corner_figure = corner.corner(
     display_samples,
     labels=labels,
     titles=names,
@@ -257,5 +249,17 @@ corner.corner(
     levels=[0.68, 0.95],
     plot_datapoints=False,
     fill_contours=True,
+)
+# Flattening log_prob uses the same step/walker order as display_samples, so
+# this also applies the plot's major/minor conversion to the selected draw.
+best_display = display_samples[np.argmax(posterior.log_prob)]
+corner.overplot_lines(corner_figure, best_display, color="C2")
+corner.overplot_points(corner_figure, best_display[None, :], color="C2", marker="s", markersize=4)
+corner_figure.text(
+    0.62,
+    0.84,
+    "Green: highest-posterior draw\nTitles: marginal median and 68% interval",
+    fontsize=12,
+    ha="center",
 )
 plt.show()

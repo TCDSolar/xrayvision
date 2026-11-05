@@ -241,7 +241,8 @@ plt.show()
 # ``parameter_names`` and ``parameter_units``. No sampler internals are needed.
 # The diagonal panels show marginal distributions and the 16th, 50th, and 84th
 # percentiles; the lower panels show joint distributions with 68% and 95%
-# probability contours. Red markers indicate the injected parameters. A corner
+# probability contours. Red markers indicate the injected parameters and green
+# markers show the highest-posterior draw used for the sampled image. A corner
 # plot displays parameter uncertainty and correlation, not sampling convergence.
 # Added noise can shift the posterior peak away from an injected value; compare
 # the marginal credible intervals reported above rather than expecting equality.
@@ -275,5 +276,14 @@ corner_figure = corner.corner(
     plot_datapoints=False,
     fill_contours=True,
 )
-corner_figure.text(0.63, 0.85, "Circular Gaussian posterior\nRed: injected parameters", fontsize=12, ha="center")
+best_params = posterior.samples[np.argmax(posterior.log_prob)]
+corner.overplot_lines(corner_figure, best_params, color="C2")
+corner.overplot_points(corner_figure, best_params[None, :], color="C2", marker="s", markersize=4)
+corner_figure.text(
+    0.63,
+    0.85,
+    "Circular Gaussian posterior\nRed: injected parameters\nGreen: highest-posterior draw",
+    fontsize=12,
+    ha="center",
+)
 plt.show()

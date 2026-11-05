@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 from numpy.testing import assert_allclose, assert_array_equal
-from scipy.stats import norm
+from scipy.stats import norm, uniform
 
 import astropy.units as apu
 
@@ -214,3 +214,101 @@ def test_seeded_noisy_circular_posterior_matches_local_analytic_solution():
     assert_allclose((result.samples.mean(axis=0) - expected_mean) / scale, 0, atol=0.3)
     assert_allclose(result.samples.std(axis=0, ddof=1) / scale, 1, rtol=0.2)
     assert np.all(np.abs(result.samples.mean(axis=0) - truth) < 4 * scale)
+
+
+@pytest.mark.parametrize("sampler_seed", [18, 19])
+def test_noisy_elongated_ellipse_recovers_identifiable_parameters(sampler_seed):
+    reference, noiseless = make_problem("elliptical")
+    truth = reference.initial_params
+    u, v = reference.fit_data.u, reference.fit_data.v
+    prediction = noiseless.visibilities.value
+    up = u * np.cos(truth[5]) + v * np.sin(truth[5])
+    vp = -u * np.sin(truth[5]) + v * np.cos(truth[5])
+    # Independent analytical derivatives give the local Fisher covariance and
+    # the expected response to one fixed noise realisation, including theta.
+    derivative = np.array(
+        [
+            prediction / truth[0],
+            2j * np.pi * u * prediction,
+            2j * np.pi * v * prediction,
+            -4 * np.pi**2 * up**2 * truth[3] * prediction,
+            -4 * np.pi**2 * vp**2 * truth[4] * prediction,
+            -4 * np.pi**2 * up * vp * (truth[3] ** 2 - truth[4] ** 2) * prediction,
+        ]
+    ).T
+    sigma = np.concatenate([np.full(30, 0.01), np.full(30, 0.02)])
+    jacobian = np.vstack([derivative.real, derivative.imag]) / sigma[:, None]
+    covariance = np.linalg.inv(jacobian.T @ jacobian)
+    # Change the sampler seed, but keep this measurement noise fixed.
+    rng = np.random.default_rng(74)
+    noise = rng.normal(size=60) * sigma
+    observed = noiseless.visibilities + (noise[:30] + 1j * noise[30:]) * FLUX_UNIT
+    vis = Visibilities(observed, noiseless.u, noiseless.v, uncertainty=np.full(30, 0.01 + 0.02j) * FLUX_UNIT)
+    priors = {
+        "source[0].amp": ParameterPrior(uniform(0.1, 3.9), FLUX_UNIT),
+        "source[0].x0": ParameterPrior(uniform(-10, 20), apu.arcsec),
+        "source[0].y0": ParameterPrior(uniform(-10, 20), apu.arcsec),
+        "source[0].sigmax": ParameterPrior(uniform(0.5, 4), apu.arcsec),
+        "source[0].sigmay": ParameterPrior(uniform(0.5, 4), apu.arcsec),
+        "source[0].theta": ParameterPrior(uniform(-np.pi / 4, np.pi / 2), apu.rad),
+    }
+    problem = BayesianVisibilityProblem(vis, reference.sources, priors)
+    expected_mean = truth + covariance @ jacobian.T @ (noise / sigma)
+    positions = np.random.default_rng(sampler_seed).multivariate_normal(expected_mean, covariance, size=24)
+    result = sample_emcee(problem, positions, n_steps=1600, burn_in=400, seed=sampler_seed)
+    scale = np.sqrt(np.diag(covariance))
+    assert_allclose((result.samples.mean(axis=0) - expected_mean) / scale, 0, atol=0.4)
+    assert_allclose(result.samples.std(axis=0, ddof=1) / scale, 1, rtol=0.2)
+    assert np.all(np.abs(result.samples.mean(axis=0) - truth) < 4 * scale)
+
+
+@pytest.mark.parametrize("sampler_seed", [20, 21])
+def test_circular_ellipse_recovers_size_without_identifying_orientation(sampler_seed):
+    # Rotationally balanced sampling and noiseless data isolate the geometry
+    # degeneracy. A noisy realisation can prefer a small apparent ellipticity.
+    radii, angles = np.meshgrid([0.02, 0.05, 0.08, 0.11], np.linspace(0, 2 * np.pi, 16, endpoint=False))
+    u = (radii * np.cos(angles)).ravel() / apu.arcsec
+    v = (radii * np.sin(angles)).ravel() / apu.arcsec
+    sources = SourceList(
+        [
+            Source(
+                "elliptical", 2 * FLUX_UNIT, 0 * apu.arcsec, 0 * apu.arcsec, 2 * apu.arcsec, 2 * apu.arcsec, 0 * apu.rad
+            )
+        ]
+    )
+    circular = SourceList([Source("circular", 2 * FLUX_UNIT, 0 * apu.arcsec, 0 * apu.arcsec, 2 * apu.arcsec)])
+    vis = Visibilities(sources_to_vis(circular, u, v), u, v, uncertainty=np.full(u.size, 0.03 + 0.03j) * FLUX_UNIT)
+    priors = {
+        "source[0].amp": ParameterPrior(uniform(0.1, 3.9), FLUX_UNIT),
+        "source[0].x0": ParameterPrior(norm(0, 5), apu.arcsec),
+        "source[0].y0": ParameterPrior(norm(0, 5), apu.arcsec),
+        "source[0].sigmax": ParameterPrior(uniform(0.5, 4), apu.arcsec),
+        "source[0].sigmay": ParameterPrior(uniform(0.5, 4), apu.arcsec),
+        "source[0].theta": ParameterPrior(uniform(-np.pi / 4, np.pi / 2), apu.rad),
+    }
+    problem = BayesianVisibilityProblem(vis, sources, priors)
+    params = problem.initial_params.copy()
+    likelihoods = []
+    for angle in np.linspace(-np.pi / 4, np.pi / 4, 25):
+        params[5] = angle
+        assert_allclose(problem.predict(params).value, vis.visibilities.value, atol=1e-13)
+        likelihoods.append(problem.log_likelihood(params))
+    assert_allclose(likelihoods, likelihoods[0], atol=1e-10)
+    rng = np.random.default_rng(sampler_seed)
+    positions = problem.initial_params + rng.normal(size=(24, 6)) * [0.02, 0.03, 0.03, 0.02, 0.02, 0.1]
+    positions[:, 5] = rng.uniform(-np.pi / 4, np.pi / 4, 24)
+    result = sample_emcee(problem, positions, n_steps=2000, burn_in=500, seed=sampler_seed)
+    # Flux, location and a rotation-invariant size are identifiable even when
+    # theta is not. Require both recovery and useful precision.
+    size = np.sqrt((result.samples[:, 3] ** 2 + result.samples[:, 4] ** 2) / 2)
+    identifiable = np.column_stack([result.samples[:, :3], size])
+    lower, upper = np.quantile(identifiable, [0.025, 0.975], axis=0)
+    truth = np.array([2, 0, 0, 2])
+    assert np.all(lower < truth)
+    assert np.all(truth < upper)
+    assert np.all(upper - lower < 0.15)
+    theta = result.samples[:, 5]
+    assert np.ptp(np.quantile(theta, [0.025, 0.975])) > 0.8 * (np.pi / 2)
+    # Fourth harmonic is appropriate to this half-pi angle interval with
+    # exchangeable widths. A uniform angle distribution has zero moment.
+    assert np.abs(np.mean(np.exp(4j * theta))) < 0.2
