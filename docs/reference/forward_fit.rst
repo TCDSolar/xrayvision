@@ -149,6 +149,56 @@ distributions; a posterior sampler consumes their log densities together with
 the visibility log likelihood. Correlated and conditional priors are not
 represented by this scalar wrapper.
 
+Sampler-independent Bayesian problem
+-----------------------------------
+
+``BayesianVisibilityProblem`` connects observations, an existing ``SourceList``,
+and a complete set of named priors. It requires measurement errors, validates
+prior names and units, and uses ``sources_to_vis`` for predictions. For a single
+circular source and observations ``vis`` in the photon flux unit above:
+
+.. code-block:: python
+
+   from xrayvision.vis_forward_fit.bayesian import BayesianVisibilityProblem
+   from xrayvision.vis_forward_fit.sources import Source, SourceList
+
+   sources = SourceList([
+       Source("circular", 2 * photon_flux_unit, 0 * u.arcsec, 0 * u.arcsec, 2 * u.arcsec),
+   ])
+   priors.update({
+       "source[0].y0": ParameterPrior(norm(loc=0, scale=0.1), u.arcmin),
+       "source[0].sigma": ParameterPrior(uniform(loc=0.5, scale=4.5), u.arcsec),
+   })
+   problem = BayesianVisibilityProblem(vis, sources, priors)
+   params = problem.initial_params
+   log_posterior = problem.log_posterior(params)
+   prediction = problem.predict(params)
+   reconstructed = problem.sources_from_params(params)
+
+Parameter vectors are numerical values ordered by ``parameter_names``, in
+``parameter_units``. Reconstructed sources carry quantities, including the
+observation's amplitude unit. The problem supports circles, ellipses, loops,
+and mixed source lists. It does not impose initial-guess-dependent optimiser
+bounds, including their position and orientation windows.
+
+``log_prior`` evaluates exactly the supplied independent priors.
+``log_likelihood`` evaluates the normalised measurement model independently of
+those priors. ``log_posterior`` adds the two and skips prediction when prior
+probability is zero. ``prior_transform`` maps a vector of probabilities through
+the same independent inverse CDFs, without changing their distribution.
+
+Invalid fluxes, widths, loop ordering, or loop opening angles receive negative
+infinity from the likelihood. Direct predictions raise
+``InvalidSourceParameters``, a ``ValueError`` subclass; unrelated implementation
+errors are not suppressed. The existing loop geometry, including its minimum
+component width and zero-angle approximation, is retained.
+
+Geometry rejection does not normalise a prior conditional on valid geometry.
+For future evidence calculations, the prior must explicitly represent the
+intended model domain; it is not enough to discard invalid draws and assume
+that the remaining distribution is normalised. Source labels and orientations
+are retained as supplied, without bootstrap-style relabelling.
+
 Parameter uncertainties
 =======================
 

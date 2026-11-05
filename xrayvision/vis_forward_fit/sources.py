@@ -27,6 +27,7 @@ __all__ = [
     "Circular",
     "Elliptical",
     "GenericSource",
+    "InvalidSourceParameters",
     "Loop",
     "Source",
     "SourceFactory",
@@ -36,6 +37,10 @@ __all__ = [
     "elliptical_gaussian_img",
     "elliptical_gaussian_vis",
 ]
+
+
+class InvalidSourceParameters(ValueError):
+    """Parameters fall outside the mathematical domain of a source model."""
 
 
 def circular_gaussian_img(
@@ -418,7 +423,7 @@ def _compute_loop_geometry(
 
     # Validate opening angle
     if np.abs(loop_angle) >= 2.0 * np.pi:
-        raise ValueError(
+        raise InvalidSourceParameters(
             f"Loop arc parameter {arc_param} produces opening angle {loop_angle:.3f} rad "
             f"(>= 2π). Reduce arc_param or adjust sigma_max."
         )
