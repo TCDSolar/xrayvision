@@ -1,13 +1,9 @@
 from collections.abc import Callable
 from concurrent.futures import ProcessPoolExecutor
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 from numpy.typing import NDArray
-from pymoo.algorithms.soo.nonconvex.pso import PSO
-from pymoo.core.problem import Problem
-from pymoo.core.result import Result
-from pymoo.optimize import minimize as moo_minimize
 from scipy.optimize import minimize
 
 import astropy.units as apu
@@ -36,6 +32,9 @@ from xrayvision.vis_forward_fit.uncertainty import (
     estimate_parameter_uncertainty,
 )
 from xrayvision.visibility import Visibilities
+
+if TYPE_CHECKING:
+    from pymoo.core.result import Result
 
 __all__ = [
     "SOURCE_TO_IMAGE",
@@ -160,44 +159,6 @@ def fit_statistics(vis: Visibilities, sources: SourceList, *, weighting: str = "
     return data.statistics(prediction, sum(source.n_params for source in sources))
 
 
-def _sources_to_vis_batch(
-    source_list: SourceList, u: NDArray[np.float64], v: NDArray[np.float64], population: NDArray[np.float64]
-) -> NDArray[np.complex128]:
-    r"""Vectorized `sources_to_vis`, used by `VisForwardFitProblem` to evaluate a whole
-    PSO population in one batch of broadcast numpy operations rather than one
-    `sources_to_vis` call per particle. ``population`` is (n_particles, n_vars); the
-    result is (n_particles, n_vis).
-
-    `circular_gaussian_vis`/`elliptical_gaussian_vis` are plain broadcastable numpy
-    expressions, so passing them (n_particles, 1)-shaped parameter columns against a
-    (1, n_vis)-shaped u, v already produces the right (n_particles, n_vis) result with
-    no changes to those functions. `loop_vis`'s geometry calculation branches on
-    scalar conditions (e.g. ``if loop_angle == 0``), which isn't safe to evaluate on an
-    array of candidate loop angles at once, so any `Loop` source falls back to
-    evaluating one particle at a time via the existing scalar `sources_to_vis`.
-    """
-    if any(isinstance(source, Loop) for source in source_list):
-        vis = np.zeros((population.shape[0], u.shape[0]), dtype=np.complex128)
-        for i in range(population.shape[0]):
-            cur_sources = source_list.from_params(source_list, population[i])
-            vis[i] = sources_to_vis(cur_sources, u, v)
-        return vis
-
-    u_row, v_row = u[None, :], v[None, :]
-    vis = np.zeros((population.shape[0], u.shape[0]), dtype=np.complex128)
-    offset = 0
-    for source in source_list:
-        n_params = source.n_params
-        amp = population[:, offset : offset + 1]
-        rest = [population[:, offset + i : offset + i + 1] for i in range(1, n_params)]
-        try:
-            vis += SOURCE_TO_VIS[source.__class__.__name__](amp, u_row, v_row, *rest)
-        except KeyError:
-            raise KeyError(f"Unknown source type: {source.__class__.__name__}")
-        offset += n_params
-    return vis
-
-
 def _run_one_pso(
     visobs: Visibilities,
     sources: SourceList,
@@ -205,10 +166,15 @@ def _run_one_pso(
     pop: int,
     weighting: str,
     bounds: NDArray[np.float64],
-) -> Result:
+) -> "Result":
     r"""Run a single PSO optimisation. A module-level function so it can be pickled and
     sent to worker processes by `_vis_forward_fit_minimise`'s multi-restart path.
     """
+    from pymoo.algorithms.soo.nonconvex.pso import PSO
+    from pymoo.optimize import minimize as moo_minimize
+
+    from xrayvision.vis_forward_fit._pso import VisForwardFitProblem
+
     problem = VisForwardFitProblem(visobs.u, visobs.v, visobs, sources, weighting=weighting, bounds=bounds)
     algo = PSO(pop_size=pop)
     return moo_minimize(problem, algo, seed=seed)
@@ -426,41 +392,3 @@ def vis_forward_fit(
     if map:
         return image
     return image, output_sources
-
-
-class VisForwardFitProblem(Problem):  # type: ignore[misc]
-    def __init__(
-        self,
-        u: Quantity,
-        v: Quantity,
-        visobs: Visibilities,
-        sources: SourceList,
-        *,
-        weighting: str = "auto",
-        bounds: NDArray[np.float64] | None = None,
-    ) -> None:
-        self.fit_data = VisibilityFitData(visobs, weighting=weighting)
-        self.u = u.to_value(apu.arcsec**-1)
-        self.v = v.to_value(apu.arcsec**-1)
-        self.sources = sources.to_canonical(self.fit_data.flux_unit)
-        n_var = len(sources.params)
-
-        # `Loop` sources need sigma_min <= sigma_max enforced as a constraint, at their own
-        # offset within the flat parameter vector (sigma_min, sigma_max are params 3 and 4 of a Loop).
-        self._loop_sigma_offsets = []
-        offset = 0
-        for source in sources:
-            if isinstance(source, Loop):
-                self._loop_sigma_offsets.append((offset + 3, offset + 4))
-            offset += source.n_params
-
-        xl, xu = self.sources.bounds if bounds is None else bounds
-        super().__init__(n_var=n_var, n_obj=1, n_ieq_constr=len(self._loop_sigma_offsets), xl=xl, xu=xu)
-
-    def _evaluate(self, x: NDArray[np.float64], out: dict[str, Any], *args: Any, **kwargs: Any) -> None:
-        # x is (n_particles, n_var): the whole PSO population is evaluated in one batch
-        # of broadcast numpy operations (see _sources_to_vis_batch)
-        if self._loop_sigma_offsets:
-            out["G"] = np.column_stack([x[:, i_min] - x[:, i_max] for i_min, i_max in self._loop_sigma_offsets])
-        vispred = _sources_to_vis_batch(self.sources, self.u, self.v, x)
-        out["F"] = self.fit_data.objective(vispred)

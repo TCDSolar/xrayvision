@@ -6,9 +6,9 @@ from scipy.optimize import minimize
 import astropy.units as apu
 
 from xrayvision.transform import generate_uv
+from xrayvision.vis_forward_fit._pso import VisForwardFitProblem
 from xrayvision.vis_forward_fit.forward_fit import (
     SourceList,
-    VisForwardFitProblem,
     _vis_forward_fit_minimise,
     circular_gaussian_vis,
     fit_statistics,
