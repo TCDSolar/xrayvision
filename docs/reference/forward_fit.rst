@@ -293,6 +293,8 @@ alongside the other reconstructions, and finish with posterior corner plots.
 Each uses one ensemble with 1,000 burn-in steps and 10,000 production steps,
 and reports acceptance fractions, autocorrelation estimates and marginal
 credible intervals.
+For detailed posterior visibility comparisons, see
+:ref:`sphx_glr_generated_gallery_bayesian_visibility_fit.py`.
 Green lines and square markers in the corner plots identify the production
 draw with the highest sampled log posterior, also used for the sampled image.
 The instrument plots apply their major/minor conversion to this draw too.

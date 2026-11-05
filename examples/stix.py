@@ -132,6 +132,9 @@ vis_fwd_pso_map, fitted_sources, pso_result = vis_forward_fit(
 # parameter priors. Starting near the PSO fit, emcee samples the posterior
 # distribution to estimate parameter uncertainty and correlations.
 # Source position is relative to the visibility's own phase center.
+#
+# See :ref:`sphx_glr_generated_gallery_bayesian_visibility_fit.py` for a
+# detailed synthetic example with posterior visibility predictions.
 
 flux_unit = stix_vis.visibilities.unit
 initial_sources = fitted_sources.to_canonical(flux_unit)
