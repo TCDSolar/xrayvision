@@ -290,9 +290,9 @@ The :ref:`sphx_glr_generated_gallery_stix.py` and
 to observed visibilities, initialising walkers near a PSO fit. They use explicit
 illustrative priors and amplitude-error weighting, show a sampled source image
 alongside the other reconstructions, and finish with posterior corner plots.
-Each uses one ensemble with 1,000 burn-in steps and 10,000 production steps,
-and reports acceptance fractions, autocorrelation estimates and marginal
-credible intervals.
+Their longer runs use one ensemble with 1,000 burn-in steps and 10,000 production
+steps, and report acceptance fractions, autocorrelation estimates and marginal
+credible intervals. Read the Docs uses reduced sampling as described below.
 For detailed posterior visibility comparisons, see
 :ref:`sphx_glr_generated_gallery_bayesian_visibility_fit.py`.
 Green lines and square markers in the corner plots identify the production
@@ -375,6 +375,29 @@ weighted posteriors. The two components have identical priors; their label
 permutations are sampled and left/right matching is applied only for display.
 The ellipse and two-circle model share the same prior on total flux. Other
 induced priors, such as source area, differ and are stated in the example.
+
+Example sampling budgets
+------------------------
+
+On Read the Docs all three Bayesian examples use a quick mode.
+Local execution defaults to the longer settings: the synthetic emcee example
+uses 500 burn-in and 5,000 production steps, and the STIX/RHESSI examples use
+1,000 and 10,000 respectively. The synthetic evidence comparison repeats with
+200 and 400 live points, independent seeds, and ``dlogz=0.2``.
+
+Set ``XRAYVISION_QUICK_EXAMPLES=1`` to preview the quick mode locally, or ``0``
+to force longer runs, including on Read the Docs. For example:
+
+.. code-block:: console
+
+   XRAYVISION_QUICK_EXAMPLES=1 python examples/bayesian_visibility_fit.py
+   XRAYVISION_QUICK_EXAMPLES=0 python examples/bayesian_visibility_fit.py
+
+For scientific use, choose longer chains, burn-in, and live-point counts based
+on diagnostics and stability across independent runs. Even the longer example
+settings do not guarantee convergence or exploration of every mode. Switching
+sampling mode does not invalidate Sphinx-Gallery's file cache; regenerate cached
+examples when comparing documentation builds with different settings.
 
 Information criteria
 ====================

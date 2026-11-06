@@ -129,6 +129,7 @@ graphviz_dot_args = [
 path = pathlib.Path.cwd()
 example_dir = path.parent.joinpath("examples")
 sphinx_gallery_conf = {
+    "parallel": True,
     "backreferences_dir": str(path.joinpath("generated", "modules")),
     "filename_pattern": "^((?!skip_).)*$",
     "examples_dirs": example_dir,

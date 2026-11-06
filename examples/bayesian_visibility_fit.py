@@ -11,7 +11,15 @@ differs from model comparison.
 The example uses the public fitting API; no separate source implementation is
 needed. Install the documentation dependencies to run the plotting example,
 including ``corner`` (``pip install 'xrayvisim[docs]'``).
+
+Read the Docs uses reduced sampling to keep builds short. Set
+``XRAYVISION_QUICK_EXAMPLES=1``. Quick-mode plots illustrate the workflow,
+they do not establish convergence or reliable evidence. For scientific use,
+extend the runs and check the diagnostics and stability across independent
+seeds and more live points.
 """
+
+import os
 
 import corner
 import matplotlib.pyplot as plt
@@ -24,6 +32,10 @@ from xrayvision.vis_forward_fit.bayesian import BayesianVisibilityProblem, Param
 from xrayvision.vis_forward_fit.forward_fit import sources_to_image, sources_to_vis, vis_forward_fit
 from xrayvision.vis_forward_fit.sources import Source, SourceList
 from xrayvision.visibility import Visibilities
+
+quick_run = os.environ.get("XRAYVISION_QUICK_EXAMPLES", os.environ.get("READTHEDOCS", "False")).lower() in {"1", "true"}
+if quick_run:
+    print("Quick documentation run: short chains and coarse evidence estimates; extend sampling for scientific use.")
 
 ###############################################################################
 # Simulate independent complex visibility measurements
@@ -122,7 +134,9 @@ priors = {
 }
 problem = BayesianVisibilityProblem(observed, fitted, priors)
 positions = rng.multivariate_normal(problem.initial_params, initial_covariance, size=16)
-posterior = sample_emcee(problem, positions, n_steps=5000, burn_in=500, seed=24)
+posterior = sample_emcee(
+    problem, positions, n_steps=600 if quick_run else 5000, burn_in=200 if quick_run else 500, seed=24
+)
 
 print("Autocorrelation status:", posterior.autocorrelation_status)
 print("Autocorrelation times:", posterior.autocorrelation_time)
@@ -389,24 +403,29 @@ for model_name, source_list in candidate_sources.items():
 # Estimate evidence and check repeatability
 # -----------------------------------------
 #
-# Repeat with an independent seed and more live points. Report dynesty's
+# The longer mode repeats with an independent seed and more live points;
+# quick mode uses one smaller run per model. Report dynesty's
 # estimated errors and the change between runs, rather than claiming that a
 # stopping criterion proves convergence. Here dlogz limits the estimated
 # remaining evidence contribution; it is not the error bar on log evidence.
 # The example is modest in size; difficult or multimodal data can require many
 # more live points and further checks.
-# Random-walk proposals help explore the correlated blend parameters. The
+# Random-walk proposals help explore the correlated blend parameters.
 # Symmetry implies equal posterior probability for the two label orderings.
 # The printed weights assess this finite-run approximation; left/right
 # relabelling cannot repair a missed mode.
 
 comparison_runs = []
-live_point_counts = (200, 400)
+live_point_counts = (50,) if quick_run else (200, 400)
 for run_index, nlive in enumerate(live_point_counts):
     run_results = {}
     for model_index, (model_name, model_problem) in enumerate(comparison_problems.items()):
         result = sample_dynesty(
-            model_problem, nlive=nlive, dlogz=0.2, sample="rwalk", seed=81 + 10 * run_index + model_index
+            model_problem,
+            nlive=nlive,
+            dlogz=1.0 if quick_run else 0.2,
+            sample="rwalk",
+            seed=81 + 10 * run_index + model_index,
         )
         run_results[model_name] = result
         print(
@@ -428,8 +447,9 @@ for run_results in comparison_runs:
     # The two model runs use independent random seeds.
     log_bayes_errors.append(np.hypot(elliptical_result.log_evidence_error, circular_result.log_evidence_error))
     print(f"log Bayes factor (two circles / one ellipse): {log_bayes_factors[-1]:.2f} +/- {log_bayes_errors[-1]:.2f}")
-print("Change in log Bayes factor between runs:", log_bayes_factors[1] - log_bayes_factors[0])
-print("Estimated error on that change:", np.hypot(*log_bayes_errors))
+if len(comparison_runs) > 1:
+    print("Change in log Bayes factor between runs:", log_bayes_factors[1] - log_bayes_factors[0])
+    print("Estimated error on that change:", np.hypot(*log_bayes_errors))
 
 ###############################################################################
 # Refine maximum likelihood and report AIC and BIC
@@ -485,7 +505,8 @@ for model_name, result in nested_results.items():
 # Use an actual high-posterior draw for each image, selected using likelihood
 # plus prior density. The largest nested-sampling weight is not the posterior
 # mode: weights also reflect the prior volume represented by each sample.
-# Use the second, larger run for the images and corner plots below.
+# Use the final run for the images and corner plots below. In the longer mode,
+# this is the second run with more live points.
 
 comparison_images = [sources_to_image(blend_truth, image_shape, pixel_size)]
 comparison_best = {}
@@ -496,6 +517,8 @@ for model_name, result in nested_results.items():
     comparison_images.append(sources_to_image(result.sources_from_sample(best_index), image_shape, pixel_size))
 
 model_figure = plt.figure(figsize=(14, 8), layout="constrained")
+if quick_run:
+    model_figure.suptitle("Quick documentation run: illustrative sampling")
 grid = model_figure.add_gridspec(2, 6)
 model_axes = [model_figure.add_subplot(grid[0, :2])]
 model_axes.extend(
@@ -513,12 +536,12 @@ model_figure.colorbar(artist, ax=model_axes, label=brightness_unit.to_string("la
 evidence_axis = model_figure.add_subplot(grid[1, :3])
 for run_index, (run_results, nlive) in enumerate(zip(comparison_runs, live_point_counts)):
     evidence_axis.errorbar(
-        np.arange(2) + (run_index - 0.5) * 0.12,
+        np.arange(2) + (run_index - (len(comparison_runs) - 1) / 2) * 0.12,
         [result.log_evidence for result in run_results.values()],
         yerr=[result.log_evidence_error for result in run_results.values()],
         fmt="o",
         capsize=4,
-        label=f"{nlive} live points, independent seeds",
+        label=f"{nlive} live points",
     )
 evidence_axis.set(xticks=[0, 1], xticklabels=list(nested_results), ylabel="Log evidence (larger is favoured)")
 evidence_axis.set_title(

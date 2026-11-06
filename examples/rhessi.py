@@ -5,7 +5,15 @@ RHESSI Visibility Imaging
 
 Create images from RHESSI visibility data
 
+Read the Docs uses reduced sampling to keep builds short. Set
+``XRAYVISION_QUICK_EXAMPLES=1``. Quick-mode plots illustrate the workflow,
+they do not establish convergence or reliable evidence. For scientific use,
+extend the runs and check the diagnostics and stability across independent
+seeds and more live points.
+
 """
+
+import os
 
 import corner
 import matplotlib.pyplot as plt
@@ -24,6 +32,8 @@ from xrayvision.vis_forward_fit.bayesian import BayesianVisibilityProblem, Param
 from xrayvision.vis_forward_fit.forward_fit import sources_to_image, vis_forward_fit
 from xrayvision.vis_forward_fit.sources import Source, SourceList
 from xrayvision.visibility import Visibilities, VisMeta
+
+quick_run = os.environ.get("XRAYVISION_QUICK_EXAMPLES", os.environ.get("READTHEDOCS", "False")).lower() in {"1", "true"}
 
 ###############################################################################
 # We will use `astropy.io.fits` to download and open the RHESSI visibility fits
@@ -211,7 +221,11 @@ for _ in range(2400):
         break
 if len(positions) != 24:
     raise RuntimeError("Could not initialise 24 valid walkers; inspect the fit and priors.")
-posterior = sample_emcee(problem, np.asarray(positions), n_steps=10000, burn_in=1000, seed=43)
+if quick_run:
+    print("Quick documentation run: illustrative posterior; extend sampling and check convergence for scientific use.")
+posterior = sample_emcee(
+    problem, np.asarray(positions), n_steps=600 if quick_run else 10000, burn_in=200 if quick_run else 1000, seed=43
+)
 print("RHESSI reduced chi-square (initial PSO fit):", pso_result.fit_statistics.reduced_chi2)
 print("RHESSI autocorrelation status:", posterior.autocorrelation_status)
 print("Autocorrelation times:", posterior.autocorrelation_time)
