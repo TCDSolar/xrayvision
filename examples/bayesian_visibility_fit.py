@@ -3,20 +3,19 @@
 Bayesian recovery of a synthetic source
 =======================================
 
-Fit noisy complex X-ray visibilities with the existing circular Gaussian model,
-inspect emcee traces and visibility predictions, and plot the posterior with
-corner. Then compare two overlapping circular Gaussians with one elliptical
-Gaussian using dynesty evidence, AIC, and BIC, showing how parameter estimation
-differs from model comparison.
-The example uses the public fitting API; no separate source implementation is
-needed. Install the documentation dependencies to run the plotting example,
-including ``corner`` (``pip install 'xrayvisim[docs]'``).
+How accurately can we recover a source's flux, position, and size from noisy
+visibilities? We start with a circular Gaussian whose parameters are known,
+make an initial fit, and use emcee to explore the range of source parameters
+consistent with the measurements and our prior assumptions.
 
-Read the Docs uses reduced sampling to keep builds short. Set
-``XRAYVISION_QUICK_EXAMPLES=1``. Quick-mode plots illustrate the workflow,
-they do not establish convergence or reliable evidence. For scientific use,
-extend the runs and check the diagnostics and stability across independent
-seeds and more live points.
+We then ask whether the data can distinguish two overlapping circular sources
+from a single elliptical source. Dynesty estimates the evidence for each model,
+and we compare their reconstructed images, parameter uncertainties, AIC, and BIC.
+
+Read the Docs uses short runs to illustrate the workflow. Set
+``XRAYVISION_QUICK_EXAMPLES=1`` to preview these locally, or ``0`` to use the
+longer settings. For scientific use, extend sampling until the diagnostics and
+independent runs support reliable parameter uncertainties and model comparisons.
 """
 
 import os
@@ -35,16 +34,16 @@ from xrayvision.visibility import Visibilities
 
 quick_run = os.environ.get("XRAYVISION_QUICK_EXAMPLES", os.environ.get("READTHEDOCS", "False")).lower() in {"1", "true"}
 if quick_run:
-    print("Quick documentation run: short chains and coarse evidence estimates; extend sampling for scientific use.")
+    print("Quick documentation run: short chains and coarse evidence estimates, extend sampling for scientific use.")
 
 ###############################################################################
-# Simulate independent complex visibility measurements
-# ----------------------------------------------------
+# Create noisy observations of a known source
+# -------------------------------------------
 #
-# Source amplitude is differential photon flux integrated over angular area,
-# rather than surface brightness. Real and imaginary noise have separate known
-# standard deviations. Each sampled baseline appears once: conjugate copies
-# would not provide independent measurements.
+# We first define a circular Gaussian and calculate its complex visibilities at
+# 30 spatial frequencies. Adding Gaussian noise produces a synthetic observation,
+# with separate known noise levels for the real and imaginary components.
+# Knowing the original source lets us check how well the fitting recovers it.
 
 flux_unit = apu.ph / (apu.s * apu.cm**2 * apu.keV)
 truth = SourceList(
@@ -65,13 +64,14 @@ observed = Visibilities(
 )
 
 ###############################################################################
-# Initialise with the existing SciPy fit
-# --------------------------------------
+# Make an initial circular-source fit
+# ------------------------------------
 #
-# The local fit and its Gauss-Newton covariance place the walkers near a useful
-# starting point. This covariance is only used for initialisation; the posterior
-# uncertainty below comes from sampling. Optimisation bounds do not become
-# priors.
+# A first fit of a circular source is made with the default fitting method,
+# Nelder-Mead. This provides a reference image and a starting point for the
+# Bayesian fit. We also request a local Gauss-Newton covariance estimate, which
+# will set the initial spread and correlations of the emcee walkers. The final
+# parameter uncertainties will come from the posterior samples.
 
 guess = SourceList(
     [
@@ -94,13 +94,12 @@ if initial_covariance is None:
     raise RuntimeError("The local fit did not provide a usable initialisation covariance.")
 
 ###############################################################################
-# Compare the injected and initially recovered images
-# ---------------------------------------------------
+# Compare the original source with the initial fit
+# ------------------------------------------------
 #
-# Render both source lists on the same angular grid and share a colour scale.
-# Analytical images sample a surface-brightness density in canonical arcsecond
-# coordinates, so the displayed intensity is photon flux per square arcsecond.
-# This image comparison uses the initial SciPy fit, before posterior sampling.
+# Before sampling, we compare the initial reconstruction with the source used
+# to create the data. The common image grid and colour scale let us judge its
+# position, size, and brightness directly.
 
 input_image = sources_to_image(truth, image_shape, pixel_size)
 field_of_view = (image_shape * pixel_size).to_value(apu.arcsec)
@@ -119,12 +118,13 @@ image_figure.colorbar(artist, ax=image_axes, label=brightness_unit.to_string("la
 plt.show()
 
 ###############################################################################
-# Specify scientific priors explicitly
-# ------------------------------------
+# Describe plausible source parameters
+# -------------------------------------
 #
-# Flux and width have positive, bounded priors; positions have broad normal
-# priors in arcseconds. Prior names match the source parameter names exactly.
-# Units can differ from the observation units when they are convertible.
+# Bayesian fitting combines how well a source explains the data with our prior
+# assumptions about its parameters. Here we allow a broad range of positive
+# fluxes and sizes, and use broad normal distributions for position. These
+# priors are chosen explicitly, separately from the bounds used by the first fit.
 
 priors = {
     "source[0].amp": ParameterPrior(uniform(loc=0.1, scale=3.9), flux_unit),
@@ -132,11 +132,34 @@ priors = {
     "source[0].y0": ParameterPrior(norm(loc=0, scale=5), apu.arcsec),
     "source[0].sigma": ParameterPrior(uniform(loc=0.5, scale=5.5), apu.arcsec),
 }
+
+###############################################################################
+# Explore parameter uncertainty with emcee
+# ----------------------------------------
+#
+# We combine the observations, circular-source model, and priors in a Bayesian
+# fitting problem. Sixteen walkers start near the first fit, spread according
+# to its covariance, and explore the posterior distribution. After discarding
+# the initial burn-in steps, their samples describe which parameter values are
+# plausible and how those parameters vary together.
+
 problem = BayesianVisibilityProblem(observed, fitted, priors)
 positions = rng.multivariate_normal(problem.initial_params, initial_covariance, size=16)
 posterior = sample_emcee(
     problem, positions, n_steps=600 if quick_run else 5000, burn_in=200 if quick_run else 500, seed=24
 )
+
+###############################################################################
+# Check the sampling and recovered parameters
+# -------------------------------------------
+#
+# We inspect the sampling diagnostics before interpreting the uncertainties.
+# In particular, ``chain_too_short`` indicates that the run needs extending,
+# even an estimated autocorrelation time does not establish convergence by itself.
+#
+# Because this is a simulation, we can also check whether each injected
+# parameter falls within its marginal 95% credible interval. Noise can shift
+# the recovered values away from the input, so exact agreement is not expected.
 
 print("Autocorrelation status:", posterior.autocorrelation_status)
 print("Autocorrelation times:", posterior.autocorrelation_time)
@@ -150,19 +173,19 @@ for name, true_value, unit in zip(posterior.parameter_names, truth_params, poste
     coverage[name] = inside
     print(name, "injected:", true_value * unit, "95% credible interval:", interval, "contains injected value:", inside)
 
-# These are individual, marginal intervals, not a joint 95% region. A correctly
-# calibrated interval can miss the true value in any particular noisy dataset.
+# These intervals describe each parameter separately. Even a well-calibrated
+# interval can miss the injected value in a particular noisy observation.
 print("All injected parameters inside their marginal 95% intervals:", all(coverage.values()))
 
 ###############################################################################
-# Compare the injected, initial, and sampled source images
-# --------------------------------------------------------
+# Reconstruct an image from the posterior
+# ---------------------------------------
 #
-# Select the actual production draw with the largest sampled log posterior.
-# This is an approximation to the posterior mode, not an optimisation proving
-# the global maximum. Using a complete draw preserves the joint parameter
-# configuration. The credible intervals and full sample distribution still
-# describe uncertainty; this single image is only a representative point result.
+# To show one representative reconstruction, we choose the sampled source with
+# the highest posterior density. Using a complete sample keeps its parameters
+# together, including their correlations. We compare this image with the input
+# source and first fit. The full posterior, rather than this one image, describes
+# the uncertainty in the reconstruction.
 
 best_step, best_walker = np.unravel_index(np.argmax(posterior.log_prob), posterior.log_prob.shape)
 sampled_sources = posterior.sources_from_sample(int(best_step), int(best_walker))
@@ -182,13 +205,14 @@ posterior_image_figure.colorbar(artist, ax=posterior_image_axes, label=brightnes
 plt.show()
 
 ###############################################################################
-# Inspect the production traces
-# -----------------------------
+# Follow the walkers through the run
+# ----------------------------------
 #
-# Burn-in is excluded from ``chain``. Walkers within this ensemble are dependent;
-# they are not independent chains for convergence statistics. An autocorrelation
-# estimate and apparently stable traces do not prove that all modes were found.
-# For this simple single-source example the local fit provides a good start.
+# Each line below follows a walker's parameter values after burn-in. The traces
+# help us see whether the walkers explore a stable region or continue to drift.
+# Dashed lines mark the injected values. We interpret these plots alongside the
+# diagnostics above, since the walkers are correlated and stable-looking traces
+# can still miss another region of plausible solutions.
 
 symbols = [r"$F$", r"$x_0$", r"$y_0$", r"$\sigma$"]
 labels = [f"{symbol}\n{unit.to_string('latex_inline')}" for symbol, unit in zip(symbols, posterior.parameter_units)]
@@ -198,18 +222,19 @@ for column, axis in enumerate(trace_axes):
     axis.axhline(truth_params[column], color="C3", linestyle="--", linewidth=1)
     axis.set_ylabel(labels[column])
 trace_axes[-1].set_xlabel("Production step")
-trace_figure.suptitle("Parameter traces; dashed lines show injected values")
+trace_figure.suptitle("Parameter traces, dashed lines show injected values")
 plt.show()
 
 ###############################################################################
 # Compare posterior visibility predictions with the observations
 # --------------------------------------------------------------
 #
-# Predict visibilities from individual source draws. This propagates the joint
-# parameter distribution through the original analytical visibility function.
-# The intervals describe uncertainty in the noiseless model prediction; they do
-# not include a second draw of measurement noise. Each baseline is a separate
-# point, ordered by spatial frequency for display.
+# We also check the reconstruction against the measurements it was fitted to.
+# Predicting visibilities from 200 posterior samples gives a range of plausible
+# model values at each measured spatial frequency. The orange intervals show
+# uncertainty in that prediction, while the blue error bars show measurement
+# noise. Red crosses mark the noiseless source used to make the observation.
+# The points are ordered by spatial frequency to make the comparison easier.
 
 draw_indices = rng.choice(len(posterior.samples), size=200, replace=False)
 predictions = np.array([problem.predict(posterior.samples[i]).to_value(flux_unit) for i in draw_indices])
@@ -254,17 +279,14 @@ plt.show()
 # Plot the emcee posterior with corner
 # ------------------------------------
 #
-# ``samples`` already contains the flattened production draws in the order of
-# ``parameter_names`` and ``parameter_units``. No sampler internals are needed.
-# The diagonal panels show marginal distributions and the 16th, 50th, and 84th
-# percentiles; the lower panels show joint distributions with 68% and 95%
-# probability contours. Red markers indicate the injected parameters and green
-# markers show the highest-posterior draw used for the sampled image. A corner
-# plot displays parameter uncertainty and correlation, not sampling convergence.
-# Added noise can shift the posterior peak away from an injected value; compare
-# the marginal credible intervals reported above rather than expecting equality.
-# With repeated source types or periodic angles, label switching or angular
-# wrapping would need attention before interpreting these marginal summaries.
+# A corner plot brings the parameter uncertainties and correlations together.
+# The diagonal panels show each parameter's distribution, with its median and
+# 16th/84th percentiles. The panels below show pairs of parameters with 68% and
+# 95% probability contours, tilted contours reveal correlations.
+#
+# Red markers show the injected parameters. Green markers show the same complete
+# sample used for the reconstructed image. Their separation reflects both the
+# measurement noise and the spread of plausible sources in the posterior.
 
 # Pad the sampled range and injected value by one posterior standard deviation
 # on each side. These display limits do not change the credible intervals.
@@ -306,18 +328,18 @@ corner_figure.text(
 plt.show()
 
 ###############################################################################
-# Compare source models with dynesty
-# ----------------------------------
+# Can one ellipse explain two overlapping sources?
+# ------------------------------------------------
 #
-# Emcee estimates parameters within a chosen model. Nested sampling also
-# estimates the evidence, the likelihood averaged over the model's entire prior.
-# A flexible model can fit better but is supported only when this improvement
-# outweighs the prior volume giving poor fits. Evidence depends on the priors;
-# it is not just a comparison of the best likelihoods or parameter counts.
+# So far, we have assumed the source is a circular Gaussian and asked how well
+# its parameters can be measured. We now ask which source model the data support.
+# Two overlapping circles can resemble a single ellipse in an image. Can the
+# visibilities distinguish them, and do they justify the two additional
+# parameters needed for two circles?
 #
-# Use a new noisy dataset from two overlapping circular sources, keeping the
-# same spatial frequencies, flux units, and noise convention for both models.
-# No SciPy fit or initial ensemble is needed for nested sampling.
+# We create a second observation from two overlapping circular Gaussians. Both
+# candidate models will be fitted to these same visibilities, with the same
+# spatial-frequency coverage and noise levels.
 
 blend_truth = SourceList(
     [
@@ -338,24 +360,22 @@ comparison_observed = Visibilities(
 )
 
 ###############################################################################
-# Keep model priors explicit and comparable
-# -----------------------------------------
+# State the assumptions for each model
+# ------------------------------------
 #
-# Each circular component has a uniform flux prior [0.1, 2]. Their sum has a
-# triangular distribution on [0.2, 4], which is used for the ellipse's total
-# flux, giving both models the same total-flux prior. Every position has a
-# normal prior with mean zero and standard deviation 5 arcsec, and each width
-# is uniform on [0.5, 6] arcsec. These choices do not give identical priors on
-# centroid or source area. Evidence remains conditional on these assumptions.
+# Model comparison depends on the full prior assumptions, including the range
+# of sources each model allows. We give both models the same prior on total
+# flux: two independent uniform component fluxes add to a triangular
+# distribution, which we use for the ellipse's flux. We also use broad position
+# and width priors. The models still imply different priors on quantities such
+# as source area and centroid, so the comparison remains conditional on these
+# illustrative choices.
 #
-# The two circles have identical, independent priors. Both label permutations
-# belong to the sampled model: no ordering constraint or factorial correction
-# is applied to the evidence. Left/right labels are assigned only for plotting.
-# For the ellipse, theta spans 90 degrees and the two widths remain unordered.
-# Swapping the axes and rotating by 90 degrees gives an equivalent ellipse,
-# so this chart covers each non-circular physical ellipse once. It avoids
-# imposing an ordering constraint on independent width priors. A circular
-# ellipse still has no identifiable orientation.
+# The circle labels are arbitrary, so both components receive identical priors
+# and can exchange labels during sampling. We will call them left and right
+# only when plotting. For the ellipse, we use a 90-degree angle range with
+# unordered widths, covering each non-circular ellipse once without counting
+# equivalent axis swaps twice.
 
 candidate_sources = {
     "Two circles": SourceList(
@@ -400,20 +420,23 @@ for model_name, source_list in candidate_sources.items():
     comparison_problems[model_name] = BayesianVisibilityProblem(comparison_observed, source_list, model_priors)
 
 ###############################################################################
-# Estimate evidence and check repeatability
-# -----------------------------------------
+# Compare the evidence with dynesty
+# ---------------------------------
 #
-# The longer mode repeats with an independent seed and more live points;
-# quick mode uses one smaller run per model. Report dynesty's
-# estimated errors and the change between runs, rather than claiming that a
-# stopping criterion proves convergence. Here dlogz limits the estimated
-# remaining evidence contribution; it is not the error bar on log evidence.
-# The example is modest in size; difficult or multimodal data can require many
-# more live points and further checks.
-# Random-walk proposals help explore the correlated blend parameters.
-# Symmetry implies equal posterior probability for the two label orderings.
-# The printed weights assess this finite-run approximation; left/right
-# relabelling cannot repair a missed mode.
+# Dynesty explores each model starting from its priors and estimates its
+# evidence: the likelihood averaged over all the sources allowed by those
+# priors. This asks whether the extra flexibility improves the explanation of
+# the data enough to outweigh the additional range of possible sources.
+#
+# In the longer mode, we repeat with an independent seed and more live points
+# to see how stable the evidence estimates are. Quick mode runs each model once
+# for illustration. We report the estimated numerical errors and, where
+# available, the change between runs. The ``dlogz`` setting controls when sampling
+# stops, the reported evidence error is a separate estimate of numerical precision.
+#
+# For two circles, we also inspect how much posterior weight falls in each
+# label ordering. Symmetry implies equal probability for the two orderings.
+# A large imbalance can indicate that sampling needs extending.
 
 comparison_runs = []
 live_point_counts = (50,) if quick_run else (200, 400)
@@ -452,20 +475,20 @@ if len(comparison_runs) > 1:
     print("Estimated error on that change:", np.hypot(*log_bayes_errors))
 
 ###############################################################################
-# Refine maximum likelihood and report AIC and BIC
-# -------------------------------------------------
+# Compare AIC and BIC at refined fits
+# -----------------------------------
 #
-# AIC = 2*k - 2*log(L_max), BIC = k*log(n) - 2*log(L_max), with k=8 for two
-# circles and k=6 for one ellipse. Here n=2*N_vis counts the independent real
-# and imaginary measurements; the supplied noise scales are not fitted.
-# These use maximum likelihood, not maximum posterior density or evidence.
-# Start the existing SciPy fitter at the best likelihood draw and refine it.
-# Broad physical bounds are optimisation safeguards, not Bayesian priors.
-# This local refinement does not guarantee that a global maximum was found.
+# AIC and BIC provide another way to compare the models, balancing the best
+# likelihood against a penalty for the number of fitted parameters. Two circles
+# have eight parameters, while one ellipse has six. Smaller criteria favour
+# a model. Here the real and imaginary measurements are independent, giving
+# ``n = 2 * N_vis`` - the known noise levels add no fitted parameters.
 #
-# Smaller AIC/BIC values favour a model. They are asymptotic approximations,
-# particularly fragile for mixtures whose components coincide or disappear;
-# they should not be treated as exact substitutes for the evidence.
+# These criteria require maximum-likelihood estimates. We take each model's
+# highest-likelihood nested sample and refine it with SciPy's L-BFGS-B method,
+# using broad physical bounds. This is a local refinement, so finding the global
+# maximum still depends on exploring the possible solutions. AIC and BIC are
+# approximations, especially for mixtures with coincident or vanishing components.
 
 nested_results = comparison_runs[-1]
 maximum_likelihood_statistics = {}
@@ -495,18 +518,19 @@ for model_name, result in nested_results.items():
     )
 
 ###############################################################################
-# See the competing images, evidence, and information criteria
-# ------------------------------------------------------------
+# Bring the images and model comparisons together
+# -----------------------------------------------
 #
-# A positive log Bayes factor favours two circles under these priors. Equal
-# prior model odds would give posterior model odds equal to the Bayes factor;
-# these are not probabilities that either model is the true source.
+# We can now compare the images alongside the evidence and information criteria.
+# Higher evidence favours a model - the log Bayes factor is positive when it
+# favours two circles and negative when it favours one ellipse. With equal
+# prior model odds, the Bayes factor gives the posterior odds between these
+# two hypotheses, conditional on their priors and the measurement model.
 #
-# Use an actual high-posterior draw for each image, selected using likelihood
-# plus prior density. The largest nested-sampling weight is not the posterior
-# mode: weights also reflect the prior volume represented by each sample.
-# Use the final run for the images and corner plots below. In the longer mode,
-# this is the second run with more live points.
+# As before, each reconstructed image uses the sampled source with the highest
+# posterior density. AIC and BIC use the separately refined likelihood fits.
+# All plots below use the final nested-sampling run, which has more live points
+# in the longer mode.
 
 comparison_images = [sources_to_image(blend_truth, image_shape, pixel_size)]
 comparison_best = {}
@@ -566,7 +590,7 @@ criteria_table.scale(1, 2)
 criteria_axis.text(
     0.5,
     0.2,
-    f"Refined maximum-likelihood fits; n = {2 * len(u)} real measurements\n"
+    f"Refined maximum-likelihood fits: n = {2 * len(u)} real measurements\n"
     "Images above show highest-posterior sampled draws.",
     ha="center",
     transform=criteria_axis.transAxes,
@@ -574,17 +598,19 @@ criteria_axis.text(
 plt.show()
 
 ###############################################################################
-# Inspect weighted parameter distributions for both models
-# ---------------------------------------------------------
+# Explore the uncertainty within each model
+# -----------------------------------------
 #
-# Nested samples require weights in both histograms and marginal quantiles.
-# Display the weighted central 99.8 percent range, padded by a posterior standard
-# deviation and extended to include injected values where the parameter exists.
-# Sort each two-circle draw by x position for display, including the selected
-# highest-posterior draw, while preserving the original samples and weights.
-# An ellipse has no injected parameter vector for a two-circle source, so no
-# red truth markers are shown for that model. A precise posterior can accompany
-# the wrong morphology; uncertainty within one model does not assess that model.
+# Finally, we examine the parameters of each candidate model. For overlapping
+# circles, one component's flux or position can trade off against the other's.
+# The corner plot makes these correlations visible. We assign left/right labels
+# for display so that interchangeable source labels do not obscure the result.
+# Red markers show the injected circular components. There is no injected ellipse
+# parameter vector, so its plot has no red markers.
+#
+# Dynesty samples carry different posterior weights, which must be included in
+# the histograms and quantiles. These plots describe uncertainty within each
+# model. We use the evidence and information criteria above to compare models.
 
 blend_parameters = np.asarray(blend_truth.to_canonical(flux_unit).params)
 for model_name, result in nested_results.items():

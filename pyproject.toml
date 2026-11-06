@@ -41,7 +41,7 @@ map = [
     "sunpy[map]>=7.0.0"
 ]
 pso = [
-        "pymoo>=0.6.1.3"
+    "pymoo>=0.6.1.3"
 ]
 bayes = [
     "emcee>=3.1.6",
