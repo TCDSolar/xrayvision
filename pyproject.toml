@@ -45,7 +45,8 @@ pso = [
 ]
 bayes = [
     "emcee>=3.1.6",
-    "corner>=2.2.3"
+    "corner>=2.2.3",
+    "dynesty>=3.0.0"
 ]
 all = ["xrayvisim[map,pso,bayes]"]
 tests = [

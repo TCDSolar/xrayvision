@@ -152,7 +152,9 @@ def fit_statistics(vis: Visibilities, sources: SourceList, *, weighting: str = "
     All source parameters are counted as free. Reduced chi-square uses
     ``2 * n_visibilities - n_parameters`` and is unavailable without errors
     or with non-positive degrees of freedom. See `VisibilityFitData` for
-    the error conventions selected by ``weighting``.
+    the error conventions selected by ``weighting``. With known errors, also
+    reports normalised log likelihood and AIC/BIC. Interpret the criteria at
+    maximum-likelihood estimates; this function does not optimise the sources.
     """
     data = VisibilityFitData(vis, weighting=weighting)
     numeric_sources = sources.to_canonical(data.flux_unit)

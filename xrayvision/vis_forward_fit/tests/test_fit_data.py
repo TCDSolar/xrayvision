@@ -51,6 +51,12 @@ def test_statistics_use_real_data_count_and_do_not_reduce_objective():
     assert stats.chi2 == 15
     assert stats.dof == 2
     assert stats.reduced_chi2 == 7.5
+    expected_log_likelihood = multivariate_normal.logpdf(
+        data.values_ri, mean=np.concatenate([prediction.real, prediction.imag]), cov=np.eye(6)
+    )
+    assert_allclose(stats.log_likelihood, expected_log_likelihood)
+    assert_allclose(stats.aic, 2 * 4 - 2 * expected_log_likelihood)
+    assert_allclose(stats.bic, 4 * np.log(6) - 2 * expected_log_likelihood)
     assert data.objective(prediction) == 15
     assert data.statistics(prediction, n_parameters=6).reduced_chi2 is None
 
@@ -63,6 +69,9 @@ def test_unweighted_objective_is_not_reported_as_chi_square():
     assert stats.weighting == "none"
     assert stats.chi2 is None
     assert stats.reduced_chi2 is None
+    assert stats.log_likelihood is None
+    assert stats.aic is None
+    assert stats.bic is None
     weighted = make_observations(amplitude_uncertainty=np.full(3, 100) * apu.Jy)
     assert VisibilityFitData(weighted, weighting="none").statistics(data.values - 1, 4) == stats
 
@@ -138,6 +147,18 @@ def test_log_likelihood_observation_unit_jacobian():
     jy = VisibilityFitData(obs).log_likelihood(prediction)
     mjy = VisibilityFitData(converted).log_likelihood(prediction)
     assert_allclose(mjy - jy, -6 * np.log(1000))
+    # Absolute scores shift with the density's numeric unit; model differences
+    # remain invariant when both fits use the same converted observations.
+    jy_data, mjy_data = VisibilityFitData(obs), VisibilityFitData(converted)
+    for criterion in ("aic", "bic"):
+        jy_scores = [
+            getattr(jy_data.statistics(model, k), criterion) for model, k in ((prediction, 2), (obs.visibilities, 4))
+        ]
+        mjy_scores = [
+            getattr(mjy_data.statistics(model, k), criterion) for model, k in ((prediction, 2), (obs.visibilities, 4))
+        ]
+        assert_allclose(mjy_scores[0] - jy_scores[0], 12 * np.log(1000))
+        assert_allclose(mjy_scores[1] - mjy_scores[0], jy_scores[1] - jy_scores[0])
 
 
 @pytest.mark.parametrize("with_errors", [False, True])

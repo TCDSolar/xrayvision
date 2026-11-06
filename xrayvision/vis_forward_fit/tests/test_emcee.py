@@ -8,7 +8,7 @@ from scipy.stats import norm, uniform
 import astropy.units as apu
 
 from xrayvision.vis_forward_fit.bayesian import BayesianVisibilityProblem, ParameterPrior, sample_emcee
-from xrayvision.vis_forward_fit.forward_fit import sources_to_vis
+from xrayvision.vis_forward_fit.forward_fit import sources_to_vis, vis_forward_fit
 from xrayvision.vis_forward_fit.sources import Source, SourceList
 from xrayvision.visibility import Visibilities
 
@@ -312,3 +312,115 @@ def test_circular_ellipse_recovers_size_without_identifying_orientation(sampler_
     # Fourth harmonic is appropriate to this half-pi angle interval with
     # exchangeable widths. A uniform angle distribution has zero moment.
     assert np.abs(np.mean(np.exp(4j * theta))) < 0.2
+
+
+@pytest.mark.parametrize("shape, n_steps", [("loop", 1600), ("mixed", 2400)])
+def test_noisy_loop_and_mixed_source_parameter_recovery(shape, n_steps):
+    models = [
+        Source("circular", 1.2 * FLUX_UNIT, -8 * apu.arcsec, -5 * apu.arcsec, 1.4 * apu.arcsec),
+        Source(
+            "elliptical",
+            0.9 * FLUX_UNIT,
+            7 * apu.arcsec,
+            -4 * apu.arcsec,
+            1.1 * apu.arcsec,
+            2.3 * apu.arcsec,
+            0.35 * apu.rad,
+        ),
+        Source(
+            "loop",
+            1.5 * FLUX_UNIT,
+            -1 * apu.arcsec,
+            6 * apu.arcsec,
+            2 * apu.arcsec,
+            4.5 * apu.arcsec,
+            0.25 * apu.rad,
+            0.9 * apu.rad,
+        ),
+    ]
+    sources = SourceList(models[-1:] if shape == "loop" else models)
+    # Resolved components and one source of each type avoid interchangeable
+    # labels. Positive curvature and angles away from their chart boundaries
+    # select one representation of each geometry for parameter summaries.
+    # These are local recovery tests, not a test of exploring every mode.
+    ranges = {
+        "Circular": [[0.2, -15, -15, 0.5], [3, 15, 15, 3]],
+        "Elliptical": [[0.2, -15, -15, 0.5, 0.5, -np.pi / 4], [3, 15, 15, 3, 3, np.pi / 4]],
+        "Loop": [[0.2, -15, -15, 1.2, 3.5, -np.pi / 2, 0.3], [3, 15, 15, 2.8, 6, np.pi / 2, 1.2]],
+    }
+    rng = np.random.default_rng(91)
+    u, v = rng.uniform(-0.14, 0.14, (2, 96)) / apu.arcsec
+    sigma_real, sigma_imag = 0.005, 0.008
+    noise = rng.normal(0, sigma_real, 96) + 1j * rng.normal(0, sigma_imag, 96)
+    vis = Visibilities(
+        sources_to_vis(sources, u, v) + noise * FLUX_UNIT,
+        u,
+        v,
+        uncertainty=np.full(96, sigma_real + 1j * sigma_imag) * FLUX_UNIT,
+    )
+    truth = np.asarray(sources.to_canonical(FLUX_UNIT).params)
+    guess = truth.copy()
+    offset = 0
+    for source in sources:
+        guess[offset : offset + 3] += [-0.06, 0.2, -0.15]
+        guess[offset + 3 : offset + source.n_params] *= 1.04
+        offset += source.n_params
+    initial = SourceList.from_params(sources, guess)
+    for source in initial:
+        source.amp *= FLUX_UNIT
+        source.bounds = ranges[type(source).__name__]
+    # The fixed physical ranges above define explicit uniform priors. Match
+    # the optimiser bounds for this experiment without deriving scientific
+    # priors from the fitted parameters or their uncertainty estimates.
+    lower, upper = np.asarray(initial.bounds)
+    priors = {
+        name: ParameterPrior(uniform(loc=lo, scale=hi - lo), unit)
+        for name, unit, lo, hi in zip(initial.parameter_names, initial.parameter_units(FLUX_UNIT), lower, upper)
+    }
+    _, fitted, fit = vis_forward_fit(
+        vis,
+        initial,
+        [33, 33] * apu.pix,
+        [1, 1] * apu.arcsec / apu.pix,
+        map=False,
+        method="L-BFGS-B",
+        return_result=True,
+        uncertainty="gauss_newton",
+    )
+    assert fit.success
+    assert fit.parameter_uncertainty.status == "ok"
+    covariance = fit.parameter_uncertainty.covariance
+    assert covariance is not None
+    centre = np.asarray(fitted.to_canonical(FLUX_UNIT).params)
+    problem = BayesianVisibilityProblem(vis, fitted, priors)
+    # Start around the perturbed-guess SciPy fit, not at the injected vector.
+    # At this noise level the local Gauss-Newton covariance approximates the
+    # posterior, but the sampler must recover its location and spread itself.
+    sampler_rng = np.random.default_rng(73)
+    positions = sampler_rng.multivariate_normal(centre, 4 * covariance, size=2 * problem.ndim + 6)
+    result = sample_emcee(problem, positions, n_steps=n_steps, burn_in=500, seed=52)
+    scale = np.sqrt(np.diag(covariance))
+    assert_allclose((result.samples.mean(axis=0) - centre) / scale, 0, atol=0.4)
+    assert_allclose(result.samples.std(axis=0, ddof=1) / scale, 1, rtol=0.25)
+    # Noise can displace a recovered parameter from its injected value. These
+    # are individual checks, not a claim of joint credible-interval coverage.
+    assert np.all(np.abs(result.samples.mean(axis=0) - truth) < 4 * scale)
+
+    # Check recovery of the combined visibility field at baselines not used in
+    # fitting, so success is more than agreeing at the observed sample points.
+    test_u, test_v = rng.uniform(-0.14, 0.14, (2, 32)) / apu.arcsec
+    expected = sources_to_vis(sources, test_u, test_v).to_value(FLUX_UNIT)
+    indices = sampler_rng.choice(len(result.samples), size=200, replace=False)
+    predictions = np.array(
+        [
+            sources_to_vis(
+                result.sources_from_sample(int(i // result.chain.shape[1]), int(i % result.chain.shape[1])),
+                test_u,
+                test_v,
+            ).to_value(FLUX_UNIT)
+            for i in indices
+        ]
+    )
+    residual = predictions.mean(axis=0) - expected
+    assert np.sqrt(np.mean(residual.real**2)) < 2 * sigma_real
+    assert np.sqrt(np.mean(residual.imag**2)) < 2 * sigma_imag

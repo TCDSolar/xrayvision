@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 from numpy.typing import NDArray
+from scipy.special import logsumexp
 
 import astropy.units as apu
 from astropy.units import Quantity, UnitBase
@@ -24,7 +25,14 @@ if TYPE_CHECKING:
 
     type _ScalarDistribution = rv_continuous_frozen[rv_continuous, float | np.float64]
 
-__all__ = ["BayesianFitResult", "BayesianVisibilityProblem", "ParameterPrior", "sample_emcee"]
+__all__ = [
+    "BayesianFitResult",
+    "BayesianVisibilityProblem",
+    "NestedFitResult",
+    "ParameterPrior",
+    "sample_dynesty",
+    "sample_emcee",
+]
 
 
 class ParameterPrior:
@@ -386,5 +394,133 @@ def sample_emcee(
             "seed": seed,
             "autocorrelation_message": message,
             "zero_acceptance_walkers": np.flatnonzero(acceptance == 0).tolist(),
+        },
+    )
+
+
+@dataclass
+class NestedFitResult:
+    """Weighted posterior samples and evidence from static nested sampling.
+
+    Rows of ``samples`` are not equally weighted posterior draws. Use
+    ``weights`` for summaries or pass them to a plotting function accepting
+    weights. ``log_weights`` are dynesty's unnormalised log evidence weights.
+    ``log_evidence_error`` is its estimated standard error on log evidence;
+    it does not establish that every mode was explored.
+
+    Evidence comparisons require the same observations, error convention,
+    and numeric flux unit, with explicitly normalised model priors. The log
+    Bayes factor favouring A over B is ``A.log_evidence - B.log_evidence``;
+    posterior model odds also depend on prior model odds. Invalid geometry
+    retains zero likelihood under the declared prior, as in the problem.
+    """
+
+    problem: BayesianVisibilityProblem
+    samples: NDArray[np.float64]
+    log_likelihood: NDArray[np.float64]
+    log_weights: NDArray[np.float64]
+    log_evidence: float
+    log_evidence_error: float
+    diagnostics: dict[str, object]
+
+    @property
+    def parameter_names(self) -> tuple[str, ...]:
+        """Parameter labels in sample-column order."""
+        return self.problem.parameter_names
+
+    @property
+    def parameter_units(self) -> tuple[UnitBase, ...]:
+        """Parameter units, including the observation's flux unit."""
+        return self.problem.parameter_units
+
+    @property
+    def weights(self) -> NDArray[np.float64]:
+        """Normalised posterior weights, summing to one."""
+        return np.exp(self.log_weights - logsumexp(self.log_weights))
+
+    def parameter_samples(self, name: str) -> Quantity:
+        """Return a named weighted sample column with its parameter unit."""
+        try:
+            column = self.parameter_names.index(name)
+        except ValueError as error:
+            raise KeyError(f"Unknown parameter: {name}.") from error
+        return self.samples[:, column] * self.parameter_units[column]
+
+    def sources_from_sample(self, sample: int) -> SourceList:
+        """Reconstruct one weighted sample as quantity-valued sources."""
+        return self.problem.sources_from_params(self.samples[sample])
+
+
+def sample_dynesty(
+    problem: BayesianVisibilityProblem,
+    *,
+    nlive: int = 500,
+    dlogz: float = 0.01,
+    maxcall: int | None = None,
+    sample: str = "auto",
+    seed: int | None = None,
+    progress: bool = False,
+) -> NestedFitResult:
+    """Estimate posterior weights and model evidence with static dynesty.
+
+    Requires the optional ``xrayvisim[bayes]`` extra. Uses the existing
+    normalised likelihood and independent prior transform, without optimiser
+    bounds or initial positions. Uses dynesty's default bounding method with
+    ``nlive`` live points. ``sample`` selects its proposal method, default
+    ``'auto'``; ``'rwalk'`` can help with correlated parameter distributions.
+
+    ``dlogz`` controls the estimated remaining contribution to log evidence;
+    it is not a target error on log evidence. ``maxcall`` optionally limits
+    likelihood calls (approximately, following dynesty). A run stopped at
+    this limit may have unreliable evidence; dynesty's warnings are retained.
+    Neither termination nor the reported error guarantees mode exploration.
+    Repeat with different seeds and more live points before interpreting
+    model comparisons. A seed leaves NumPy's global random state unchanged.
+    """
+    try:
+        import dynesty
+    except ModuleNotFoundError as error:
+        if error.name != "dynesty":
+            raise
+        raise ImportError(
+            "Dynesty sampling requires the optional dependency: pip install 'xrayvisim[bayes]'."
+        ) from error
+
+    nlive = index(nlive)
+    if nlive <= 2 * problem.ndim:
+        raise ValueError("nlive must be greater than twice the number of parameters.")
+    if not np.isfinite(dlogz) or dlogz <= 0:
+        raise ValueError("dlogz must be finite and positive.")
+    if maxcall is not None:
+        maxcall = index(maxcall)
+        if maxcall < 1:
+            raise ValueError("maxcall must be positive.")
+
+    sampler = dynesty.NestedSampler(
+        problem.log_likelihood,
+        problem.prior_transform,
+        problem.ndim,
+        nlive=nlive,
+        sample=sample,
+        rstate=np.random.default_rng(seed),
+    )
+    sampler.run_nested(dlogz=dlogz, maxcall=maxcall, print_progress=progress)
+    results = sampler.results
+    return NestedFitResult(
+        problem=problem,
+        samples=np.array(results.samples, dtype=np.float64, copy=True),
+        log_likelihood=np.array(results.logl, dtype=np.float64, copy=True),
+        log_weights=np.array(results.logwt, dtype=np.float64, copy=True),
+        log_evidence=float(results.logz[-1]),
+        log_evidence_error=float(results.logzerr[-1]),
+        diagnostics={
+            "nlive": nlive,
+            "dlogz": dlogz,
+            "maxcall": maxcall,
+            "sample": sample,
+            "seed": seed,
+            "niter": int(results.niter),
+            "ncall": int(np.sum(results.ncall)),
+            "efficiency": float(results.eff),
         },
     )

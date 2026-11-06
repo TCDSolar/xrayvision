@@ -71,8 +71,8 @@ are free: a circle has four, an ellipse six, and a loop seven. Conjugate copies
 of measured visibilities do not supply independent observations and should not
 be added to fitting input. The denominator follows the stacked real/imaginary
 data count used by IDL, rather than ``N_v - N_free`` printed in Equation 4 of
-:cite:t:`Volpara2022_forward_fit`.
-The IDL PSO loop parameter-count discrepancy is not reproduced.
+:cite:t:`Volpara2022_forward_fit`. The IDL PSO loop parameter-count discrepancy
+is not reproduced.
 
 Set ``return_result=True`` to access statistics and the native optimiser result:
 
@@ -217,7 +217,7 @@ errors are not suppressed. The existing loop geometry, including its minimum
 component width and zero-angle approximation, is retained.
 
 Geometry rejection does not normalise a prior conditional on valid geometry.
-For future evidence calculations, the prior must explicitly represent the
+For evidence calculations, the prior must explicitly represent the
 intended model domain; it is not enough to discard invalid draws and assume
 that the remaining distribution is normalised. Source labels and orientations
 are retained as supplied, without bootstrap-style relabelling.
@@ -280,7 +280,7 @@ independent chains for convergence statistics. See
 The :ref:`sphx_glr_generated_gallery_bayesian_visibility_fit.py` example shows
 injected images, the initial SciPy fit, a highest-posterior sampled image,
 production traces, visibility predictions, and
-a final corner plot using the public posterior results. It also reports
+a corner plot using the public posterior results. It also reports
 whether each injected parameter lies within its marginal 95% credible interval.
 The plotting example uses ``corner``, included in the ``bayes`` extra and
 the documentation dependencies.
@@ -320,6 +320,99 @@ Synthetic sampler tests cover both a noisy elongated ellipse with identifiable
 orientation and a noiseless circular ellipse with balanced angular sampling.
 The circular test isolates the geometric degeneracy; a noisy realisation can
 favour a small apparent elongation and a particular angle.
+
+Dynesty evidence and weighted posterior sampling
+================================================
+
+The same ``bayes`` extra includes dynesty. ``sample_dynesty`` uses static nested
+sampling with the existing problem's normalised likelihood and prior transform.
+It needs no initial ensemble and does not apply optimiser bounds.
+
+.. code-block:: python
+
+   from xrayvision.vis_forward_fit.bayesian import sample_dynesty
+
+   nested = sample_dynesty(problem, nlive=500, dlogz=0.01, seed=42)
+   flux = nested.parameter_samples("source[0].amp")
+   mean_flux = np.average(flux.value, weights=nested.weights) * flux.unit
+   draw_sources = nested.sources_from_sample(-1)
+   print(nested.log_evidence, nested.log_evidence_error)
+
+``NestedFitResult.samples`` has shape ``(n_samples, n_parameters)``. These rows
+are weighted samples, so ordinary means, percentiles, or unweighted corner
+plots would give incorrect posterior summaries. ``weights`` sums to one;
+``log_weights`` retains dynesty's unnormalised log evidence weights.
+``log_likelihood`` stores each row's log likelihood. Names, units, and source
+reconstruction follow the existing source API, including its raw angles.
+
+For two models fitted to the same observations, uncertainty convention, and
+numeric flux unit, ``result_a.log_evidence - result_b.log_evidence`` is the log
+Bayes factor favouring A. Posterior model odds also include prior model odds.
+Evidence depends on the full prior distribution, including its support; it
+must not silently use bounds chosen to help an optimiser. Invalid geometry
+continues to have zero likelihood under the declared prior, without an implicit
+renormalisation conditional on valid geometry.
+
+``log_evidence_error`` is dynesty's estimated standard error on log evidence.
+``dlogz`` controls the estimated remaining evidence contribution, rather than
+this error. Neither establishes exploration of every mode. Repeat with
+different seeds and more live points when assessing a model comparison.
+The optional ``maxcall`` approximately limits likelihood calls; warnings from
+dynesty about early termination are retained. Results from such a truncated
+run can have unreliable evidence. ``diagnostics`` records run settings, total
+likelihood calls, iterations, and sampling efficiency.
+``sample`` selects dynesty's proposal method, default ``'auto'``; ``'rwalk'``
+can help with correlated parameters, as in the overlapping-source example.
+
+See the `dynesty documentation <https://dynesty.readthedocs.io/en/v3.0.0/quickstart.html>`_
+for the underlying evidence and weighted-sample conventions.
+
+The :ref:`sphx_glr_generated_gallery_bayesian_visibility_fit.py` example also
+compares two overlapping circular Gaussians with one elliptical Gaussian. It
+shows the injected and recovered images beside evidence estimates and AIC/BIC,
+repeats with independent seeds and more live points, and plots both models'
+weighted posteriors. The two components have identical priors; their label
+permutations are sampled and left/right matching is applied only for display.
+The ellipse and two-circle model share the same prior on total flux. Other
+induced priors, such as source area, differ and are stated in the example.
+
+Information criteria
+====================
+
+With known measurement errors, ``fit_statistics(vis, fitted_sources)`` and
+``result.fit_statistics`` from the existing SciPy/PSO fit expose
+``log_likelihood``, ``aic``, and ``bic``. These are ``None`` for unweighted fits.
+For example:
+
+.. code-block:: python
+
+   from xrayvision.vis_forward_fit.forward_fit import fit_statistics
+
+   stats = fit_statistics(vis, fitted_sources)
+   print(stats.log_likelihood, stats.aic, stats.bic)
+
+For a maximum-likelihood fit with ``k`` freely fitted parameters, the criteria
+are
+
+.. math::
+
+   \mathrm{AIC} = 2k - 2\log L_{\max}, \qquad
+   \mathrm{BIC} = k\log(2N_{\mathrm{vis}}) - 2\log L_{\max}.
+
+Here the real and imaginary components are independent observations, so the
+sample-size convention is ``n = 2 * N_vis``. Known, unfitted noise scales do
+not add parameters. Smaller values favour a model, comparing the same data,
+uncertainty convention, and numeric flux unit. Absolute scores can be negative
+and depend on this unit; differences between consistently evaluated models do
+not change under a common unit conversion.
+
+These statistics are evaluated at the supplied sources; computing them does
+not find a maximum. The example refines the highest-likelihood nested sample
+with SciPy, without applying the Bayesian prior density to the objective.
+Information criteria should not be evaluated at a posterior mean or mode, or
+by substituting log evidence for log likelihood. They are asymptotic criteria;
+mixture models with disappearing or coincident components violate regularity
+assumptions, so AIC/BIC are not exact replacements for nested-sampling evidence.
 
 Parameter uncertainties
 =======================
