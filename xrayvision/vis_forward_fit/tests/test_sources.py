@@ -221,6 +221,75 @@ def test_source_list_rejects_wrong_parameter_count(n_params):
         SourceList.from_params(sources, np.ones(n_params))
 
 
+@pytest.mark.parametrize(
+    "model, shape_params",
+    [
+        ("circular", [3 * apu.arcsec]),
+        ("elliptical", [3 * apu.arcsec, 4 * apu.arcsec, 30 * apu.deg]),
+        ("loop", [3 * apu.arcsec, 7 * apu.arcsec, 30 * apu.deg, 45 * apu.deg]),
+    ],
+)
+def test_custom_source_bounds_survive_reconstruction_and_reset(model, shape_params):
+    source = Source(model, 2 * apu.ct / apu.s, 1 * apu.arcsec, 2 * apu.arcsec, *shape_params)
+    defaults = source.bounds
+    custom = source.bounds
+    custom[0][0], custom[1][0] = 0.1, 10
+    source.bounds = custom
+    # Assignment and access must not allow callers to mutate another source's limits.
+    custom[0][0] = -1
+    returned = source.bounds
+    returned[0][0] = -2
+    assert source.bounds[0][0] == 0.1
+    for copied in [
+        source.to_canonical(),
+        source.to_quantities(),
+        SourceList.from_params(SourceList([source]), source.param_list)[0],
+    ]:
+        assert_allclose(copied.bounds, source.bounds)
+        assert copied.n_params == len(shape_params) + 3
+        copied.bounds = None
+        assert_allclose(copied.bounds, defaults)
+    assert source.bounds[0][0] == 0.1
+    source.x0 += 10
+    source.bounds = None
+    assert_allclose(source.bounds[0][1], defaults[0][1] + 10)
+    assert_allclose(source.bounds[1][1], defaults[1][1] + 10)
+
+
+def test_custom_bounds_units():
+    flux_unit = apu.ph / (apu.s * apu.cm**2 * apu.keV)
+    source = Source("circular", 2 * flux_unit, 1 * apu.arcsec, 2 * apu.arcsec, 3 * apu.arcsec)
+    source.bounds = [
+        [0.5 * flux_unit, -1 * apu.arcmin, -2 * apu.arcmin, 0.5 * apu.arcsec],
+        [4 * flux_unit, 1 * apu.arcmin, 2 * apu.arcmin, 0.1 * apu.arcmin],
+    ]
+    expected = np.array([[0.5, -60, -120, 0.5], [4, 60, 120, 6]])
+    assert_allclose(source.bounds, expected)
+    converted_unit = apu.ph / (apu.s * apu.cm**2 * apu.eV)
+    expected[:, 0] /= 1000
+    assert_allclose(source.to_canonical(converted_unit).bounds, expected)
+    params = source.param_list
+    params[0] = source.amp.to(converted_unit)
+    restored = SourceList.from_params(SourceList([source]), params)[0]
+    assert_allclose(restored.bounds, expected)
+
+
+@pytest.mark.parametrize(
+    "bounds",
+    [
+        [[0, -10, -10], [4, 10, 10]],
+        [[np.nan, -10, -10, 0.5], [4, 10, 10, 6]],
+        [[4, -10, -10, 0.5], [4, 10, 10, 6]],
+    ],
+)
+def test_custom_bounds_reject_invalid_limits(bounds):
+    source = Source("circular", 2 * apu.ct, 1 * apu.arcsec, 2 * apu.arcsec, 3 * apu.arcsec)
+    defaults = source.bounds
+    with pytest.raises(ValueError, match=r"bounds|Bounds"):
+        source.bounds = bounds
+    assert_allclose(source.bounds, defaults)
+
+
 @pytest.mark.parametrize("sigma_min, sigma_max", [(3, 7), (7, 3), (5, 5)])
 def test_loop_bounds_keep_sigma_min_below_sigma_max(sigma_min, sigma_max):
     # Regardless of the initial guess, the sigma_min and sigma_max boxes must not overlap,

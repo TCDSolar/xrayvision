@@ -134,7 +134,7 @@ def _align_sources(candidate: SourceList, reference: SourceList, scales: NDArray
         rows, cols = linear_sum_assignment(cost)
         for row, col in zip(rows, cols):
             i = ref_indices[row]
-            aligned[offsets[i] : offsets[i + 1]] = alternatives[row, col]
+            aligned[offsets[i] : offsets[i + 1]] = alternatives[int(row), int(col)]
     return aligned
 
 
