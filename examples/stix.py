@@ -3,11 +3,16 @@
 Solar Orbiter/STIX Visibility Imaging
 ======================================
 
-Read the Docs uses reduced sampling to keep builds short. Set
-``XRAYVISION_QUICK_EXAMPLES=1``. Quick-mode plots illustrate the workflow,
-they do not establish convergence or reliable evidence. For scientific use,
-extend the runs and check the diagnostics and stability across independent
-seeds and more live points.
+We reconstruct a solar X-ray source from STIX visibilities using back projection,
+CLEAN, maximum entropy, and an elliptical Gaussian source model. Comparing the
+images shows how each method handles the limited spatial-frequency coverage.
+We then use Bayesian fitting to explore the uncertainty in the ellipse's flux,
+position, size, and orientation.
+
+Read the Docs uses short runs to illustrate the workflow. Set
+``XRAYVISION_QUICK_EXAMPLES=1`` to preview these locally, or ``0`` to use the
+longer settings. For scientific use, extend sampling and check the diagnostics
+and stability across independent runs before interpreting the uncertainties.
 
 """
 
@@ -34,10 +39,14 @@ from xrayvision.vis_forward_fit.sources import Source, SourceList
 quick_run = os.environ.get("XRAYVISION_QUICK_EXAMPLES", os.environ.get("READTHEDOCS", "False")).lower() in {"1", "true"}
 
 ###############################################################################
-# Create images from STIX visibility data.
+# Load the prepared STIX observations
+# -----------------------------------
 #
-# The STIX data has already been prepared and stored in python pickle format
-# the variables can be simply restored.
+# The example dataset contains prepared measurements for a selected
+# time and energy range. We load its
+# :class:`~xrayvision.visibility.Visibilities` object so we can focus on image
+# reconstruction. It keeps the complex measurements, spatial frequencies,
+# phase centre, and uncertainties together.
 
 # Sphinx-Gallery runs in the example directory without defining __file__.
 example_dir = Path(__file__).parent if "__file__" in globals() else Path.cwd()
@@ -49,21 +58,39 @@ energy_range = stix_data["energy_range"]
 stix_vis = stix_data["stix_visibilities"]
 
 ###############################################################################
-# Lets have a look at the point spread function (PSF) or dirty beam
+# Inspect the response to a point source
+# --------------------------------------
+#
+# Before reconstructing the source, we examine the point spread function using
+# :func:`~xrayvision.imaging.vis_psf_map`. This dirty beam shows the response of
+# the sampled spatial frequencies to a point source. Its sidelobes help us
+# recognise structure that the sampling pattern can introduce into an image.
 
 psf_map = vis_psf_map(stix_vis, shape=(129, 129) * apu.pixel, pixel_size=2 * apu.arcsec / apu.pix, scheme="uniform")
 plt.figure()
 psf_map.plot()
 
 ###############################################################################
-# Back projection
+# Make a first image with back projection
+# ---------------------------------------
+#
+# :func:`~xrayvision.imaging.vis_to_map` forms an image directly from the measured
+# Fourier components. This gives a useful first view of the source. The limited
+# frequency coverage also introduces sidelobes, which motivate the reconstruction
+# methods below.
 
 backproj_map = vis_to_map(stix_vis, shape=(129, 129) * apu.pixel, pixel_size=2 * apu.arcsec / apu.pix, scheme="uniform")
 plt.figure()
 backproj_map.plot()
 
 ###############################################################################
-# Clean
+# Reduce sidelobes with CLEAN
+# ---------------------------
+#
+# :func:`~xrayvision.clean.vis_clean` identifies bright components and iteratively
+# removes their dirty-beam response. It restores the component model with a
+# chosen clean beam and adds the residual image. Here we use a 20-arcsecond
+# restoring beam and allow up to 100 iterations.
 
 clean_map, model_map, resid_map = vis_clean(
     stix_vis,
@@ -76,9 +103,14 @@ plt.figure()
 clean_map.plot()
 
 ###############################################################################
-# MEM
+# Reconstruct a maximum-entropy image
+# -----------------------------------
+#
+# :func:`~xrayvision.mem.mem` balances agreement with the visibilities against
+# an entropy term, allowing us to reconstruct an extended source without choosing
+# a parametric shape. We estimate the signal-to-noise ratio and use it to choose
+# ``percent_lambda``, which sets the strength of the regularisation.
 
-# Compute percent_lambda
 snr_value, _ = resistant_mean((np.abs(stix_vis.visibilities) / stix_vis.amplitude_uncertainty).flatten(), 3)
 percent_lambda = 2 / (snr_value**2 + 90) * apu.percent
 
@@ -87,11 +119,15 @@ mem_map = mem(
 )
 
 ###############################################################################
-# VIS_FWD_FIT
+# Fit an elliptical source with Nelder-Mead
+# -----------------------------------------
 #
-# Forward fitting assumes the source is a parametric shape (here a single
-# elliptical Gaussian) and fits its parameters directly to the visibilities.
-# Source position is relative to the visibility's own phase center.
+# Forward fitting describes the image with a small set of source parameters.
+# We use :obj:`~xrayvision.vis_forward_fit.sources.Source` to define an elliptical
+# Gaussian and :func:`~xrayvision.vis_forward_fit.forward_fit.vis_forward_fit`
+# to fit its flux, position, widths, and orientation directly to the visibilities.
+# The default Nelder-Mead method starts from the initial guess below. Source
+# positions are relative to the observation's phase centre.
 
 sources = SourceList(
     [
@@ -119,6 +155,17 @@ vis_fwd_map = vis_forward_fit(
     weighting="amplitude",
 )
 
+###############################################################################
+# Search more broadly with particle swarm optimisation
+# ----------------------------------------------------
+#
+# The same :func:`~xrayvision.vis_forward_fit.forward_fit.vis_forward_fit` API
+# also offers particle swarm optimisation (PSO). A population of candidate
+# ellipses explores the bounds more broadly than a single local fit. We run
+# three independent searches and retain the solution with the smallest objective.
+# Both methods use the amplitude uncertainties for weighting, so their fit
+# objectives can be compared directly.
+
 vis_fwd_pso_map, fitted_sources, pso_result = vis_forward_fit(
     stix_vis,
     sources,
@@ -131,17 +178,23 @@ vis_fwd_pso_map, fitted_sources, pso_result = vis_forward_fit(
 )
 
 ###############################################################################
-# Bayesian visibility fitting
-# ---------------------------
+# Describe plausible ellipses with explicit priors
+# ------------------------------------------------
 #
-# Bayesian fitting uses the same parametric source model (here a single
-# elliptical Gaussian), combining a complex-visibility likelihood with explicit
-# parameter priors. Starting near the PSO fit, emcee samples the posterior
-# distribution to estimate parameter uncertainty and correlations.
-# Source position is relative to the visibility's own phase center.
+# The PSO fit gives one solution. We now ask which range of ellipses is supported
+# by the measurements and our prior assumptions. We keep the same source model
+# and error convention, and specify broad uniform priors with
+# :class:`~xrayvision.vis_forward_fit.bayesian.ParameterPrior`. These are explicit
+# scientific assumptions, separate from the optimisation bounds.
+#
+# We first express the fitted ellipse in the same orientation interval used by
+# the priors, swapping its axis labels where necessary. Then
+# :class:`~xrayvision.vis_forward_fit.bayesian.BayesianVisibilityProblem` combines
+# the source, priors, and complex-visibility likelihood.
 #
 # See :ref:`sphx_glr_generated_gallery_bayesian_visibility_fit.py` for a
-# detailed synthetic example with posterior visibility predictions.
+# walkthrough using a known synthetic source, including posterior visibility
+# predictions and comparison of alternative source models.
 
 flux_unit = stix_vis.visibilities.unit
 initial_sources = fitted_sources.to_canonical(flux_unit)
@@ -159,6 +212,17 @@ priors = {
     "source[0].theta": ParameterPrior(uniform(loc=-np.pi / 2, scale=np.pi / 2), apu.rad),
 }
 problem = BayesianVisibilityProblem(stix_vis, initial_sources, priors, weighting="amplitude")
+
+###############################################################################
+# Explore parameter uncertainty with emcee
+# ----------------------------------------
+#
+# We initialise 24 walkers near the PSO solution and use
+# :func:`~xrayvision.vis_forward_fit.bayesian.sample_emcee` to explore the posterior.
+# After the initial burn-in, the samples describe plausible parameter values
+# and their correlations. The short documentation run illustrates this process;
+# longer runs are needed to assess the uncertainty reliably.
+
 rng = np.random.default_rng(42)
 centre = problem.initial_params
 spread = np.array([0.02 * centre[0], 1, 1, 0.05 * centre[3], 0.05 * centre[4], 0.02])
@@ -176,6 +240,17 @@ if quick_run:
 posterior = sample_emcee(
     problem, np.asarray(positions), n_steps=600 if quick_run else 10000, burn_in=200 if quick_run else 1000, seed=42
 )
+
+###############################################################################
+# Check the fit and sampling diagnostics
+# --------------------------------------
+#
+# The initial PSO reduced chi-square describes its agreement with the data under
+# the chosen error convention. Acceptance fractions and autocorrelation estimates
+# help us assess the subsequent sampling. In particular, ``chain_too_short``
+# calls for a longer run before interpreting the reported credible intervals.
+# Each 95% interval describes one parameter separately.
+
 print("STIX reduced chi-square (initial PSO fit):", pso_result.fit_statistics.reduced_chi2)
 print("STIX autocorrelation status:", posterior.autocorrelation_status)
 print("Autocorrelation times:", posterior.autocorrelation_time)
@@ -184,19 +259,29 @@ print(posterior.diagnostics["autocorrelation_message"])
 for name in posterior.parameter_names:
     print(name, "95% credible interval:", posterior.credible_interval(name, level=0.95))
 
-# A complete sampled parameter vector provides a representative image. This is
-# the largest sampled posterior density, rather than a proven global maximum.
+###############################################################################
+# Reconstruct a representative Bayesian image
+# -------------------------------------------
+#
+# We select the sampled ellipse with the highest posterior density and render
+# it with :func:`~xrayvision.vis_forward_fit.forward_fit.sources_to_image`. Using
+# a complete sample preserves the relationships between its parameters. This
+# gives one representative image; the full posterior describes its uncertainty.
+
 best_step, best_walker = np.unravel_index(np.argmax(posterior.log_prob), posterior.log_prob.shape)
 sampled_sources = posterior.sources_from_sample(int(best_step), int(best_walker))
 bayesian_image = sources_to_image(sampled_sources, [129, 129] * apu.pixel, [2, 2] * apu.arcsec / apu.pix)
 bayesian_map = Map((bayesian_image, vis_fwd_pso_map.meta))
 
 ###############################################################################
-# Comparison plot
-# ---------------
+# Compare the reconstructed images
+# --------------------------------
 #
-# Every map has the same pixel grid and WCS.
-# The Bayesian panel is the highest-posterior production draw.
+# We bring the results together on the same coordinate grid to compare source
+# position and extent. The PSF provides a reference for the sampling response;
+# CLEAN and MEM reconstruct an image without assuming an elliptical source,
+# while the forward fits use that specific shape. The Bayesian panel shows
+# the highest-posterior sample selected above.
 
 comparison_maps = (
     (psf_map, "PSF"),
@@ -228,14 +313,17 @@ for coordinate in axs[4].coords:
 plt.show()
 
 ###############################################################################
-# Posterior corner plot
-# ---------------------
+# Examine parameter uncertainty and correlations
+# ----------------------------------------------
 #
-# Green lines and squares mark the same highest-posterior draw as the image.
-# It is a joint sampled point, not the peak of each marginal distribution.
-# Plot every ellipse using its major and minor widths and the major-axis
-# angle modulo pi. This reconciles the apparent width/angle lobes where the
-# original angle interval swaps axis labels.
+# The corner plot shows the marginal distributions of the ellipse's parameters
+# and how they vary together. Titles give marginal medians and 68% intervals;
+# green lines and squares identify the same complete sample used for the image.
+#
+# An ellipse can be represented by exchanging its widths and rotating it by
+# 90 degrees. For this plot, we express every sample with major/minor widths
+# and the major-axis angle so that equivalent axis labels do not split the
+# distributions. The stored samples retain the original source parameters.
 
 
 display_samples = posterior.samples.copy()
