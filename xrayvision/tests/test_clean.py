@@ -208,6 +208,43 @@ def test_ms_clean_multiscale_recovers_flux():
     assert_allclose(model.sum(), clean_map.sum(), atol=0.5)
 
 
+def test_ms_clean_non_positive_beam_peak_raises():
+    n = m = 65
+    with pytest.raises(ValueError, match="positive peak"):
+        ms_clean(
+            np.ones((n, m)),
+            np.zeros((3 * n, 3 * m)),
+            pixel_size=[1, 1] * u.arcsec / u.pixel,
+            scales=[1, 2],
+            clean_beam_width=None,
+        )
+
+
+def test_ms_clean_recovers_extended_source_with_multiple_scales():
+    n = m = 65
+    clean_map = _component(scale=8, shape=(n, m))
+    clean_map /= clean_map.sum()
+
+    dirty_beam = np.zeros((3 * n, 3 * m))
+    dirty_beam[(3 * n - 1) // 2, (3 * m - 1) // 2] = 1.0
+    dirty_map = signal.convolve2d(clean_map, dirty_beam, mode="same")
+
+    model, _res = ms_clean(
+        dirty_map,
+        dirty_beam,
+        pixel_size=[1, 1] * u.arcsec / u.pixel,
+        scales=[1, 2, 4, 8],
+        clean_beam_width=None,
+        niter=100,
+        thres=1e-10,
+    )
+
+    # Recover the extended source within a limited number of iterations, even when a point
+    # scale is available. Selecting only point components recovers less than 20% of its flux.
+    assert_allclose(model.sum(), clean_map.sum(), atol=0.15)
+    assert_allclose(model, clean_map, atol=0.004)
+
+
 # @pytest.mark.skip(reason="Broken test")
 def test_clean_sim():
     n = m = 31
