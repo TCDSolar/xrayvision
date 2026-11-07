@@ -331,6 +331,13 @@ def ms_clean(
         scaled_dirty_beams[:, :, i] = signal.convolve(dirty_beam, scale_kernels[:, :, i], mode="same")
         max_scaled_dirty_beams[i] = scaled_dirty_beams[:, :, i].max()
 
+    # The peaks normalise each scale's response, so a non-positive one would flip signs or blow
+    # up that scale's strengths and make it win the scale selection every iteration.
+    if np.any(max_scaled_dirty_beams <= 0):
+        raise ValueError("dirty_beam convolved with each scale kernel must have a positive peak")
+
+    scale_factors = scale_biases / max_scaled_dirty_beams
+
     # Cross terms need every scale kernel to already exist, so this must be a separate pass
     # from the one above (which is still populating scale_kernels one scale at a time).
     for i in range(number_of_scales):
@@ -342,24 +349,18 @@ def ms_clean(
 
     # Clean loop
     for i in range(niter):
-        # For each scale find the strength and location of the largest deviation by absolute
-        # value
-        max_index: int = np.argmax(np.abs(scaled_residuals)).astype(int)
+        # Correct each scale's response before comparing peaks, so unit-sum kernels do not
+        # systematically favour the point scale over extended components.
+        responses = scaled_residuals * scale_factors
+        max_index: int = np.argmax(np.abs(responses)).astype(int)
         max_x: int
         max_y: int
         max_scale: int
         max_x, max_y, max_scale = (int(x) for x in np.unravel_index(max_index, scaled_residuals.shape))
 
-        strength = scaled_residuals[max_x, max_y, max_scale]
-
-        # Adjust for the max of scaled beam
-        strength = strength / max_scaled_dirty_beams[max_scale]
+        strength = responses[max_x, max_y, max_scale]
 
         logger.info(f"Iter: {i}, max scale: {max_scale}, strength: {strength}")
-
-        # Scale dependent bias, not yet including loop gain so `strength` here is comparable
-        # across iterations for the stopping checks below
-        strength = strength * scale_biases[max_scale]
 
         # Fixed reference residual from the first iteration, used by the divergence check
         # below
