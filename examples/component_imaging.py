@@ -110,7 +110,7 @@ vis_thermal, vis_nonthermal = vis_spectral_components(vis_per_energy, fractions,
 # published in that paper, with no significant differences found between the
 # two.
 
-clean_kwargs = dict(shape=shape, pixel_size=pixel_size, niter=100, clean_beam_width=6 * apu.arcsec)
+clean_kwargs = {"shape": shape, "pixel_size": pixel_size, "niter": 100, "clean_beam_width": 6 * apu.arcsec}
 clean_thermal, _, _ = vis_clean(vis_thermal, **clean_kwargs)
 clean_nonthermal, _, _ = vis_clean(vis_nonthermal, **clean_kwargs)
 

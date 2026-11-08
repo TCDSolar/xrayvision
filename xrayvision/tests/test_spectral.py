@@ -65,25 +65,52 @@ def test_vis_spectral_components_recovers_known_components(two_components):
         assert comp.amplitude_uncertainty is not None
 
 
-def test_vis_spectral_components_normalization(two_components):
+@pytest.mark.parametrize("with_units", [False, True])
+def test_vis_spectral_components_normalisation(two_components, with_units):
     vis_per_energy, fractions, vis_comp_true, u, v = two_components
 
     n_e = len(vis_per_energy)
-    normalization = np.linspace(1, 5, n_e)
+    normalisation = np.linspace(1, 5, n_e)
     scaled_vis = [
         _make_vis(
-            v_e.visibilities.to_value(VUNIT) * normalization[e],
-            v_e.amplitude_uncertainty.to_value(VUNIT) * normalization[e],
+            v_e.visibilities.to_value(VUNIT) * normalisation[e],
+            v_e.amplitude_uncertainty.to_value(VUNIT) * normalisation[e],
             u,
             v,
         )
         for e, v_e in enumerate(vis_per_energy)
     ]
 
-    components = vis_spectral_components(scaled_vis, fractions, normalization=normalization * VUNIT)
+    if with_units:
+        normalisation = normalisation * VUNIT
+    components = vis_spectral_components(scaled_vis, fractions, normalisation=normalisation)
 
     for k, comp in enumerate(components):
-        assert_allclose(comp.visibilities.to_value(VUNIT), vis_comp_true[k], atol=1e-6)
+        assert comp.visibilities.unit == apu.dimensionless_unscaled
+        assert comp.amplitude_uncertainty.unit == apu.dimensionless_unscaled
+        assert_allclose(comp.visibilities.value, vis_comp_true[k], atol=1e-6)
+
+
+@pytest.mark.parametrize("vis_unit", [VUNIT, apu.ph / (apu.m**2 * apu.s)])
+@pytest.mark.parametrize("normalisation_unit", [VUNIT, apu.ph / (apu.m**2 * apu.s)])
+def test_vis_spectral_components_normalisation_unit_invariance(uv, vis_unit, normalisation_unit):
+    u, v = uv
+    values = np.full(u.shape, 4 + 2j) * VUNIT
+    sigma = np.full(u.shape, 0.2) * VUNIT
+    vis = Visibilities(
+        values.to(vis_unit),
+        u=u,
+        v=v,
+        amplitude_uncertainty=sigma.to(vis_unit),
+    )
+    normalisation = (np.array([2]) * VUNIT).to(normalisation_unit)
+
+    component = vis_spectral_components([vis], np.ones((1, 1)), normalisation=normalisation)[0]
+
+    assert component.visibilities.unit == apu.dimensionless_unscaled
+    assert component.amplitude_uncertainty.unit == apu.dimensionless_unscaled
+    assert_allclose(component.visibilities.value, 2 + 1j)
+    assert_allclose(component.amplitude_uncertainty.value, 0.1)
 
 
 def test_vis_spectral_components_requires_amplitude_uncertainty(two_components):

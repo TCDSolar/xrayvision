@@ -26,7 +26,7 @@ def vis_spectral_components(
     vis: Sequence[Visibilities],
     fractions: NDArray[np.floating] | Quantity,
     *,
-    normalization: NDArray[np.floating] | Quantity | None = None,
+    normalisation: NDArray[np.floating] | Quantity | None = None,
 ) -> list[Visibilities]:
     r"""
     Decompose visibilities observed in multiple energy bins into visibilities of a number
@@ -69,7 +69,9 @@ def vis_spectral_components(
     normalization :
         Total flux, :math:`F(E)`, of each energy bin, shape ``(len(vis),)``, used to
         convert ``vis`` to relative visibilities, :math:`\nu(u, v, E)`, before solving.
-        Defaults to no normalization, i.e. `vis` are assumed to already be relative
+        A quantity must have units equivalent to the input visibility unit; an array
+        is interpreted in that unit.
+        Defaults to no normalisation, i.e. `vis` are assumed to already be relative
         visibilities.
 
     Returns
@@ -78,6 +80,8 @@ def vis_spectral_components(
         List of `~xrayvision.visibility.Visibilities`, one per spectral component in the
         order of the columns of `fractions`, sharing the ``u``, ``v`` coordinates,
         ``phase_center`` and metadata of ``vis[0]``.
+        Component visibilities and amplitude uncertainties are dimensionless when
+        ``normalisation`` is provided; otherwise they retain the input visibility unit.
     """
     n_e = len(vis)
     if n_e == 0:
@@ -107,15 +111,17 @@ def vis_spectral_components(
     vis_unit = ref.visibilities.unit
     vis_array = np.stack([v.visibilities.to_value(vis_unit) for v in vis], axis=0)  # (n_e, n_vis)
     sigma_array = np.stack([sigma.to_value(vis_unit) for sigma in amplitude_uncertainties], axis=0)  # (n_e, n_vis)
+    component_unit = vis_unit
 
-    if normalization is not None:
-        if isinstance(normalization, apu.Quantity):
-            normalization = cast(Quantity, normalization).to_value(vis_unit)
-        normalization = np.atleast_1d(np.asarray(normalization, dtype=float))
-        if normalization.shape != (n_e,):
-            raise ValueError(f"normalization must have shape ({n_e},), got {normalization.shape}.")
-        vis_array = vis_array / normalization[:, np.newaxis]
-        sigma_array = sigma_array / normalization[:, np.newaxis]
+    if normalisation is not None:
+        if isinstance(normalisation, apu.Quantity):
+            normalisation = cast(Quantity, normalisation).to_value(vis_unit)
+        normalisation = np.atleast_1d(np.asarray(normalisation, dtype=float))
+        if normalisation.shape != (n_e,):
+            raise ValueError(f"normalization must have shape ({n_e},), got {normalisation.shape}.")
+        vis_array = vis_array / normalisation[:, np.newaxis]
+        sigma_array = sigma_array / normalisation[:, np.newaxis]
+        component_unit = apu.dimensionless_unscaled
 
     if np.any(sigma_array <= 0):
         raise ValueError("amplitude_uncertainty must be positive for all visibilities.")
@@ -145,16 +151,15 @@ def vis_spectral_components(
     vis_comp = np.einsum("uie,ue->ui", coeffs, vis_t)  # (n_vis, n_c)
     sigma_comp = np.sqrt(np.einsum("uie,ue->ui", coeffs**2, sigma_t**2))  # (n_vis, n_c)
 
-    components = []
-    for k in range(n_c):
-        components.append(
-            Visibilities(
-                vis_comp[:, k] * vis_unit,
-                u=ref.u,
-                v=ref.v,
-                phase_center=ref.phase_center,
-                meta=copy.deepcopy(ref.meta),
-                amplitude_uncertainty=sigma_comp[:, k] * vis_unit,
-            )
+    components = [
+        Visibilities(
+            vis_comp[:, k] * component_unit,
+            u=ref.u,
+            v=ref.v,
+            phase_center=ref.phase_center,
+            meta=copy.deepcopy(ref.meta),
+            amplitude_uncertainty=sigma_comp[:, k] * component_unit,
         )
+        for k in range(n_c)
+    ]
     return components
