@@ -126,7 +126,7 @@ jobs:
     uses: OpenAstronomy/github-actions-workflows/.github/workflows/publish_pure_python.yml@1285b95e32c783cfa40eb2ffbd6ca4cd023fb884  # v3.2.2
     with:
       python-version: '3.13'
-      test_extras: 'tests,map'
+      test_extras: 'tests,all'
       test_command: 'pytest -p no:warnings --doctest-rst --pyargs xrayvision'
       submodules: false
       save_artifacts: true
