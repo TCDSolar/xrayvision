@@ -8,6 +8,10 @@ from astropy.convolution.kernels import Gaussian2DKernel
 
 from xrayvision.clean import (
     _component,
+    _gaussian_basis,
+    _group_images,
+    _paraboloid_basis,
+    _psf_fwhm,
     _radial_prolate_sphereoidal,
     _vec_radial_prolate_sphereoidal,
     clean,
@@ -15,7 +19,7 @@ from xrayvision.clean import (
     vis_clean,
     vis_ms_clean,
 )
-from xrayvision.imaging import image_to_vis
+from xrayvision.imaging import image_to_vis, vis_psf_image, vis_to_image
 from xrayvision.transform import dft_map, idft_map
 
 
@@ -469,3 +473,290 @@ def test_vis_ms_clean_no_restore_no_map():
     assert model.shape == data.shape
     assert residual.shape == data.shape
     assert_allclose(clean_map, model + residual)
+
+
+def _circles_vis(truth, n_circles=10, per_circle=12, ratio=0.6, first_radius=0.4):
+    # u-v points on circles of geometrically decreasing radius, like the grids of a Fourier-based
+    # hard x-ray imager, so groups of neighbouring circles have beams of very different width
+    radii = first_radius * ratio ** np.arange(n_circles)
+    angle = np.linspace(0, np.pi, per_circle, endpoint=False)
+    uu = np.concatenate([r * np.cos(angle + 0.3 * i) for i, r in enumerate(radii)]) / u.arcsec
+    vv = np.concatenate([r * np.sin(angle + 0.3 * i) for i, r in enumerate(radii)]) / u.arcsec
+    return image_to_vis(truth * u.dimensionless_unscaled, u=uu, v=vv, pixel_size=[1, 1] * u.arcsec / u.pix)
+
+
+def _two_source_truth(n=65):
+    y, x = np.indices((n, n))
+
+    def gaussian(cy, cx, sigma, flux):
+        kernel = np.exp(-((y - cy) ** 2 + (x - cx) ** 2) / (2 * sigma**2))
+        return flux * kernel / kernel.sum()
+
+    return gaussian(30, 28, 1.0, 10.0) + gaussian(34, 40, 6.0, 30.0)
+
+
+def _groups(n_circles=10, per_circle=12, size=3):
+    return [np.arange(i * per_circle, min(i + size, n_circles) * per_circle) for i in range(0, n_circles, size)]
+
+
+def test_psf_fwhm():
+    n = 129
+    x = np.arange(n) - (n - 1) // 2
+    sigma = 5.0
+    gaussian = np.exp(-(x[:, None] ** 2 + x[None, :] ** 2) / (2 * sigma**2))
+    # No negative lobes: the search is bounded by the edges of the beam
+    assert abs(_psf_fwhm(gaussian) - 2.3548 * sigma) <= 1
+
+    # Negative lobes either side of the peak, which ring on at twice the width
+    ringing = np.cos(np.pi * x / (4 * sigma))[None, :] * gaussian
+    assert abs(_psf_fwhm(ringing) - 2 * sigma) <= 1
+
+    # A peak that is a single pixel wide is not narrower than one pixel
+    narrow = np.zeros((n, n))
+    narrow[(n - 1) // 2, (n - 1) // 2] = 1.0
+    narrow[(n - 1) // 2, (n - 1) // 2 + 1] = narrow[(n - 1) // 2, (n - 1) // 2 - 1] = -0.1
+    assert _psf_fwhm(narrow) == 1.0
+
+
+@pytest.mark.parametrize("make_basis", [_gaussian_basis, _paraboloid_basis])
+@pytest.mark.parametrize("shape", [(33, 33), (32, 33), (32, 32)])
+def test_basis_functions(make_basis, shape):
+    fwhm = 6.0
+    kernel = make_basis(fwhm, shape)
+    assert_allclose(kernel.sum(), 1.0)
+    # Centred on the integer pixel `signal.convolve(..., mode="same")` treats as the centre
+    centre = (shape[0] - 1) // 2, (shape[1] - 1) // 2
+    assert np.unravel_index(np.argmax(kernel), shape) == centre
+    # and has the requested full width at half maximum along the row through the peak
+    row = kernel[centre[0]]
+    assert abs(np.sum(row >= row.max() / 2) - fwhm) <= 1
+
+
+def test_group_images_sum_to_full():
+    n = 33
+    vis = _circles_vis(_two_source_truth(n))
+    shape, pixel_size = [n, n] * u.pix, [1, 1] * u.arcsec / u.pix
+    for scheme in ("natural", "uniform"):
+        maps, beams = _group_images(vis, _groups(), shape, pixel_size, scheme)
+        assert maps.shape == (4, n, n)
+        assert beams.shape == (4, 3 * n, 3 * n)
+        assert_allclose(maps.sum(axis=0), vis_to_image(vis, shape=shape, pixel_size=pixel_size, scheme=scheme).value)
+        assert_allclose(
+            beams.sum(axis=0), vis_psf_image(vis, shape=shape * 3, pixel_size=pixel_size, scheme=scheme).value
+        )
+
+    # Visibilities that are in no group are not used
+    unused = _groups()[:2]
+    maps, _ = _group_images(vis, unused, shape, pixel_size, "natural")
+    used = np.concatenate(unused)
+    assert_allclose(
+        maps.sum(axis=0),
+        idft_map(
+            vis.visibilities[used],
+            u=vis.u[used],
+            v=vis.v[used],
+            shape=shape,
+            weights=np.ones(used.size) / used.size,
+            pixel_size=pixel_size,
+        ).value,
+    )
+
+
+def test_group_images_invalid_groups():
+    n = 33
+    vis = _circles_vis(_two_source_truth(n))
+    shape, pixel_size = [n, n] * u.pix, [1, 1] * u.arcsec / u.pix
+    with pytest.raises(ValueError, match="overlap"):
+        _group_images(vis, [[0, 1, 2], [2, 3]], shape, pixel_size, "natural")
+    with pytest.raises(ValueError, match="at least one"):
+        _group_images(vis, [[0, 1, 2], []], shape, pixel_size, "natural")
+
+
+@pytest.mark.parametrize("basis", ["gaussian", "paraboloid"])
+def test_vis_ms_clean_groups_recovers_flux(basis):
+    truth = _two_source_truth()
+    vis = _circles_vis(truth)
+
+    # Without a clean beam the result is the model plus the background estimate
+    clean_map, model, residual = vis_ms_clean(
+        vis,
+        shape=[65, 65] * u.pix,
+        pixel_size=[1, 1] * u.arcsec / u.pix,
+        scales=None,
+        groups=_groups(),
+        basis=basis,
+        map=False,
+        niter=3000,
+        thres=1e-5,
+    )
+    assert_allclose(clean_map, model + residual)
+    assert_allclose(model.sum(), truth.sum(), rtol=0.1)
+    assert np.linalg.norm(clean_map - truth) / np.linalg.norm(truth) < 0.25
+    # The compact source is found at its own pixel, not smeared by the extended components
+    assert np.unravel_index(np.argmax(model), model.shape) == (30, 28)
+
+
+def test_vis_ms_clean_groups_map_and_clean_beam():
+    truth = _two_source_truth(33)
+    vis = _circles_vis(truth)
+
+    clean_map, model, residual = vis_ms_clean(
+        vis,
+        shape=[33, 33] * u.pix,
+        pixel_size=[1, 1] * u.arcsec / u.pix,
+        scales=None,
+        groups=_groups(),
+        clean_beam_width=3.0 * u.arcsec,
+        niter=200,
+    )
+    for result in (clean_map, model, residual):
+        assert result.data.shape == (33, 33)
+    assert clean_map.meta["naxis1"] == 33
+
+
+def test_vis_ms_clean_default_clean_beam():
+    truth = _two_source_truth(33)
+    vis = _circles_vis(truth)
+    shape, pixel_size = [33, 33] * u.pix, [1, 1] * u.arcsec / u.pix
+
+    # No groups: a clean beam is used unless told otherwise
+    clean_map, model, _residual = vis_ms_clean(vis, shape, pixel_size, [1, 2], map=False, niter=20)
+    assert not np.allclose(clean_map, model)
+
+
+def test_ms_clean_groups_scales_and_biases():
+    truth = _two_source_truth(33)
+    vis = _circles_vis(truth)
+    shape, pixel_size = [33, 33] * u.pix, [1, 1] * u.arcsec / u.pix
+    maps, beams = _group_images(vis, _groups(), shape, pixel_size, "natural")
+
+    def run(**kwargs):
+        return ms_clean(maps, beams, pixel_size, clean_beam_width=None, niter=1, **kwargs)[0]
+
+    measured = [_psf_fwhm(beam) for beam in beams]
+    assert measured == sorted(measured)
+
+    # Measured scales are the defaults, groups given coarse to fine are put in order
+    reference = run()
+    assert_allclose(ms_clean(maps[::-1], beams[::-1], pixel_size, clean_beam_width=None, niter=1)[0], reference)
+    assert_allclose(run(scales=measured), reference)
+
+    # Scale biases only change what is searched for, not the flux that is found
+    assert_allclose(run(scale_biases=[1.0, 0.1, 0.1, 0.1]), run(scale_biases=[1.0, 0.5, 0.5, 0.5]))
+    # but they do change what is chosen, a heavily favoured coarse scale is used first
+    assert not np.allclose(run(scale_biases=[0.01, 0.01, 0.01, 1.0]), reference)
+    # the biases are given in the order of the groups passed in
+    assert_allclose(
+        ms_clean(maps[::-1], beams[::-1], pixel_size, clean_beam_width=None, niter=1, scale_biases=[0.1] * 3 + [1.0])[
+            0
+        ],
+        run(scale_biases=[1.0] + [0.1] * 3),
+    )
+
+
+def test_ms_clean_groups_invalid_input():
+    truth = _two_source_truth(33)
+    vis = _circles_vis(truth)
+    shape, pixel_size = [33, 33] * u.pix, [1, 1] * u.arcsec / u.pix
+    maps, beams = _group_images(vis, _groups(), shape, pixel_size, "natural")
+
+    def run(maps=maps, beams=beams, **kwargs):
+        return ms_clean(maps, beams, pixel_size, clean_beam_width=None, **kwargs)
+
+    with pytest.raises(ValueError, match="one beam per group"):
+        run(beams=beams[:2])
+    with pytest.raises(ValueError, match="one beam per group"):
+        run(beams=beams[0])
+    with pytest.raises(ValueError, match="'gaussian' or 'paraboloid'"):
+        run(basis="box")
+    with pytest.raises(ValueError, match="ascending order"):
+        run(scales=[8, 4, 2, 1])
+    with pytest.raises(ValueError, match="one entry per group"):
+        run(scales=[1, 2, 4])
+    with pytest.raises(ValueError, match="one entry per group"):
+        run(scale_biases=[1, 0.5])
+    with pytest.raises(ValueError, match="positive peak"):
+        run(beams=-beams)
+
+
+def test_ms_clean_groups_stops():
+    truth = _two_source_truth(33)
+    vis = _circles_vis(truth)
+    shape, pixel_size = [33, 33] * u.pix, [1, 1] * u.arcsec / u.pix
+    maps, beams = _group_images(vis, _groups(), shape, pixel_size, "natural")
+
+    # Scales that are only sidelobes or noise are never searched, with none left there is nothing to do
+    model, _res = ms_clean(-np.abs(maps), beams, pixel_size, clean_beam_width=None)
+    assert not model.any()
+
+    # Threshold on the summed residual
+    model, _res = ms_clean(maps, beams, pixel_size, clean_beam_width=None, thres=np.abs(maps.sum(axis=0)).max())
+    assert model.any()
+
+
+def test_ms_clean_groups_diverging(caplog):
+    # Two groups with the same delta beams, apart from a strong negative lobe in the second: each
+    # component found in the first is subtracted from the second as a large *increase*.
+    n = 33
+    peak = (3 * n - 1) // 2
+    beams = np.zeros((2, 3 * n, 3 * n))
+    beams[:, peak, peak] = 1.0
+    beams[1, peak, peak - 3] = beams[1, peak, peak + 3] = -5.0
+    maps = np.zeros((2, n, n))
+    maps[0, 16, 16] = 1.0
+    maps[1, 16, 16] = 0.5
+
+    caplog.set_level("INFO")
+    ms_clean(maps, beams, [1, 1] * u.arcsec / u.pix, clean_beam_width=None, gain=0.5)
+    assert "Diverging" in caplog.text
+
+
+def test_ms_clean_groups_negative_largest_scale(caplog):
+    n = 33
+    peak = (3 * n - 1) // 2
+    beams = np.zeros((2, 3 * n, 3 * n))
+    beams[:, peak, peak] = 1.0
+    beams[1, peak, peak - 3] = beams[1, peak, peak + 3] = 5.0
+    maps = np.zeros((2, n, n))
+    maps[0, 16, 16] = 1.0
+    maps[1, 16, 16] = 0.5
+
+    # Subtracting the lobe of the second group drives it negative, at its own (largest) scale
+    caplog.set_level("INFO")
+    ms_clean(maps, beams, [1, 1] * u.arcsec / u.pix, clean_beam_width=None, gain=0.5)
+    assert "Reached negative on largest scale" in caplog.text
+
+
+def test_ms_clean_max_iterations_groups(caplog):
+    n = 33
+    vis = _circles_vis(_two_source_truth(n))
+    maps, beams = _group_images(vis, _groups(), [n, n] * u.pix, [1, 1] * u.arcsec / u.pix, "natural")
+    caplog.set_level("INFO")
+    ms_clean(maps, beams, [1, 1] * u.arcsec / u.pix, clean_beam_width=None, niter=2, thres=0.0)
+    assert "Max iterations reached" in caplog.text
+
+
+def test_ms_clean_scale_bias_does_not_change_flux():
+    n = 65
+    clean_map = np.zeros((n, n))
+    clean_map[30, 30] = 10.0
+    dirty_beam = _tapered_cross_beam(n, n)
+    dirty_map = signal.convolve2d(clean_map, dirty_beam, mode="same")
+
+    def first_component(biases):
+        model, _res = ms_clean(
+            dirty_map,
+            dirty_beam,
+            pixel_size=[1, 1] * u.arcsec / u.pixel,
+            scales=[1, 2, 4],
+            clean_beam_width=None,
+            niter=1,
+            scale_biases=biases,
+        )
+        return model
+
+    assert_allclose(first_component([1.0, 0.5, 0.2]), first_component([1.0, 0.1, 0.01]))
+    assert first_component([1.0, 0.5, 0.2]).sum() > 0
+
+    with pytest.raises(ValueError, match="one entry per scale"):
+        first_component([1.0, 0.5])
