@@ -135,6 +135,29 @@ def test_vis_spectral_components_requires_matching_uv(two_components):
         vis_spectral_components(mismatched, fractions)
 
 
+@pytest.mark.parametrize("phase_center", [[5, 0] * apu.arcsec, [0, 5] * apu.arcsec])
+def test_vis_spectral_components_requires_matching_phase_centers(two_components, phase_center):
+    vis_per_energy, fractions, _, _, _ = two_components
+    vis_per_energy[-1].phase_center = phase_center
+
+    with pytest.raises(ValueError, match="phase_center"):
+        vis_spectral_components(vis_per_energy, fractions)
+
+
+def test_vis_spectral_components_accepts_equivalent_phase_center_units(two_components):
+    vis_per_energy, fractions, vis_comp_true, _, _ = two_components
+    phase_center = [12, -6] * apu.arcsec
+    for i, vis in enumerate(vis_per_energy):
+        vis.phase_center = phase_center.to(apu.deg if i % 2 else apu.arcsec)
+
+    components = vis_spectral_components(vis_per_energy, fractions)
+
+    for k, component in enumerate(components):
+        assert apu.quantity.allclose(component.phase_center, phase_center)
+        assert component.phase_center.unit == apu.arcsec
+        assert_allclose(component.visibilities.to_value(VUNIT), vis_comp_true[k], atol=1e-6)
+
+
 def test_vis_spectral_components_fractions_shape_mismatch(two_components):
     vis_per_energy, fractions, _, _, _ = two_components
 

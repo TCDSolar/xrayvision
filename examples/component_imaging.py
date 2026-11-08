@@ -100,7 +100,7 @@ for i in range(len(energies)):
 # Decompose the per-energy visibilities into visibilities of the thermal and
 # non-thermal spectral components.
 
-vis_thermal, vis_nonthermal = vis_spectral_components(vis_per_energy, fractions, normalization=total_flux)
+vis_thermal, vis_nonthermal = vis_spectral_components(vis_per_energy, fractions, normalisation=total_flux)
 
 ###############################################################################
 # Image each spectral component separately. As in Stiefel et al. 2025 (Sect.

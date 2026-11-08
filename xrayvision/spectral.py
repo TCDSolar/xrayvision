@@ -61,13 +61,13 @@ def vis_spectral_components(
     vis :
         Visibilities, :math:`V(u, v, E)`, for each energy bin/channel, ordered to match
         the rows of `fractions`. All elements must share the same ``u``, ``v``
-        coordinates and must provide
+        coordinates and ``phase_center``, and must provide
         `~xrayvision.visibility.Visibilities.amplitude_uncertainty`.
     fractions :
         Fractional contribution, :math:`f_k(E)`, of each spectral component to the total
         flux in each energy bin, shape ``(len(vis), n_components)``.
         The columns must be linearly independent to separate the components.
-    normalization :
+    normalisation :
         Total flux, :math:`F(E)`, of each energy bin, shape ``(len(vis),)``, used to
         convert ``vis`` to relative visibilities, :math:`\nu(u, v, E)`, before solving.
         A quantity must have units equivalent to the input visibility unit; an array
@@ -113,6 +113,8 @@ def vis_spectral_components(
         for v in vis[1:]
     ):
         raise ValueError("All input visibilities must share the same u, v coordinates.")
+    if any(not apu.quantity.allclose(v.phase_center, ref.phase_center) for v in vis[1:]):
+        raise ValueError("All input visibilities must share the same phase_center.")
 
     vis_unit = ref.visibilities.unit
     vis_array = np.stack([v.visibilities.to_value(vis_unit) for v in vis], axis=0)  # (n_e, n_vis)
@@ -124,7 +126,7 @@ def vis_spectral_components(
             normalisation = cast(Quantity, normalisation).to_value(vis_unit)
         normalisation = np.atleast_1d(np.asarray(normalisation, dtype=float))
         if normalisation.shape != (n_e,):
-            raise ValueError(f"normalization must have shape ({n_e},), got {normalisation.shape}.")
+            raise ValueError(f"normalisation must have shape ({n_e},), got {normalisation.shape}.")
         vis_array = vis_array / normalisation[:, np.newaxis]
         sigma_array = sigma_array / normalisation[:, np.newaxis]
         component_unit = apu.dimensionless_unscaled
