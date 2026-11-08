@@ -66,6 +66,7 @@ def vis_spectral_components(
     fractions :
         Fractional contribution, :math:`f_k(E)`, of each spectral component to the total
         flux in each energy bin, shape ``(len(vis), n_components)``.
+        The columns must be linearly independent to separate the components.
     normalization :
         Total flux, :math:`F(E)`, of each energy bin, shape ``(len(vis),)``, used to
         convert ``vis`` to relative visibilities, :math:`\nu(u, v, E)`, before solving.
@@ -97,6 +98,11 @@ def vis_spectral_components(
     n_c = fractions.shape[1]
     if n_e < n_c:
         raise ValueError(f"At least as many energy bins ({n_e}) as spectral components ({n_c}) are required.")
+    if np.linalg.matrix_rank(fractions) < n_c:
+        raise ValueError(
+            "Could not solve for the spectral component visibilities: `fractions` must have full column rank. "
+            "Linearly dependent component fractions produce a singular system."
+        )
 
     ref = vis[0]
     if any(v.amplitude_uncertainty is None for v in vis):

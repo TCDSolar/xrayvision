@@ -155,3 +155,23 @@ def test_vis_spectral_components_singular_fractions(two_components):
 
     with pytest.raises(ValueError, match="singular"):
         vis_spectral_components(vis_per_energy, degenerate_fractions)
+
+
+@pytest.mark.parametrize(
+    "fractions",
+    [
+        np.tile([0.7, 0.3], (3, 1)),
+        np.tile([0.6, 0.4], (3, 1)),
+        np.tile([0.2, 0.3, 0.5], (3, 1)),
+        np.array([[0.1, 0.4, 0.5], [0.2, 0.3, 0.5], [0.3, 0.2, 0.5]]),
+    ],
+    ids=["constant-70-30", "constant-60-40", "constant-three-components", "dependent-third-component"],
+)
+def test_vis_spectral_components_rejects_dependent_fractions(uv, fractions):
+    u, v = uv
+    # All rows sum to one, so these data are consistent with every component
+    # having the same visibility. Their individual contributions are not unique.
+    vis = [_make_vis(np.ones(u.shape, dtype=complex), np.full(u.shape, 0.1), u, v) for _ in fractions]
+
+    with pytest.raises(ValueError, match="singular"):
+        vis_spectral_components(vis, fractions)
