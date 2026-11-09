@@ -21,6 +21,14 @@ class FitStatistics:
     ``2 * n_visibilities - n_parameters``; ``reduced_chi2`` is also ``None``
     when this is non-positive. Each complex visibility supplies two independent
     real measurements under the diagonal Gaussian error model used here.
+
+    ``log_likelihood``, ``aic``, and ``bic`` also require known errors. Interpret
+    the information criteria at a maximum-likelihood fit, not a posterior mean
+    or mode. The parameter count excludes the supplied, unfitted noise scales;
+    BIC uses ``n = 2 * n_visibilities`` independent real components. Smaller
+    criteria favour a model when comparing the same data and error convention
+    in the same numeric flux unit. These are asymptotic criteria; component
+    degeneracies in mixture models can invalidate their regularity assumptions.
     """
 
     objective: float
@@ -30,6 +38,19 @@ class FitStatistics:
     weighting: str
     chi2: float | None
     reduced_chi2: float | None
+    log_likelihood: float | None = None
+
+    @property
+    def aic(self) -> float | None:
+        """Akaike information criterion, ``2*k - 2*log_likelihood``."""
+        return None if self.log_likelihood is None else 2 * self.n_parameters - 2 * self.log_likelihood
+
+    @property
+    def bic(self) -> float | None:
+        """Bayesian information criterion, ``k*log(2*N_vis) - 2*log_likelihood``."""
+        if self.log_likelihood is None:
+            return None
+        return float(self.n_parameters * np.log(2 * self.n_visibilities) - 2 * self.log_likelihood)
 
 
 class VisibilityFitData:
@@ -113,16 +134,48 @@ class VisibilityFitData:
         return np.asarray(residual, dtype=np.float64)
 
     def objective(self, prediction: Quantity | NDArray[np.complex128]) -> float | NDArray[np.float64]:
-        """Return the unreduced sum of squared residuals for each prediction."""
+        """
+        Return the unreduced sum of squared residuals for each prediction.
+        """
         result = np.sum(self.residuals(prediction) ** 2, axis=-1)
         return float(result) if result.ndim == 0 else result
 
+    def log_likelihood(self, prediction: Quantity | NDArray[np.complex128]) -> float | NDArray[np.float64]:
+        r"""
+        Return the normalised independent-component Gaussian log likelihood.
+
+        Uses the same error convention and unreduced objective as the optimisers:
+        ``-0.5 * (objective + 2 * sum(log(sigma_ri)) + 2 * N_v * log(2*pi))``.
+        Known measurement standard deviations are required; unweighted fitting
+        does not implicitly assume unit noise. Correlations are not included.
+
+        The density is defined with respect to real/imaginary numerical values
+        in ``flux_unit``. Converting the observation unit changes its absolute
+        log density by the corresponding Jacobian, comparisons between models
+        must use the same observation unit. Quantity predictions are converted
+        to this unit before evaluation.
+
+        Leading batch dimensions are preserved. Non-finite predictions or
+        overflowing residual sums return negative infinity for the affected
+        predictions. Shape and unit errors still raise exceptions.
+        """
+        if self.sigma_ri is None:
+            raise ValueError("Log likelihood requires known measurement standard deviations.")
+        normalisation = 2 * np.sum(np.log(self.sigma_ri)) + self.values_ri.size * np.log(2 * np.pi)
+        with np.errstate(over="ignore", invalid="ignore"):
+            result = -0.5 * (self.objective(prediction) + normalisation)
+        result = np.where(np.isfinite(result), result, -np.inf)
+        return float(result) if result.ndim == 0 else result
+
     def statistics(self, prediction: Quantity | NDArray[np.complex128], n_parameters: int) -> FitStatistics:
-        """Report nominal degrees of freedom and, with errors, reduced chi-square.
+        """Report fit statistics at a supplied prediction.
 
         ``n_parameters`` must count only freely fitted parameters. The current
         fitters vary every source parameter. Reducing the objective is a reporting
         operation and must not be used to scale a Bayesian likelihood.
+        With known errors, includes the normalised log likelihood and AIC/BIC.
+        The caller must supply a maximum-likelihood fit for interpreting these
+        criteria; this method does not optimise the prediction itself.
         """
         if n_parameters < 0:
             raise ValueError("n_parameters must be non-negative.")
@@ -133,4 +186,7 @@ class VisibilityFitData:
         dof = 2 * self.values.size - n_parameters
         chi2 = objective if self.sigma_ri is not None else None
         reduced_chi2 = chi2 / dof if chi2 is not None and dof > 0 else None
-        return FitStatistics(objective, self.values.size, n_parameters, dof, self.weighting, chi2, reduced_chi2)
+        log_likelihood = float(self.log_likelihood(prediction)) if self.sigma_ri is not None else None
+        return FitStatistics(
+            objective, self.values.size, n_parameters, dof, self.weighting, chi2, reduced_chi2, log_likelihood
+        )
