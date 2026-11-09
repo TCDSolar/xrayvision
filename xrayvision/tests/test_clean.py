@@ -47,57 +47,58 @@ def test_clean_ideal():
     assert_allclose(out_map, clean_map, atol=dirty_beam.max() * 1e-12)
 
 
-def test_clean_even_shape():
-    def make_beam(n, m):
-        on, om = (3 * n) // 2 * 2 + 1, (3 * m) // 2 * 2 + 1
-        beam = np.zeros((on, om))
-        beam[(on - 1) // 2, (om - 1) // 2] = 1.0
-        return beam
+@pytest.mark.parametrize(("n", "m"), [(65, 65), (64, 65), (65, 64), (64, 64)])
+def test_clean_even_shape(n, m):
+    pos = (20, 30)
+    clean_map = np.zeros((n, m))
+    clean_map[pos] = 10.0
+    on, om = (3 * n) // 2 * 2 + 1, (3 * m) // 2 * 2 + 1
+    dirty_beam = np.zeros((on, om))
+    dirty_beam[(on - 1) // 2, (om - 1) // 2] = 1.0
+    dirty_map = signal.convolve(clean_map, dirty_beam, mode="same")
 
-    for n, m in [(65, 65), (64, 65), (65, 64), (64, 64)]:
-        pos = (20, 30)
-        clean_map = np.zeros((n, m))
-        clean_map[pos] = 10.0
-        dirty_beam = make_beam(n, m)
-        dirty_map = signal.convolve(clean_map, dirty_beam, mode="same")
+    _out_map, model, resid = clean(dirty_map, dirty_beam, clean_beam_width=None, niter=200, thres=1e-8)
 
-        _out_map, model, resid = clean(dirty_map, dirty_beam, clean_beam_width=None, niter=200, thres=1e-8)
-
-        assert np.unravel_index(np.argmax(model), model.shape) == pos, f"shape=({n},{m})"
-        assert_allclose(model.sum(), 10.0, atol=1e-8, err_msg=f"shape=({n},{m})")
-        assert_allclose(np.abs(resid).max(), 0.0, atol=1e-8, err_msg=f"shape=({n},{m})")
+    assert np.unravel_index(np.argmax(model), model.shape) == pos
+    assert_allclose(model.sum(), 10.0, atol=1e-8)
+    assert_allclose(np.abs(resid).max(), 0.0, atol=1e-8)
 
 
-def _tapered_cross_beam(n, m, peak_sidelobe=0.75):
+@pytest.fixture
+def tapered_cross_beam():
     r"""
     A synthetic dirty beam with a strong (0.75 of peak) but *decaying* cross-shaped sidelobe,
     representative of real dirty beams, whose sidelobe strength falls off with distance from the
     main lobe (confirmed against real STIX back-projected data, which shows near-in sidelobe
     ratios of ~0.75-0.9 at small angular separations from the peak).
     """
-    on, om = (3 * n) // 2 * 2 + 1, (3 * m) // 2 * 2 + 1
-    beam = np.zeros((on, om))
-    cy, cx = (on - 1) // 2, (om - 1) // 2
-    beam[cy, cx] = 1.0
-    decay_length = min(n, m) / 8.0
-    for d in range(1, min(n, m) // 2):
-        amp = peak_sidelobe * np.exp(-d / decay_length)
-        beam[cy - d, cx] = amp
-        beam[cy + d, cx] = amp
-        beam[cy, cx - d] = amp
-        beam[cy, cx + d] = amp
-    return beam
+
+    def make_beam(n, m, peak_sidelobe=0.75):
+        on, om = (3 * n) // 2 * 2 + 1, (3 * m) // 2 * 2 + 1
+        beam = np.zeros((on, om))
+        cy, cx = (on - 1) // 2, (om - 1) // 2
+        beam[cy, cx] = 1.0
+        decay_length = min(n, m) / 8.0
+        for d in range(1, min(n, m) // 2):
+            amp = peak_sidelobe * np.exp(-d / decay_length)
+            beam[cy - d, cx] = amp
+            beam[cy + d, cx] = amp
+            beam[cy, cx - d] = amp
+            beam[cy, cx + d] = amp
+        return beam
+
+    return make_beam
 
 
-def test_ms_clean_even_shape():
+@pytest.mark.parametrize(("n", "m"), [(65, 65), (64, 65), (65, 64), (64, 64)])
+def test_ms_clean_even_shape(n, m, tapered_cross_beam):
     pos1, pos2 = (15, 30), (40, 32)
 
-    reference = None
-    for n, m in [(65, 65), (64, 65), (65, 64), (64, 64)]:
+    def recover(n, m):
         clean_map = np.zeros((n, m))
         clean_map[pos1] = 10.0
         clean_map[pos2] = 7.0
-        dirty_beam = _tapered_cross_beam(n, m)
+        dirty_beam = tapered_cross_beam(n, m)
         dirty_map = signal.convolve2d(clean_map, dirty_beam, mode="same")
 
         model, _res = ms_clean(
@@ -108,10 +109,9 @@ def test_ms_clean_even_shape():
             clean_beam_width=None,
             niter=3000,
         )
-        result = (model[pos1], model[pos2], model.sum())
-        if reference is None:
-            reference = result
-        assert_allclose(result, reference, atol=0.05, err_msg=f"shape=({n},{m}) vs odd-shape baseline")
+        return model[pos1], model[pos2], model.sum()
+
+    assert_allclose(recover(n, m), recover(65, 65), atol=0.05)
 
 
 def test_component():
@@ -181,7 +181,7 @@ def test_ms_clean_ideal():
     assert np.allclose(clean_map, recovered, atol=dirty_beam.max() * 0.1)
 
 
-def test_ms_clean_multiscale_recovers_flux():
+def test_ms_clean_multiscale_recovers_flux(tapered_cross_beam):
     n = m = 65
     pos1 = [15, 30]
     pos2 = [40, 32]
@@ -190,7 +190,7 @@ def test_ms_clean_multiscale_recovers_flux():
     clean_map[pos1[0], pos1[1]] = 10.0
     clean_map[pos2[0], pos2[1]] = 7.0
 
-    dirty_beam = _tapered_cross_beam(n, m)
+    dirty_beam = tapered_cross_beam(n, m)
     dirty_map = signal.convolve2d(clean_map, dirty_beam, mode="same")
 
     model, _res = ms_clean(
@@ -312,10 +312,10 @@ def test_vis_clean_sim():
     np.allclose(data, clean_map.data, atol=0.1)
 
 
-def test_ms_clean_unsorted_scales_raises():
+def test_ms_clean_unsorted_scales_raises(tapered_cross_beam):
     n = m = 65
     dirty_map = np.zeros((n, m))
-    dirty_beam = _tapered_cross_beam(n, m)
+    dirty_beam = tapered_cross_beam(n, m)
 
     with pytest.raises(ValueError, match="ascending order"):
         ms_clean(
@@ -327,12 +327,12 @@ def test_ms_clean_unsorted_scales_raises():
         )
 
 
-def test_clean_max_iterations(caplog):
+def test_clean_max_iterations(caplog, tapered_cross_beam):
     n = m = 65
     pos = (20, 30)
     clean_map = np.zeros((n, m))
     clean_map[pos] = 10.0
-    dirty_beam = _tapered_cross_beam(n, m)
+    dirty_beam = tapered_cross_beam(n, m)
     dirty_map = signal.convolve2d(clean_map, dirty_beam, mode="same")
 
     caplog.set_level("INFO")
@@ -344,12 +344,12 @@ def test_clean_max_iterations(caplog):
     assert model.sum() > 0
 
 
-def test_clean_convolve_residual():
+def test_clean_convolve_residual(tapered_cross_beam):
     n = m = 65
     pos = (20, 30)
     clean_map = np.zeros((n, m))
     clean_map[pos] = 10.0
-    dirty_beam = _tapered_cross_beam(n, m)
+    dirty_beam = tapered_cross_beam(n, m)
     dirty_map = signal.convolve2d(clean_map, dirty_beam, mode="same")
 
     # A handful of iterations, well short of convergence, so a substantial residual remains for
@@ -372,13 +372,13 @@ def test_clean_convolve_residual():
     assert not np.allclose(resid_plain, resid_convolved)
 
 
-def test_ms_clean_clean_beam_width():
+def test_ms_clean_clean_beam_width(tapered_cross_beam):
     n = m = 65
     pos1, pos2 = (15, 30), (40, 32)
     clean_map = np.zeros((n, m))
     clean_map[pos1] = 10.0
     clean_map[pos2] = 7.0
-    dirty_beam = _tapered_cross_beam(n, m)
+    dirty_beam = tapered_cross_beam(n, m)
     dirty_map = signal.convolve2d(clean_map, dirty_beam, mode="same")
 
     out_map, model, resid = ms_clean(
