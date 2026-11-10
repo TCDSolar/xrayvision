@@ -22,7 +22,7 @@ from astropy.units import Quantity
 from sunpy.map.map_factory import Map
 from sunpy.util.decorators import add_common_docstring
 
-from xrayvision.imaging import vis_psf_image, vis_to_map
+from xrayvision.imaging import validate_and_expand_kwarg, vis_psf_image, vis_to_map
 from xrayvision.utils import get_logger
 from xrayvision.visibility import Visibilities
 
@@ -127,9 +127,11 @@ def clean(
     dirty_map :
         The dirty map to be cleaned 2D
     dirty_beam :
-        The dirty beam or point spread function (PSF) 2D must
+        The 2D dirty beam or point spread function (PSF), with its peak at the central
+        pixel ``(N - 1) // 2``. Each axis needs at least ``2 * N - 1`` pixels to cover
+        every shift over the corresponding ``N``-pixel image axis.
     pixel_size :
-        The pixel size in arcsec
+        The pixel size in arcsec. Required when `clean_beam_width` is not `None`.
     {clean_beam_width}
     {gain}
     {thres}
@@ -140,6 +142,23 @@ def clean(
 
     {notes_clean}
     """
+    return _clean(dirty_map, dirty_beam, pixel_size, clean_beam_width, gain, thres, niter, convolve_residual)
+
+
+def _clean(
+    dirty_map: NDArray[np.float64],
+    dirty_beam: NDArray[np.float64],
+    pixel_size: Quantity | None,
+    clean_beam_width: Quantity | None,
+    gain: float | None,
+    thres: float | None,
+    niter: int,
+    convolve_residual: bool,
+    *,
+    clean_beam_shape: tuple[int, ...] | None = None,
+) -> Any:
+    """Run standard CLEAN with optional restoring support independent of the dirty beam."""
+    gain = cast(float, gain)
     # Peak pixel of the (always odd-shaped, oversized) dirty beam
     beam_peak = (dirty_beam.shape[0] - 1) // 2, (dirty_beam.shape[1] - 1) // 2
 
@@ -179,22 +198,27 @@ def clean(
         logger.info("Max iterations reached")
 
     if clean_beam_width is not None:
+        if pixel_size is None:
+            raise ValueError("pixel_size is required when clean_beam_width is not None")
         # Convert from FWHM to StDev   FWHM = sigma*(8ln2)**0.5 = 2.3548200450309493
         x_stdev = (clean_beam_width / pixel_size[1]).to_value(u.pix) / 2.3548200450309493
         y_stdev = (clean_beam_width / pixel_size[0]).to_value(u.pix) / 2.3548200450309493
-        clean_beam = Gaussian2DKernel(x_stdev, y_stdev, x_size=dirty_beam.shape[1], y_size=dirty_beam.shape[0]).array
+        if clean_beam_shape is None:
+            clean_beam_shape = dirty_beam.shape
+        clean_beam = Gaussian2DKernel(x_stdev, y_stdev, x_size=clean_beam_shape[1], y_size=clean_beam_shape[0]).array
         # Normalise beam
         clean_beam = clean_beam / clean_beam.max()
 
         # Convolve clean beam with model and scale
-        clean_map = signal.convolve2d(model, clean_beam / clean_beam.sum(), mode="same") / (
+        # Linear FFT convolution keeps the zero-filled boundary and centering.
+        clean_map = signal.fftconvolve(model, clean_beam / clean_beam.sum(), mode="same") / (
             pixel_size[0].value * pixel_size[1].value
         )
 
         # Scale residual map with model and scale
         dirty_map = dirty_map / clean_beam.sum() / (pixel_size[0].value * pixel_size[1].value)
         if convolve_residual:
-            dirty_map = signal.convolve2d(dirty_map, clean_beam / clean_beam.sum(), mode="same")
+            dirty_map = signal.fftconvolve(dirty_map, clean_beam / clean_beam.sum(), mode="same")
         return clean_map + dirty_map, model, dirty_map
 
     return model + dirty_map, model, dirty_map
@@ -237,17 +261,24 @@ def vis_clean(
 
     {notes_clean}
     """
+    shape = validate_and_expand_kwarg(shape, "shape").to(u.pix)
+    pixel_size = validate_and_expand_kwarg(pixel_size, "pixel_size")
     dirty_map = vis_to_map(vis, shape=shape, pixel_size=pixel_size, **kwargs)
-    dirty_beam_shape = [x.value * 3 + 1 if x.value * 3 % 2 == 0 else x.value * 3 for x in shape] * shape.unit
+    # All relative pixel offsets lie between -(N - 1) and N - 1 on each axis.
+    dirty_beam_shape = 2 * shape - 1 * u.pix
     dirty_beam = vis_psf_image(vis, shape=dirty_beam_shape, pixel_size=pixel_size, **kwargs)
-    clean_map, model, residual = clean(
+    # Keep the former Gaussian support and normalization, including for broad beams.
+    clean_beam_shape = tuple(int(3 * n) // 2 * 2 + 1 for n in shape.to_value(u.pix))
+    clean_map, model, residual = _clean(
         dirty_map.data,
         dirty_beam.value,
         pixel_size=pixel_size,
         clean_beam_width=clean_beam_width,
         gain=gain,
+        thres=None,
         niter=niter,
         convolve_residual=convolve_residual,
+        clean_beam_shape=clean_beam_shape,
     )
     if not map:
         return clean_map, model, residual
@@ -422,14 +453,14 @@ def ms_clean(
         # Normalise beam
         clean_beam = clean_beam / clean_beam.max()
 
-        clean_map = signal.convolve2d(model, clean_beam / clean_beam.sum(), mode="same") / (
+        clean_map = signal.fftconvolve(model, clean_beam / clean_beam.sum(), mode="same") / (
             pixel_size[0].value * pixel_size[1].value
         )
 
         # Scale residual map with model and scale
         dirty_map = (scaled_residuals / clean_beam.sum() / (pixel_size[0].value * pixel_size[1].value)).sum(axis=2)
         if convolve_residual:
-            dirty_map = signal.convolve2d(dirty_map, clean_beam / clean_beam.sum(), mode="same")
+            dirty_map = signal.fftconvolve(dirty_map, clean_beam / clean_beam.sum(), mode="same")
 
         return clean_map + dirty_map, model, dirty_map
     # Add residuals B_G * I^M + I^R
