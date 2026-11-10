@@ -8,7 +8,7 @@ appropriate component shapes at different scales.
 """
 
 from collections.abc import Sequence
-from typing import Any, cast
+from typing import Any, Literal, cast
 
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
@@ -22,7 +22,8 @@ from astropy.units import Quantity
 from sunpy.map.map_factory import Map
 from sunpy.util.decorators import add_common_docstring
 
-from xrayvision.imaging import vis_psf_image, vis_to_map
+from xrayvision.imaging import generate_header, get_weights, validate_and_expand_kwarg, vis_psf_image, vis_to_map
+from xrayvision.transform import idft_map
 from xrayvision.utils import get_logger
 from xrayvision.visibility import Visibilities
 
@@ -44,11 +45,41 @@ def _clean_parameters() -> dict[str, str]:
     RST parsing).
     """
     return {
-        "scales": ("scales : array-like, optional\n    The scales to use, in ascending order, eg ``[1, 2, 4, 8]``"),
+        "scales": (
+            "scales : array-like, optional\n"
+            "    The scales to use, in ascending order, eg ``[1, 2, 4, 8]``. For grouped input these are\n"
+            "    the basis function FWHM in pixels, one per group, by default each is measured from\n"
+            "    the central peak of its group's dirty beam."
+        ),
+        "scale_biases": (
+            "scale_biases : array-like, optional\n"
+            "    Weights that favour small scales when searching for the next component, one per scale. They\n"
+            "    only affect the search, never the flux of the component that is found. By default\n"
+            "    ``1 - 0.6 * scale / max(scale)``, or for grouped input the ratio of the smallest scale's\n"
+            "    FWHM to each scale's FWHM."
+        ),
+        "basis": (
+            "basis :\n"
+            "    Shape of the grouped components, ``'gaussian'`` or ``'paraboloid'``. Only used for grouped input."
+        ),
+        "mask_negative_scales": (
+            "mask_negative_scales :\n"
+            "    For grouped input, drop a scale for good once its residual is negative at the pixel where\n"
+            "    the residual has its largest magnitude. Retire it before selecting the next component,\n"
+            "    without updating the model or residuals from that negative peak. The divergence and\n"
+            "    negative-largest-scale stopping rules are skipped, other scales can continue cleaning."
+        ),
+        "groups": (
+            "groups : sequence of array-like, optional\n"
+            "    Indices into ``vis`` of the visibilities making up each group, eg the visibilities sampled on\n"
+            "    one or more neighbouring circles of the u-v plane. Each group is cleaned at the scale of\n"
+            "    its own dirty beam. Groups must not overlap, visibilities in no group are not used."
+        ),
+        "scheme": "scheme :\n    Weighting scheme, natural by default",
         "clean_beam_width": (
             "clean_beam_width :\n"
-            "    The width of the gaussian to convolve the model with. If set to 0.0 \\\n"
-            "    the gaussian to convolution is disabled"
+            "    The FWHM of the Gaussian used to restore the model. Set to `None` to disable\n"
+            "    this convolution, the image and residual still use surface-brightness units."
         ),
         "gain": "gain :\n    The gain per loop or loop gain",
         "thres": "thres :\n    Terminates clean when ``residual.max() <= thres``",
@@ -58,8 +89,19 @@ def _clean_parameters() -> dict[str, str]:
             "    If `True`, convolve the residual with the normalised clean beam before adding\n"
             "    it to the restored image."
         ),
-        "returns_clean": "Returns\n-------\n:\n    The CLEAN image 2D",
-        "returns_ms_clean": "Returns\n-------\n:\n    Cleaned image",
+        "returns_clean": (
+            "Returns\n-------\n"
+            "clean_map :\n    Reconstructed surface brightness, in the visibility flux unit per square arcsecond.\n"
+            "model :\n    Raw CLEAN component flux per pixel, before restoration and pixel-area conversion.\n"
+            "residual :\n    Background estimate in the same surface-brightness units as ``clean_map``."
+        ),
+        "returns_ms_clean": (
+            "Returns\n-------\n"
+            "result :\n    With a clean beam, ``(clean_map, model, residual)``. Without one, `ms_clean` returns\n"
+            "    ``(model, residual)`` and `vis_ms_clean` returns all three images. The model contains\n"
+            "    raw component flux per pixel. The reconstructed image and residual contain surface\n"
+            "    brightness in the visibility flux unit per square arcsecond."
+        ),
         "notes_clean": (
             r"""Notes
 -----
@@ -88,7 +130,17 @@ x-ray Fourier observations.
 
 It is based on the implementation in the CASA software which can be found here_ ~L956.
 
-.. _here: https://github.com/casacore/casacore/blob/f4dc1c36287c766796ce3375cebdfc8af797a388/lattices/LatticeMath/LatticeCleaner.tcc"""
+.. _here: https://github.com/casacore/casacore/blob/f4dc1c36287c766796ce3375cebdfc8af797a388/lattices/LatticeMath/LatticeCleaner.tcc
+
+When the visibilities are split into groups (eg by the circles they sample in the u-v plane) the
+dirty map and dirty beam become sums over groups, and the algorithm of [R2]_ is used instead: the
+group dirty maps are cleaned jointly, each with a basis function whose width is the FWHM of
+its own dirty beam. The scale with the largest bias weighted peak (relative to the peak of its
+initial dirty map) is chosen, the flux found at that scale's own peak is added to the model as one
+basis function and its response is subtracted from every group's residual. The bias weighted peak
+is only used to choose the scale and location, the flux added to the model is unbiased. The
+residual left over is divided by the integral of the dirty beam and added to the model as an
+estimate of the background."""
         ),
         # Only attached to `ms_clean` itself, not `vis_ms_clean` too: both docstrings can't
         # define the same `[R1]` citation without Sphinx raising a duplicate-citation warning,
@@ -97,7 +149,9 @@ It is based on the implementation in the CASA software which can be found here_ 
 ----------
 .. [R1] Cornwell, T. J., "Multiscale CLEAN Deconvolution of Radio Synthesis Images", IEEE Journal of Selected Topics in Signal Processing, vol 2, p793-801, Paper_ #noqa
 
-.. _Paper: https://ieeexplore.ieee.org/document/4703304/"""
+.. _Paper: https://ieeexplore.ieee.org/document/4703304/
+
+.. [R2] Volpara, A., Catalano, M., Piana, M., Massone, A. M., "Multi-scale CLEAN for Fourier-based hard x-ray solar imaging", Inverse Problems, vol 40, 125017, 2024, https://doi.org/10.1088/1361-6420/ad91db"""
         ),
     }
 
@@ -127,9 +181,12 @@ def clean(
     dirty_map :
         The dirty map to be cleaned 2D
     dirty_beam :
-        The dirty beam or point spread function (PSF) 2D must
+        The 2D dirty beam or point spread function (PSF), at least as large as `dirty_map`, with its
+        peak at the central pixel ``(N - 1) // 2``. It is typically about three times the size of
+        `dirty_map` so it can be shifted over every pixel of the map.
     pixel_size :
-        The pixel size in arcsec
+        The pixel size in arcsec. Required with `clean_beam_width`, without a restoring beam
+        pixels default to 1 arcsec per pixel.
     {clean_beam_width}
     {gain}
     {thres}
@@ -140,6 +197,9 @@ def clean(
 
     {notes_clean}
     """
+    # Fail before iterating, rather than when restoring
+    _restore_inputs(dirty_beam, dirty_map.shape, pixel_size, clean_beam_width)
+
     # Peak pixel of the (always odd-shaped, oversized) dirty beam
     beam_peak = (dirty_beam.shape[0] - 1) // 2, (dirty_beam.shape[1] - 1) // 2
 
@@ -178,26 +238,11 @@ def clean(
     else:
         logger.info("Max iterations reached")
 
+    result = _restore(model, dirty_map, dirty_beam, pixel_size, clean_beam_width, convolve_residual)
     if clean_beam_width is not None:
-        # Convert from FWHM to StDev   FWHM = sigma*(8ln2)**0.5 = 2.3548200450309493
-        x_stdev = (clean_beam_width / pixel_size[1]).to_value(u.pix) / 2.3548200450309493
-        y_stdev = (clean_beam_width / pixel_size[0]).to_value(u.pix) / 2.3548200450309493
-        clean_beam = Gaussian2DKernel(x_stdev, y_stdev, x_size=dirty_beam.shape[1], y_size=dirty_beam.shape[0]).array
-        # Normalise beam
-        clean_beam = clean_beam / clean_beam.max()
-
-        # Convolve clean beam with model and scale
-        clean_map = signal.convolve2d(model, clean_beam / clean_beam.sum(), mode="same") / (
-            pixel_size[0].value * pixel_size[1].value
-        )
-
-        # Scale residual map with model and scale
-        dirty_map = dirty_map / clean_beam.sum() / (pixel_size[0].value * pixel_size[1].value)
-        if convolve_residual:
-            dirty_map = signal.convolve2d(dirty_map, clean_beam / clean_beam.sum(), mode="same")
-        return clean_map + dirty_map, model, dirty_map
-
-    return model + dirty_map, model, dirty_map
+        return result
+    model, residual = result
+    return model / _pixel_area(pixel_size) + residual, model, residual
 
 
 @add_common_docstring(**_clean_parameters())  # type: ignore[untyped-decorator]
@@ -261,12 +306,15 @@ def ms_clean(
     dirty_map: Quantity,
     dirty_beam: Quantity,
     pixel_size: Quantity[u.arcsec / u.pix],
-    scales: Sequence[int] | None = None,
+    scales: Sequence[float] | None = None,
     clean_beam_width: Quantity = 4.0 * u.arcsec,
     gain: float = 0.1,
     thres: float = 0.01,
     niter: int = 5000,
     convolve_residual: bool = False,
+    scale_biases: Sequence[float] | None = None,
+    basis: Literal["gaussian", "paraboloid"] = "gaussian",
+    mask_negative_scales: bool = False,
 ) -> Quantity | NDArray[np.float64]:
     r"""
     Clean the map using a multiscale clean algorithm.
@@ -274,17 +322,25 @@ def ms_clean(
     Parameters
     ----------
     dirty_map :
-        The 2D dirty map to be cleaned
+        The 2D dirty map to be cleaned, or a stack of per group dirty maps with shape ``(groups, ny, nx)``
+        which sum to the full dirty map
     dirty_beam :
-        The 2D dirty beam should have the same dimensions as `dirty_map`
+        The 2D dirty beam, at least as large as `dirty_map`, with its peak at the central pixel
+        ``(N - 1) // 2``. It is typically about three times the size of `dirty_map` so it can be
+        shifted over every pixel of the map. For grouped input a stack of per group dirty beams with
+        shape ``(groups, Ny, Nx)`` which sum to the full dirty beam.
     pixel_size :
-        The pixel size in arcsec
+        The pixel size in arcsec. Required with `clean_beam_width`, without a restoring beam
+        pixels default to 1 arcsec per pixel.
     {scales}
     {clean_beam_width}
     {gain}
     {thres}
     {niter}
     {convolve_residual}
+    {scale_biases}
+    {basis}
+    {mask_negative_scales}
 
     {returns_ms_clean}
 
@@ -292,6 +348,22 @@ def ms_clean(
 
     {references_ms_clean}
     """
+    if np.ndim(dirty_map) == 3:
+        return _ms_clean_groups(
+            dirty_map,
+            dirty_beam,
+            pixel_size,
+            scales=scales,
+            scale_biases=scale_biases,
+            basis=basis,
+            mask_negative_scales=mask_negative_scales,
+            clean_beam_width=clean_beam_width,
+            gain=gain,
+            thres=thres,
+            niter=niter,
+            convolve_residual=convolve_residual,
+        )
+
     # Compute the number of dyadic scales, their sizes and scale biases
     number_of_scales: int = np.floor(np.log2(min(dirty_map.shape))).astype(int)
     scale_sizes: NDArray[np.int_] = 2 ** np.arange(number_of_scales)
@@ -304,9 +376,16 @@ def ms_clean(
 
     scale_sizes = np.where(scale_sizes == 0, 1, scale_sizes)
 
-    scale_biases = 1 - 0.6 * scale_sizes / scale_sizes.max()
+    biases = 1 - 0.6 * scale_sizes / scale_sizes.max()
+    if scale_biases is not None:
+        biases = np.asarray(scale_biases, dtype=float)
+        if biases.shape != scale_sizes.shape:
+            raise ValueError(f"scale_biases must have one entry per scale ({len(scale_sizes)}), got {biases.size}")
 
     model = np.zeros(dirty_map.shape)
+    # The scale maps are filtered copies of this one residual, not independent contributions
+    # to the dirty map. Track its unfiltered value for the final background estimate.
+    residual = dirty_map.copy()
     reference_residual: float | None = None
 
     # Integer center pixel of dirty_map, matching _component()'s
@@ -335,8 +414,9 @@ def ms_clean(
     # up that scale's strengths and make it win the scale selection every iteration.
     if np.any(max_scaled_dirty_beams <= 0):
         raise ValueError("dirty_beam convolved with each scale kernel must have a positive peak")
+    _restore_inputs(dirty_beam, dirty_map.shape, pixel_size, clean_beam_width)
 
-    scale_factors = scale_biases / max_scaled_dirty_beams
+    scale_factors = biases / max_scaled_dirty_beams
 
     # Cross terms need every scale kernel to already exist, so this must be a separate pass
     # from the one above (which is still populating scale_kernels one scale at a time).
@@ -350,7 +430,8 @@ def ms_clean(
     # Clean loop
     for i in range(niter):
         # Correct each scale's response before comparing peaks, so unit-sum kernels do not
-        # systematically favour the point scale over extended components.
+        # systematically favour the point scale over extended components. The bias is only used
+        # to choose the scale and location, the flux committed below is the unbiased one.
         responses = scaled_residuals * scale_factors
         max_index: int = np.argmax(np.abs(responses)).astype(int)
         max_x: int
@@ -358,14 +439,15 @@ def ms_clean(
         max_scale: int
         max_x, max_y, max_scale = (int(x) for x in np.unravel_index(max_index, scaled_residuals.shape))
 
-        strength = responses[max_x, max_y, max_scale]
+        response = responses[max_x, max_y, max_scale]
+        strength = scaled_residuals[max_x, max_y, max_scale] / max_scaled_dirty_beams[max_scale]
 
         logger.info(f"Iter: {i}, max scale: {max_scale}, strength: {strength}")
 
-        # Fixed reference residual from the first iteration, used by the divergence check
+        # Fixed reference response from the first iteration, used by the divergence check
         # below
         if reference_residual is None:
-            reference_residual = float(np.abs(strength))
+            reference_residual = float(np.abs(response))
 
         # Stop if the largest scale's found component is negative: a strong indication that
         # scale is fitting noise/sidelobes rather than real large-scale structure. With a single
@@ -375,9 +457,9 @@ def ms_clean(
             logger.info("Reached negative on largest scale")
             break
 
-        # Stop if this iteration's strength has grown by more than 50% over the first
-        # iteration's strength: clean is diverging rather than converging
-        if np.abs(strength) - reference_residual > reference_residual / 2.0:
+        # Stop if this iteration's response has grown by more than 50% over the first
+        # iteration's response: clean is diverging rather than converging
+        if np.abs(response) - reference_residual > reference_residual / 2.0:
             logger.info("Diverging")
             break
 
@@ -393,6 +475,7 @@ def ms_clean(
 
         # Add this component to current model
         model = np.add(model, comp)
+        residual = np.subtract(residual, strength * scaled_dirty_beams[:, :, max_scale][xr, yr])
 
         # Update all images using precomputed terms
         for j, _ in enumerate(scale_sizes):
@@ -413,27 +496,414 @@ def ms_clean(
     else:
         logger.info("Max iterations reached")
 
+    return _restore(model, residual, dirty_beam, pixel_size, clean_beam_width, convolve_residual)
+
+
+def _pixel_area(pixel_size: Quantity | None) -> float:
+    r"""
+    Return the area of a pixel in square arcseconds.
+
+    Parameters
+    ----------
+    pixel_size :
+        The pixel size in arcsec, a scalar or one value per axis. Unit pixels are assumed if `None`.
+
+    Returns
+    -------
+    `float`
+        The pixel area in arcsec\ :sup:`2`.
+    """
+    if pixel_size is None:
+        return 1.0
+    return float(np.prod(validate_and_expand_kwarg(pixel_size, "pixel_size").to_value(u.arcsec / u.pix)))
+
+
+def _restore_inputs(
+    dirty_beam: NDArray[np.float64],
+    image_shape: tuple[int, ...],
+    pixel_size: Quantity | None,
+    clean_beam_width: Quantity | None,
+) -> tuple[float, Quantity]:
+    r"""
+    Check what `_restore` needs and return the dirty PSF integral over the image and the pixel size.
+
+    Parameters
+    ----------
+    dirty_beam :
+        The 2D dirty beam, at least as large as the image.
+    image_shape :
+        Shape of the image `(ny, nx)`.
+    pixel_size :
+        The pixel size in arcsec, a scalar or one value per axis. Unit pixels are used if `None`
+        and there is no clean beam.
+    clean_beam_width :
+        The width of the restoring beam, or `None` for no restoring beam.
+
+    Returns
+    -------
+    `tuple`
+        The sum of the part of the dirty beam that covers the image, centred on the beam's peak
+        pixel, and the pixel size with one value per axis.
+
+    Raises
+    ------
+    ValueError
+        If `pixel_size` is `None` and `clean_beam_width` is not, if the beam is smaller than the
+        image, or if the integral is not positive.
+
+    Notes
+    -----
+    The integral is the normalisation of the background estimate in `_restore`.
+    """
+    if pixel_size is None:
+        if clean_beam_width is not None:
+            raise ValueError("pixel_size is required to restore with clean_beam_width")
+        pixel_size = 1.0 * u.arcsec / u.pix
+    if dirty_beam.shape[0] < image_shape[0] or dirty_beam.shape[1] < image_shape[1]:
+        raise ValueError(f"dirty_beam {dirty_beam.shape} must be at least as large as the image {tuple(image_shape)}")
+
+    row = (dirty_beam.shape[0] - 1) // 2 - (image_shape[0] - 1) // 2
+    col = (dirty_beam.shape[1] - 1) // 2 - (image_shape[1] - 1) // 2
+    window = dirty_beam[row : row + image_shape[0], col : col + image_shape[1]]
+    integral = float(Quantity(window).value.sum())
+    if not integral > 0:
+        raise ValueError(f"dirty_beam must integrate to a positive value over the image, got {integral}")
+    return integral, validate_and_expand_kwarg(pixel_size, "pixel_size")
+
+
+def _restore(
+    model: NDArray[np.float64],
+    residual: NDArray[np.float64],
+    dirty_beam: NDArray[np.float64],
+    pixel_size: Quantity | None,
+    clean_beam_width: Quantity | None,
+    convolve_residual: bool,
+) -> Any:
+    r"""
+    Restore a per-pixel component model and estimate surface brightness from the dirty residual.
+
+    Parameters
+    ----------
+    model :
+        The CLEAN component model, in flux per pixel.
+    residual :
+        The unfiltered dirty residual.
+    dirty_beam :
+        The 2D dirty beam, at least as large as the image.
+    pixel_size :
+        The pixel size in arcsec, a scalar or one value per axis.
+    clean_beam_width :
+        The width of the restoring beam, or `None` for no restoring beam.
+    convolve_residual :
+        Convolve the background with the restoring beam, ignored without one.
+
+    Returns
+    -------
+    `tuple`
+        ``(clean_map, model, background)`` with a clean beam, otherwise ``(model, background)``.
+        The model is returned unchanged, in flux per pixel, the others are surface brightness per
+        square arcsecond.
+
+    Notes
+    -----
+    The background is the unfiltered residual divided by the dirty PSF integral over the image
+    field of view, including pixel area. Its normalisation is independent of the restoring beam.
+    """
+    integral, pixel = _restore_inputs(dirty_beam, model.shape, pixel_size, clean_beam_width)
+    area = _pixel_area(pixel)
+    residual = residual / (integral * area)
+    if clean_beam_width is None:
+        return model, residual
+
     # Convolve model with clean beam B_G * I^M
-    if clean_beam_width is not None:
-        x_stdev = (clean_beam_width / pixel_size[0]).to_value(u.pix) / (2.0 * np.sqrt(2.0 * np.log(2.0)))
-        y_stdev = (clean_beam_width / pixel_size[1]).to_value(u.pix) / (2.0 * np.sqrt(2.0 * np.log(2.0)))
-        clean_beam = Gaussian2DKernel(x_stdev, y_stdev, x_size=dirty_beam.shape[1], y_size=dirty_beam.shape[0]).array
+    x_stdev = (clean_beam_width / pixel[1]).to_value(u.pix) / (2.0 * np.sqrt(2.0 * np.log(2.0)))
+    y_stdev = (clean_beam_width / pixel[0]).to_value(u.pix) / (2.0 * np.sqrt(2.0 * np.log(2.0)))
+    clean_beam = Gaussian2DKernel(x_stdev, y_stdev, x_size=dirty_beam.shape[1], y_size=dirty_beam.shape[0]).array
 
-        # Normalise beam
-        clean_beam = clean_beam / clean_beam.max()
+    # Normalise beam
+    clean_beam = clean_beam / clean_beam.sum()
+    clean_map = signal.convolve2d(model, clean_beam, mode="same") / area
 
-        clean_map = signal.convolve2d(model, clean_beam / clean_beam.sum(), mode="same") / (
-            pixel_size[0].value * pixel_size[1].value
-        )
+    if convolve_residual:
+        residual = signal.convolve2d(residual, clean_beam, mode="same")
 
-        # Scale residual map with model and scale
-        dirty_map = (scaled_residuals / clean_beam.sum() / (pixel_size[0].value * pixel_size[1].value)).sum(axis=2)
-        if convolve_residual:
-            dirty_map = signal.convolve2d(dirty_map, clean_beam / clean_beam.sum(), mode="same")
+    return clean_map + residual, model, residual
 
-        return clean_map + dirty_map, model, dirty_map
-    # Add residuals B_G * I^M + I^R
-    return model, scaled_residuals.sum(axis=2)
+
+def _gaussian_basis(fwhm: float, shape: tuple[int, int]) -> NDArray[np.float64]:
+    r"""
+    Circular Gaussian basis function of a given FWHM, normalised to unit sum.
+
+    Parameters
+    ----------
+    fwhm :
+        Full width at half maximum of the Gaussian in pixels.
+    shape :
+        Shape of the output array `(ny, nx)`.
+
+    Returns
+    -------
+    `numpy.ndarray`
+        The kernel, with its peak in pixel `((ny - 1) // 2, (nx - 1) // 2)`, and a sum of one.
+
+    Notes
+    -----
+    The centre is the integer `(L - 1) // 2`, as for `_component` and `scipy.signal.convolve` with
+    ``mode="same"``, so the kernel is not shifted by the convolution for even or odd shapes.
+    """
+    y, x = np.indices(shape)
+    radii_squared = (y - (shape[0] - 1) // 2) ** 2 + (x - (shape[1] - 1) // 2) ** 2
+    sigma = fwhm / (2.0 * np.sqrt(2.0 * np.log(2.0)))
+    kernel = np.exp(-radii_squared / (2.0 * sigma**2))
+    return cast(NDArray[np.float64], kernel / kernel.sum())
+
+
+def _paraboloid_basis(fwhm: float, shape: tuple[int, int]) -> NDArray[np.float64]:
+    r"""
+    Circular paraboloid basis function of a given FWHM, normalised to unit sum.
+
+    Parameters
+    ----------
+    fwhm :
+        Full width at half maximum of the paraboloid in pixels.
+    shape :
+        Shape of the output array `(ny, nx)`.
+
+    Returns
+    -------
+    `numpy.ndarray`
+        The kernel, with its peak in pixel `((ny - 1) // 2, (nx - 1) // 2)`, and a sum of one.
+
+    Notes
+    -----
+    The kernel is :math:`1 - (r / R)^2` for :math:`r < R` and zero beyond. It is at half maximum
+    when :math:`r = R / \sqrt{2}`, so the FWHM is :math:`\sqrt{2} R` and the radius is
+    ``fwhm / sqrt(2)``. The centre is the integer `(L - 1) // 2`, as for `_gaussian_basis`.
+    """
+    y, x = np.indices(shape)
+    radii_squared = (y - (shape[0] - 1) // 2) ** 2 + (x - (shape[1] - 1) // 2) ** 2
+    radius = fwhm / np.sqrt(2.0)
+    kernel = np.clip(1.0 - radii_squared / radius**2, 0.0, None)
+    return cast(NDArray[np.float64], kernel / kernel.sum())
+
+
+def _psf_fwhm(beam: NDArray[np.float64]) -> float:
+    r"""
+    Measure the FWHM, in pixels, of the central peak of a dirty beam.
+
+    Parameters
+    ----------
+    beam :
+        The 2D dirty beam, `(ny, nx)`.
+
+    Returns
+    -------
+    `float`
+        The width of the central peak in pixels, at least one.
+
+    Notes
+    -----
+    Follows the half maximum search of ``stx_vis_multiscale_pixon_gen``: along the row through the
+    peak, between the nearest negative samples either side of it, take the samples closest to half
+    of the peak value. The width is the distance between them in whole pixels.
+    """
+    row, col = np.unravel_index(np.argmax(beam), beam.shape)
+    cut = beam[row, :]
+    half = cut[col] / 2.0
+
+    negative = np.flatnonzero(cut < 0)
+    before, after = negative[negative < col], negative[negative > col]
+    left = before.max() if before.size else 0
+    right = after.min() if after.size else cut.size - 1
+
+    start = left + np.argmin(np.abs(cut[left : col + 1] - half))
+    stop = col + np.argmin(np.abs(cut[col : right + 1] - half))
+    return float(np.maximum(stop - start, 1))
+
+
+def _ms_clean_auto_shape(
+    shape: NDArray[np.int_], widths: NDArray[np.float64], pixel_size: Quantity, basis: str
+) -> NDArray[np.int_]:
+    """Choose the grouped working field using the supplied IDL basis-sizing rules.
+
+    The native code uses square fields and pixels. Apply rule per axis for
+    rectangular fields, then round upward to preserve the output pixel grid.
+    """
+    if basis == "paraboloid":
+        working = np.maximum(shape, 2 * int(np.floor(widths.max() / np.sqrt(2))) + 1)
+    else:
+        pixel = pixel_size.to_value(u.arcsec / u.pix)
+        if np.any(~np.isfinite(pixel)) or np.any(pixel <= 0):
+            raise ValueError("pixel_size must contain positive finite values for automatic working_shape")
+        sigma = widths.max() / np.sqrt(8 * np.log(2))
+        # Preserve the native Gaussian basis extent, minimum 2*N+1 field,
+        # and approximate 255-arcsec cap. Never shrink the requested output.
+        extent = (np.floor(3 * sigma * pixel).astype(int) // 2) * 2 + 1
+        cap = (np.floor(255 / pixel).astype(int) // 2) * 2 + 1
+        working = np.maximum(shape, np.minimum(np.maximum(2 * shape + 1, extent), cap))
+    return working + (working - shape) % 2
+
+
+def _ms_clean_groups(
+    dirty_map: Any,
+    dirty_beam: Any,
+    pixel_size: Quantity[u.arcsec / u.pix],
+    *,
+    scales: Sequence[float] | None,
+    scale_biases: Sequence[float] | None,
+    basis: Literal["gaussian", "paraboloid"],
+    mask_negative_scales: bool,
+    clean_beam_width: Quantity | None,
+    gain: float,
+    thres: float,
+    niter: int,
+    convolve_residual: bool,
+) -> Any:
+    r"""
+    Multi-scale CLEAN of dirty maps and beams split by visibility group, see `ms_clean`.
+
+    Parameters
+    ----------
+    dirty_map :
+        Stack of per-group dirty maps, `(n_groups, ny, nx)`.
+    dirty_beam :
+        Stack of per-group dirty beams, `(n_groups, by, bx)`, each at least as large as the image.
+    pixel_size :
+        The pixel size in arcsec.
+    scales :
+        The width of the basis function of each group in pixels, ascending. If `None` they are
+        measured from the FWHM of each group's own dirty beam and the groups sorted by them.
+    scale_biases :
+        Search bias of each group, by default the ratio of the first width to the group's width.
+    basis :
+        The shape of the basis functions.
+    mask_negative_scales :
+        Drop a scale for good once its residual is negative where its magnitude is largest.
+    clean_beam_width :
+        The width of the restoring beam, or `None` for no restoring beam.
+    gain :
+        The loop gain.
+    thres :
+        Stop when the largest magnitude of the residual, summed over the groups, is at or below this.
+    niter :
+        The maximum number of iterations.
+    convolve_residual :
+        Convolve the background with the restoring beam.
+
+    Returns
+    -------
+    `tuple`
+        As `ms_clean`: ``(clean_map, model, residual)`` with a clean beam, otherwise
+        ``(model, residual)``.
+
+    Raises
+    ------
+    ValueError
+        If the stacks do not match, `basis` is unknown, `scales` is not ascending or has the wrong
+        length, or a beam has no positive peak.
+    """
+    group_maps = np.asarray(Quantity(dirty_map).value, dtype=float)
+    group_beams = np.asarray(Quantity(dirty_beam).value, dtype=float)
+    n_groups, ny, nx = group_maps.shape
+    if group_beams.ndim != 3 or group_beams.shape[0] != n_groups:
+        raise ValueError("dirty_beam must be a stack with one beam per group of dirty_map")
+    if basis not in ("gaussian", "paraboloid"):
+        raise ValueError(f"basis must be 'gaussian' or 'paraboloid', got {basis!r}")
+
+    measured = np.array([_psf_fwhm(beam) for beam in group_beams])
+    if scales is None:
+        # Finest to coarsest, so the first scale is the one that is favoured
+        order = np.argsort(measured, kind="stable")
+        widths = measured[order]
+    else:
+        if list(scales) != sorted(scales):
+            raise ValueError(f"scales must be in ascending order, got {list(scales)}")
+        order = np.arange(n_groups)
+        widths = np.asarray(scales, dtype=float)
+    if widths.shape != (n_groups,):
+        raise ValueError(f"scales must have one entry per group ({n_groups}), got {widths.size}")
+    group_maps, group_beams = group_maps[order], group_beams[order]
+
+    if scale_biases is None:
+        biases = widths[0] / widths
+    else:
+        biases = np.asarray(scale_biases, dtype=float)
+        if biases.shape != (n_groups,):
+            raise ValueError(f"scale_biases must have one entry per group ({n_groups}), got {biases.size}")
+        biases = biases[order]
+
+    map_peak = (ny - 1) // 2, (nx - 1) // 2
+    beam_peak = (group_beams.shape[1] - 1) // 2, (group_beams.shape[2] - 1) // 2
+
+    make_basis = _gaussian_basis if basis == "gaussian" else _paraboloid_basis
+    kernels = np.stack([make_basis(width, (ny, nx)) for width in widths])
+
+    # cross_terms[i, k] is the response of group k's dirty beam to a component of scale i
+    cross_terms = np.stack([[signal.convolve(beam, kernel, mode="same") for beam in group_beams] for kernel in kernels])
+    self_peaks = np.array([cross_terms[i, i].max() for i in range(n_groups)])
+    if np.any(self_peaks <= 0):
+        raise ValueError("dirty_beam convolved with each scale kernel must have a positive peak")
+    _restore_inputs(group_beams.sum(axis=0), (ny, nx), pixel_size, clean_beam_width)
+
+    # Rescale each group's dirty map by the peak of its own initial map so groups of very different
+    # size are comparable, a group that is only sidelobes/noise (its largest value is negative) is
+    # never searched.
+    initial_max, initial_min = group_maps.max(axis=(1, 2)), group_maps.min(axis=(1, 2))
+    usable = (initial_max > 0) & (-initial_min <= initial_max)
+    search_weights = np.where(usable, biases / np.where(usable, initial_max, 1.0), 0.0)
+
+    residuals = group_maps.copy()
+    model = np.zeros((ny, nx))
+    reference_score: float | None = None
+    active = np.ones(n_groups, dtype=bool)
+
+    for i in range(niter):
+        if mask_negative_scales:
+            # Retire before selection: a negative peak must not supply one last component.
+            flat = residuals.reshape(n_groups, -1)
+            active &= flat[np.arange(n_groups), np.argmax(np.abs(flat), axis=1)] >= 0
+
+        scores = np.abs(residuals) * (search_weights * active)[:, None, None]
+        if scores.max() <= 0:
+            logger.info("No scale left to clean")
+            break
+        max_scale, max_x, max_y = (int(x) for x in np.unravel_index(np.argmax(scores), scores.shape))
+        score = scores[max_scale, max_x, max_y]
+        peak = residuals[max_scale, max_x, max_y]
+
+        logger.info(f"Iter: {i}, max scale: {max_scale}, strength: {peak}, location: {max_x, max_y}")
+
+        if reference_score is None:
+            reference_score = float(score)
+
+        if not mask_negative_scales:
+            # Stop if the largest scale's found component is negative, see `ms_clean`.
+            if max_scale == n_groups - 1 and peak < 0:
+                logger.info("Reached negative on largest scale")
+                break
+
+            if score - reference_score > reference_score / 2.0:
+                logger.info("Diverging")
+                break
+
+        # The bias was only for choosing the scale, use the true residual peak for the flux
+        flux = gain * peak / self_peaks[max_scale]
+
+        xr = slice(beam_peak[0] - max_x, beam_peak[0] - max_x + ny)
+        yr = slice(beam_peak[1] - max_y, beam_peak[1] - max_y + nx)
+
+        model += flux * shift(kernels[max_scale], (max_x - map_peak[0], max_y - map_peak[1]), order=0)
+        residuals -= flux * cross_terms[max_scale][:, xr, yr]
+
+        if np.abs(residuals.sum(axis=0)).max() <= thres:
+            logger.info("Threshold reached")
+            break
+
+    else:
+        logger.info("Max iterations reached")
+
+    residual = residuals.sum(axis=0)
+    return _restore(model, residual, group_beams.sum(axis=0), pixel_size, clean_beam_width, convolve_residual)
 
 
 @add_common_docstring(**_clean_parameters())  # type: ignore[untyped-decorator]
@@ -441,13 +911,20 @@ def vis_ms_clean(
     vis: Visibilities,
     shape: Quantity[u.pix],
     pixel_size: Quantity[u.arcsec / u.pix],
-    scales: Sequence[int] | None,
-    clean_beam_width: Quantity[u.arcsec] | None = 4.0,
+    scales: Sequence[float] | None,
+    clean_beam_width: Quantity[u.arcsec] | Literal["auto"] | None = "auto",
     niter: int = 5000,
     map: bool | None = True,  # noqa: A002
     gain: float = 0.1,
     thres: float = 0.01,
     convolve_residual: bool = False,
+    groups: Sequence[ArrayLike] | None = None,
+    scale_biases: Sequence[float] | None = None,
+    basis: Literal["gaussian", "paraboloid"] = "gaussian",
+    scheme: str = "natural",
+    mask_negative_scales: bool = False,
+    *,
+    working_shape: Quantity[u.pix] | Literal["auto"] | None = None,
 ) -> Quantity | NDArray[np.float64]:
     r"""
     Clean the visibilities using a multiscale clean method.
@@ -459,26 +936,110 @@ def vis_ms_clean(
     vis :
         The visibilities to clean
     shape :
-        Size of map
+        Size of the returned maps, in pixels, in ``(ny, nx)`` order.
+    working_shape : `~astropy.units.Quantity`, ``"auto"``, or `None`, optional
+        Size of the field on which dirty maps are evaluated and CLEAN components are searched,
+        in pixels, in ``(ny, nx)`` order. A scalar requests a square field. Defaults to `shape`.
+        Each dimension must be at least the output size and differ from it by an even number
+        of pixels, so the output is an exact central crop with the same pixel centers.
+        Pixel size and phase center are unchanged. All returned arrays are cropped after
+        reconstruction and restoration. The residual is normalised by the dirty PSF integral
+        over the full working field. Components outside the output can therefore affect it.
+        For grouped input, ``"auto"`` uses the rule: parabolic bases need
+        ``2 * floor(max(scales) / sqrt(2)) + 1`` pixels, or the output size if larger.
+        Gaussian bases use at least ``2 * shape + 1`` pixels before an approximate 255-arcsec
+        cap, subject to the native basis extent and never shrinking the output. Rules are
+        applied per axis and rounded upward to preserve even/odd parity. When `scales` is
+        `None`, widths are measured on each group's central ``2 * shape + 1`` PSF field before
+        sizing the working field, then kept fixed for reconstruction. Requires `groups`.
     pixel_size :
         The pixel size in arcsec
     map :
         Return a `sunpy.map.Map` by default or array only if `False`
     {scales}
     {clean_beam_width}
+        If not set this is 4 arcsec, or without a clean beam if ``groups`` are used.
     {gain}
     {thres}
     {niter}
     {convolve_residual}
+    {groups}
+    {scale_biases}
+    {basis}
+    {scheme}
+    {mask_negative_scales}
 
     {returns_ms_clean}
 
     {notes_ms_clean}
     """
-    dirty_map = vis_to_map(vis, shape=shape, pixel_size=pixel_size)
-    dirty_beam = vis_psf_image(vis, shape=shape * 3, pixel_size=pixel_size)
+    shape = validate_and_expand_kwarg(shape, "shape").to(u.pix)
+    auto_working = isinstance(working_shape, str)
+    if auto_working and working_shape != "auto":
+        raise ValueError("working_shape must be a pixel quantity, 'auto', or None")
+    working_field = (
+        shape
+        if working_shape is None or auto_working
+        else validate_and_expand_kwarg(working_shape, "working_shape").to(u.pix)
+    )
+    for name, dimensions in (("shape", shape), ("working_shape", working_field)):
+        values = dimensions.to_value(u.pix)
+        if np.any(~np.isfinite(values)) or np.any(values <= 0) or np.any(values != np.floor(values)):
+            raise ValueError(f"{name} must contain positive integer pixel counts")
+    output_pixels = shape.to_value(u.pix).astype(int)
+    initial_group_images = None
+    if auto_working:
+        if groups is None:
+            raise ValueError("working_shape='auto' requires visibility groups")
+        if basis not in ("gaussian", "paraboloid"):
+            raise ValueError(f"basis must be 'gaussian' or 'paraboloid', got {basis!r}")
+        pixel_size = validate_and_expand_kwarg(pixel_size, "pixel_size").to(u.arcsec / u.pix)
+        if scales is None:
+            initial_maps, initial_beams = _group_images(vis, groups, shape, pixel_size, scheme)
+            # The beam arrays are oversized for shifting; measure only the same
+            # initial field used by the IDL basis generator, not their full extent.
+            measure_shape = 2 * output_pixels + 1
+            start = (np.array(initial_beams.shape[1:]) - measure_shape) // 2
+            window = tuple(slice(int(lo), int(lo + n)) for lo, n in zip(start, measure_shape, strict=True))
+            widths = np.array([_psf_fwhm(beam[window]) for beam in initial_beams])
+            order = np.argsort(widths, kind="stable")
+            groups = [groups[i] for i in order]
+            if scale_biases is not None:
+                biases = np.asarray(scale_biases, dtype=float)
+                if biases.shape != widths.shape:
+                    raise ValueError(f"scale_biases must have one entry per group ({len(groups)}), got {biases.size}")
+                scale_biases = biases[order].tolist()
+            widths = widths[order]
+            scales = widths.tolist()
+            initial_group_images = initial_maps[order], initial_beams[order]
+        else:
+            widths = np.asarray(scales, dtype=float)
+        if widths.shape != (len(groups),):
+            raise ValueError(f"scales must have one entry per group ({len(groups)}), got {widths.size}")
+        if np.any(~np.isfinite(widths)) or np.any(widths <= 0):
+            raise ValueError("scales must contain positive finite widths for automatic working_shape")
+        working_field = _ms_clean_auto_shape(output_pixels, widths, pixel_size, basis) * u.pix
+    working_pixels = working_field.to_value(u.pix).astype(int)
+    margin = working_pixels - output_pixels
+    if np.any(margin < 0):
+        raise ValueError("working_shape must be at least as large as shape in each dimension")
+    if np.any(margin % 2):
+        raise ValueError("working_shape and shape must have the same even/odd parity in each dimension")
+
+    # The paper's algorithm adds the residual to the model directly, there is no clean beam to restore with
+    if isinstance(clean_beam_width, str):
+        clean_beam_width = 4.0 * u.arcsec if groups is None else None
+
+    if groups is None:
+        dirty_map = vis_to_map(vis, shape=working_field, pixel_size=pixel_size, scheme=scheme)
+        dirty_beam = vis_psf_image(vis, shape=working_field * 3, pixel_size=pixel_size, scheme=scheme)
+        dirty_map, dirty_beam = dirty_map.data, dirty_beam.value
+    elif initial_group_images is not None and np.array_equal(working_pixels, output_pixels):
+        dirty_map, dirty_beam = initial_group_images
+    else:
+        dirty_map, dirty_beam = _group_images(vis, groups, working_field, pixel_size, scheme)
     result = ms_clean(
-        dirty_map.data,
+        dirty_map,
         dirty_beam,
         pixel_size=pixel_size,
         scales=scales,
@@ -487,6 +1048,9 @@ def vis_ms_clean(
         thres=thres,
         niter=niter,
         convolve_residual=convolve_residual,
+        scale_biases=scale_biases,
+        basis=basis,
+        mask_negative_scales=mask_negative_scales,
     )
     # ms_clean only returns (clean_map, model, residual) when clean_beam_width is set; with
     # clean_beam_width=None it returns just (model, residual), so clean_map has to be derived.
@@ -494,11 +1058,80 @@ def vis_ms_clean(
         clean_map, model, residual = result
     else:
         model, residual = result
-        clean_map = model + residual
+        clean_map = model / _pixel_area(pixel_size) + residual
+    crop = tuple(slice(int(start), int(start + size)) for start, size in zip(margin // 2, output_pixels, strict=True))
+    clean_map, model, residual = (data[crop] for data in (clean_map, model, residual))
     if not map:
         return clean_map, model, residual
 
-    return [Map((data, dirty_map.meta)) for data in (clean_map, model, residual)]
+    meta = generate_header(vis, shape=shape, pixel_size=validate_and_expand_kwarg(pixel_size, "pixel_size"))
+    return [Map((data, meta)) for data in (clean_map, model, residual)]
+
+
+def _group_images(
+    vis: Visibilities,
+    groups: Sequence[ArrayLike],
+    shape: Quantity[u.pix],
+    pixel_size: Quantity[u.arcsec / u.pix],
+    scheme: str,
+) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
+    r"""
+    Back project each group of visibilities into a dirty map and dirty beam.
+
+    Parameters
+    ----------
+    vis :
+        The visibilities.
+    groups :
+        The indices into `vis` of each group, which must not overlap or be empty.
+    shape :
+        Size of the maps.
+    pixel_size :
+        The pixel size in arcsec.
+    scheme :
+        The weighting scheme, as for `get_weights`.
+
+    Returns
+    -------
+    `tuple`
+        The stack of dirty maps `(n_groups, ny, nx)` and of dirty beams `(n_groups, by, bx)`. The
+        beams are three times the size of the maps, rounded to odd.
+
+    Raises
+    ------
+    ValueError
+        If a group is empty or the groups overlap.
+
+    Notes
+    -----
+    The weights are normalised over every visibility that is in a group, so the maps (and the
+    beams) of the groups sum to the dirty map (and beam) of all of them. For natural weights this
+    is the ``countvis / nvis`` rescaling of the group's share of the visibilities.
+    """
+    shape = validate_and_expand_kwarg(shape, "shape").to(u.pix)
+    pixel_size = validate_and_expand_kwarg(pixel_size, "pixel_size")
+    # Odd, as for `vis_psf_image`, so the peak of the beam is in exactly one pixel
+    beam_shape = [s // 2 * 2 + 1 for s in (shape * 3).to_value(u.pix)] * u.pix
+
+    indices = [np.asarray(group, dtype=int) for group in groups]
+    if any(index.size == 0 for index in indices):
+        raise ValueError("every group must contain at least one visibility")
+    used = np.concatenate(indices)
+    if np.unique(used).size != used.size:
+        raise ValueError("groups must not overlap")
+
+    weights = get_weights(vis, scheme=scheme)
+    weights = weights / weights[used].sum()
+
+    maps, beams = [], []
+    for index in indices:
+        kwargs = {"u": vis.u[index], "v": vis.v[index], "weights": weights[index], "pixel_size": pixel_size}
+        dirty_map = idft_map(vis.visibilities[index], shape=shape, phase_center=[0.0, 0.0] * u.arcsec, **kwargs)
+        dirty_beam = idft_map(np.ones(index.size) * vis.visibilities.unit, shape=beam_shape, **kwargs)
+        maps.append(Quantity(dirty_map).value)
+        beams.append(Quantity(dirty_beam).value)
+
+    return np.stack(maps), np.stack(beams)
 
 
 def _radial_prolate_sphereoidal(nu: float) -> float:  # pyright: ignore[reportUnusedFunction]
@@ -659,14 +1292,20 @@ def _vec_radial_prolate_sphereoidal(nu: ArrayLike) -> NDArray[np.float64]:
 
 def _component(scale: float, shape: tuple[int, ...]) -> NDArray[np.float64]:
     r"""
+    Create a multi-scale CLEAN component, a prolate spheroid tapered by a paraboloid.
 
     Parameters
     ----------
-    scale
+    scale :
+        The radius of the component in pixels. A scale of zero is a single pixel (delta function).
+    shape :
+        Shape of the output array.
 
     Returns
     -------
-
+    `numpy.ndarray`
+        The component, peaked at pixel `((shape[0] - 1) // 2, (shape[1] - 1) // 2)` and zero beyond
+        `scale` pixels from it.
     """
     # Integer center pixel (not the previous `(shape - 1) / 2.0`, which is a half-integer for
     # even `shape` and left the kernel with no single, well-defined peak pixel to align with a
