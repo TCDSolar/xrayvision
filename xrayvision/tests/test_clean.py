@@ -10,6 +10,7 @@ from xrayvision.clean import (
     _component,
     _gaussian_basis,
     _group_images,
+    _ms_clean_auto_shape,
     _paraboloid_basis,
     _psf_fwhm,
     _radial_prolate_sphereoidal,
@@ -952,9 +953,257 @@ def test_ms_clean_groups_mask_negative_scales(caplog):
     masked_model, _ = ms_clean(maps, beams, mask_negative_scales=True, **kwargs)
     assert "Reached negative on largest scale" not in caplog.text
     assert "No scale left to clean" in caplog.text
-    # The scale dropped after being found negative never adds to the model again, the first scale
-    # keeps cleaning
-    assert masked_model.sum() != default_model.sum()
+    # Both groups have negative largest-magnitude residuals after the first update.
+    # Masking retires both without the extra negative component the old ordering added.
+    assert_allclose(masked_model, default_model)
+
+
+def test_ms_clean_groups_retire_before_update():
+    maps, beams = _lobed_groups(0.6)
+    kwargs = {
+        "pixel_size": [1, 1] * u.arcsec / u.pix,
+        "scales": [1.0, 1.0],
+        "clean_beam_width": None,
+        "gain": 1.0,
+        "mask_negative_scales": True,
+    }
+    # After the first component both groups' strongest residuals are negative.
+    # Retiring them must leave that component and the residual exactly as they are.
+    first_model, first_residual = ms_clean(maps, beams, niter=1, **kwargs)
+    model, residual = ms_clean(maps, beams, niter=20, **kwargs)
+    assert first_model.any()
+    assert_allclose(model, first_model, atol=1e-14)
+    assert_allclose(residual, first_residual, atol=1e-14)
+
+
+def test_ms_clean_groups_retirement_keeps_other_scales_active():
+    maps, beams = _lobed_groups(0.6, extra_group=True)
+    maps[2, 10, 10] = 3.0
+    model, _residual = ms_clean(
+        maps,
+        beams,
+        [1, 1] * u.arcsec / u.pix,
+        scales=[0.01] * 3,
+        scale_biases=[1.0, 1.0, 0.1],
+        clean_beam_width=None,
+        mask_negative_scales=True,
+        gain=1.0,
+        niter=2,
+    )
+    # Group 1 is retired after the central component; group 2 can still supply its
+    # positive source. A retiring negative winner must not consume this iteration.
+    expected = np.zeros_like(model)
+    expected[16, 16], expected[10, 10] = 1.0, 3.0
+    assert_allclose(model, expected, atol=1e-14)
+
+
+@pytest.mark.parametrize("grouped", [False, True])
+@pytest.mark.parametrize("shape", [(17, 19), (18, 20)])
+@pytest.mark.parametrize("beam_width", [None, 3.0 * u.arcsec])
+def test_vis_ms_clean_working_shape(grouped, shape, beam_width):
+    vis = _circles_vis(_two_source_truth(33))
+    shape = np.array(shape)
+    working = shape + np.array([16, 14])
+    kwargs = {
+        "pixel_size": [1, 1] * u.arcsec / u.pix,
+        "scales": [1, 2, 4, 8] if grouped else [1, 2],
+        "groups": _groups() if grouped else None,
+        "clean_beam_width": beam_width,
+        "map": False,
+        "niter": 3,
+        "mask_negative_scales": True,
+    }
+    full = vis_ms_clean(vis, working * u.pix, **kwargs)
+    cropped = vis_ms_clean(vis, shape * u.pix, working_shape=working * u.pix, **kwargs)
+    for actual, large in zip(cropped, full, strict=True):
+        assert actual.shape == tuple(shape)
+        assert_allclose(actual, large[8 : 8 + shape[0], 7 : 7 + shape[1]], atol=1e-12)
+
+
+def test_vis_ms_clean_working_shape_map():
+    vis = _circles_vis(_two_source_truth(33))
+    vis.phase_center = [350, -600] * u.arcsec
+    kwargs = {
+        "shape": [17, 19] * u.pix,
+        "pixel_size": [2, 3] * u.arcsec / u.pix,
+        "scales": None,
+        "groups": _groups(),
+        "niter": 1,
+    }
+    original = vis_ms_clean(vis, **kwargs)
+    enlarged = vis_ms_clean(vis, working_shape=33 * u.pix, **kwargs)
+    for small, large in zip(original, enlarged, strict=True):
+        assert large.data.shape == (17, 19)
+        assert large.meta["naxis1"] == 19
+        assert large.meta["naxis2"] == 17
+        assert_allclose(large.wcs.wcs.crpix, small.wcs.wcs.crpix)
+        assert_allclose(large.wcs.wcs.crval, small.wcs.wcs.crval)
+        assert_allclose(large.wcs.wcs.cdelt, small.wcs.wcs.cdelt)
+
+
+def test_vis_ms_clean_working_shape_cleans_source_outside_output():
+    # A Gaussian centered ten pixels east of the phase center is outside the
+    # requested 17-pixel field, but its tail contributes inside that field.
+    truth = np.zeros((33, 33))
+    truth[:, 10:] = 10 * _gaussian_basis(4.0, (33, 33))[:, :-10]
+    vis = _circles_vis(truth)
+    _image, model, residual = vis_ms_clean(
+        vis,
+        [17, 17] * u.pix,
+        [1, 1] * u.arcsec / u.pix,
+        scales=[4.0],
+        groups=[np.arange(len(vis.u))],
+        gain=1.0,
+        niter=1,
+        clean_beam_width=None,
+        working_shape=33 * u.pix,
+        map=False,
+    )
+    expected = truth[8:25, 8:25]
+    assert np.linalg.norm(model - expected) / np.linalg.norm(expected) < 1e-4
+    assert np.linalg.norm(residual) / np.linalg.norm(expected) < 1e-4
+
+
+@pytest.mark.parametrize(
+    ("shape", "widths", "pixel", "basis", "expected"),
+    [
+        ((129, 129), [40], (1, 1), "paraboloid", (129, 129)),
+        ((129, 129), [100], (1, 1), "paraboloid", (141, 141)),
+        ((100, 129), [100], (1, 2), "paraboloid", (142, 141)),
+        ((101, 101), [6, 34, 180], (0.5, 0.5), "gaussian", (203, 203)),
+        ((129, 129), [6, 18, 78], (1.5, 1.5), "gaussian", (171, 171)),
+        ((257, 257), [4], (1.5, 1.5), "gaussian", (257, 257)),
+        ((128, 130), [4], (1.5, 1.5), "gaussian", (172, 172)),
+        ((17, 20), [4], (1, 1), "gaussian", (35, 42)),
+        ((129, 131), [4], (1, 2), "gaussian", (255, 131)),
+        ((17, 19), [100], (1, 1), "gaussian", (127, 127)),
+    ],
+)
+def test_ms_clean_auto_shape(shape, widths, pixel, basis, expected):
+    actual = _ms_clean_auto_shape(np.array(shape), np.array(widths, dtype=float), pixel * u.arcsec / u.pix, basis)
+    assert_allclose(actual, expected)
+
+
+@pytest.mark.parametrize(
+    ("shape", "basis", "working"),
+    [
+        ((17, 19), "gaussian", (35, 39)),
+        ((18, 20), "gaussian", (38, 42)),
+        ((17, 19), "paraboloid", (33, 33)),
+        ((18, 20), "paraboloid", (34, 34)),
+    ],
+)
+def test_vis_ms_clean_auto_working_shape(shape, basis, working):
+    vis = _circles_vis(_two_source_truth(33))
+    kwargs = {
+        "shape": shape * u.pix,
+        "pixel_size": [1, 1] * u.arcsec / u.pix,
+        "scales": [1, 2, 4, 24],
+        "groups": _groups(),
+        "basis": basis,
+        "map": False,
+        "niter": 3,
+        "mask_negative_scales": True,
+    }
+    automatic = vis_ms_clean(vis, working_shape="auto", **kwargs)
+    explicit = vis_ms_clean(vis, working_shape=working * u.pix, **kwargs)
+    for actual, expected in zip(automatic, explicit, strict=True):
+        assert actual.shape == shape
+        assert_allclose(actual, expected, atol=1e-12)
+
+
+@pytest.mark.parametrize("basis", ["gaussian", "paraboloid"])
+def test_vis_ms_clean_auto_measured_scales(basis):
+    vis = _circles_vis(_two_source_truth(33))
+    groups = _groups()[::-1]
+    biases = np.array([0.01, 0.04, 0.2, 1.0])
+    shape, pixel = [17, 19] * u.pix, [1, 1] * u.arcsec / u.pix
+    # Measure independently on the initial PSF field, as the IDL basis generator
+    # does. Coarse widths can differ if remeasured on the enlarged working field.
+    group_vis = [Visibilities(vis.visibilities[group], u=vis.u[group], v=vis.v[group]) for group in groups]
+    widths = np.array(
+        [_psf_fwhm(vis_psf_image(subset, shape=2 * shape + 1 * u.pix, pixel_size=pixel).value) for subset in group_vis]
+    )
+    order = np.argsort(widths, kind="stable")
+    working = _ms_clean_auto_shape(shape.to_value(u.pix).astype(int), widths, pixel, basis) * u.pix
+    kwargs = {
+        "shape": shape,
+        "pixel_size": pixel,
+        "basis": basis,
+        "niter": 3,
+        "map": False,
+        "mask_negative_scales": True,
+    }
+    automatic = vis_ms_clean(vis, groups=groups, scales=None, scale_biases=biases, working_shape="auto", **kwargs)
+    explicit = vis_ms_clean(
+        vis,
+        groups=[groups[i] for i in order],
+        scales=widths[order].tolist(),
+        scale_biases=biases[order].tolist(),
+        working_shape=working,
+        **kwargs,
+    )
+    for actual, expected in zip(automatic, explicit, strict=True):
+        assert_allclose(actual, expected, atol=1e-12)
+
+
+@pytest.mark.parametrize("basis", ["gaussian", "paraboloid"])
+def test_vis_ms_clean_auto_working_shape_map(basis):
+    vis = _circles_vis(_two_source_truth(33))
+    maps = vis_ms_clean(
+        vis,
+        [17, 19] * u.pix,
+        [1, 1] * u.arcsec / u.pix,
+        scales=None,
+        groups=_groups(),
+        basis=basis,
+        working_shape="auto",
+        niter=1,
+    )
+    for amap in maps:
+        assert amap.data.shape == (17, 19)
+        assert amap.meta["naxis1"] == 19
+        assert amap.meta["naxis2"] == 17
+
+
+@pytest.mark.parametrize(
+    ("kwargs", "message"),
+    [
+        ({"groups": None}, "requires visibility groups"),
+        ({"basis": "box"}, "'gaussian' or 'paraboloid'"),
+        ({"scales": [1, 2]}, "one entry per group"),
+        ({"scales": [1, 2, 3, np.nan]}, "positive finite widths"),
+        ({"scales": [0, 1, 2, 3]}, "positive finite widths"),
+        ({"scales": None, "scale_biases": [1]}, "one entry per group"),
+        ({"pixel_size": 0 * u.arcsec / u.pix}, "positive finite values"),
+    ],
+)
+def test_vis_ms_clean_auto_invalid_input(kwargs, message):
+    vis = _circles_vis(_two_source_truth(33))
+    arguments = {"scales": [1, 2, 4, 8], "groups": _groups(), "pixel_size": [1, 1] * u.arcsec / u.pix, **kwargs}
+    with pytest.raises(ValueError, match=message):
+        vis_ms_clean(vis, [17, 19] * u.pix, working_shape="auto", **arguments)
+
+
+@pytest.mark.parametrize(
+    ("working_shape", "message"),
+    [
+        ([15, 21] * u.pix, "at least as large"),
+        ([19, 17] * u.pix, "at least as large"),
+        ([18, 21] * u.pix, "same even/odd parity"),
+        ([19, 20] * u.pix, "same even/odd parity"),
+        ([19.5, 21] * u.pix, "positive integer"),
+        ([np.nan, 21] * u.pix, "positive integer"),
+        ([np.inf, 21] * u.pix, "positive integer"),
+        ([-19, 21] * u.pix, "positive integer"),
+        ([19, 21, 23] * u.pix, "scalar or an 1D array"),
+        ("automatic", "'auto', or None"),
+    ],
+)
+def test_vis_ms_clean_invalid_working_shape(working_shape, message):
+    vis = _circles_vis(_two_source_truth(33))
+    with pytest.raises(ValueError, match=message):
+        vis_ms_clean(vis, [17, 19] * u.pix, [1, 1] * u.arcsec / u.pix, scales=None, working_shape=working_shape)
 
 
 def test_ms_clean_groups_mask_negative_scales_has_no_divergence_guard(caplog):

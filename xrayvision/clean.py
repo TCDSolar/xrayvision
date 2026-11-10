@@ -48,7 +48,7 @@ def _clean_parameters() -> dict[str, str]:
         "scales": (
             "scales : array-like, optional\n"
             "    The scales to use, in ascending order, eg ``[1, 2, 4, 8]``. For grouped input these are\n"
-            "    the basis function FWHM in pixels, one per group; by default each is measured from\n"
+            "    the basis function FWHM in pixels, one per group, by default each is measured from\n"
             "    the central peak of its group's dirty beam."
         ),
         "scale_biases": (
@@ -65,9 +65,9 @@ def _clean_parameters() -> dict[str, str]:
         "mask_negative_scales": (
             "mask_negative_scales :\n"
             "    For grouped input, drop a scale for good once its residual is negative at the pixel where\n"
-            "    the residual has its largest magnitude, and skip the other stopping rules, as the\n"
-            "    ``negative_max`` keyword of the SSW ``stx_vis_multiscale_clean`` does. The flux added at\n"
-            "    that iteration keeps the sign of the peak."
+            "    the residual has its largest magnitude. Retire it before selecting the next component,\n"
+            "    without updating the model or residuals from that negative peak. The divergence and\n"
+            "    negative-largest-scale stopping rules are skipped, other scales can continue cleaning."
         ),
         "groups": (
             "groups : sequence of array-like, optional\n"
@@ -79,7 +79,7 @@ def _clean_parameters() -> dict[str, str]:
         "clean_beam_width": (
             "clean_beam_width :\n"
             "    The FWHM of the Gaussian used to restore the model. Set to `None` to disable\n"
-            "    this convolution; the image and residual still use surface-brightness units."
+            "    this convolution, the image and residual still use surface-brightness units."
         ),
         "gain": "gain :\n    The gain per loop or loop gain",
         "thres": "thres :\n    Terminates clean when ``residual.max() <= thres``",
@@ -99,7 +99,7 @@ def _clean_parameters() -> dict[str, str]:
             "Returns\n-------\n"
             "result :\n    With a clean beam, ``(clean_map, model, residual)``. Without one, `ms_clean` returns\n"
             "    ``(model, residual)`` and `vis_ms_clean` returns all three images. The model contains\n"
-            "    raw component flux per pixel; the reconstructed image and residual contain surface\n"
+            "    raw component flux per pixel. The reconstructed image and residual contain surface\n"
             "    brightness in the visibility flux unit per square arcsecond."
         ),
         "notes_clean": (
@@ -134,7 +134,7 @@ It is based on the implementation in the CASA software which can be found here_ 
 
 When the visibilities are split into groups (eg by the circles they sample in the u-v plane) the
 dirty map and dirty beam become sums over groups, and the algorithm of [R2]_ is used instead: the
-group dirty maps are cleaned in parallel, each with a basis function whose width is the FWHM of
+group dirty maps are cleaned jointly, each with a basis function whose width is the FWHM of
 its own dirty beam. The scale with the largest bias weighted peak (relative to the peak of its
 initial dirty map) is chosen, the flux found at that scale's own peak is added to the model as one
 basis function and its response is subtracted from every group's residual. The bias weighted peak
@@ -601,7 +601,7 @@ def _restore(
     -------
     `tuple`
         ``(clean_map, model, background)`` with a clean beam, otherwise ``(model, background)``.
-        The model is returned unchanged, in flux per pixel; the others are surface brightness per
+        The model is returned unchanged, in flux per pixel, the others are surface brightness per
         square arcsecond.
 
     Notes
@@ -721,6 +721,29 @@ def _psf_fwhm(beam: NDArray[np.float64]) -> float:
     return float(np.maximum(stop - start, 1))
 
 
+def _ms_clean_auto_shape(
+    shape: NDArray[np.int_], widths: NDArray[np.float64], pixel_size: Quantity, basis: str
+) -> NDArray[np.int_]:
+    """Choose the grouped working field using the supplied IDL basis-sizing rules.
+
+    The native code uses square fields and pixels. Apply rule per axis for
+    rectangular fields, then round upward to preserve the output pixel grid.
+    """
+    if basis == "paraboloid":
+        working = np.maximum(shape, 2 * int(np.floor(widths.max() / np.sqrt(2))) + 1)
+    else:
+        pixel = pixel_size.to_value(u.arcsec / u.pix)
+        if np.any(~np.isfinite(pixel)) or np.any(pixel <= 0):
+            raise ValueError("pixel_size must contain positive finite values for automatic working_shape")
+        sigma = widths.max() / np.sqrt(8 * np.log(2))
+        # Preserve the native Gaussian basis extent, minimum 2*N+1 field,
+        # and approximate 255-arcsec cap. Never shrink the requested output.
+        extent = (np.floor(3 * sigma * pixel).astype(int) // 2) * 2 + 1
+        cap = (np.floor(255 / pixel).astype(int) // 2) * 2 + 1
+        working = np.maximum(shape, np.minimum(np.maximum(2 * shape + 1, extent), cap))
+    return working + (working - shape) % 2
+
+
 def _ms_clean_groups(
     dirty_map: Any,
     dirty_beam: Any,
@@ -835,6 +858,11 @@ def _ms_clean_groups(
     active = np.ones(n_groups, dtype=bool)
 
     for i in range(niter):
+        if mask_negative_scales:
+            # Retire before selection: a negative peak must not supply one last component.
+            flat = residuals.reshape(n_groups, -1)
+            active &= flat[np.arange(n_groups), np.argmax(np.abs(flat), axis=1)] >= 0
+
         scores = np.abs(residuals) * (search_weights * active)[:, None, None]
         if scores.max() <= 0:
             logger.info("No scale left to clean")
@@ -848,13 +876,7 @@ def _ms_clean_groups(
         if reference_score is None:
             reference_score = float(score)
 
-        if mask_negative_scales:
-            # A scale is dropped for good once its residual is negative at the pixel where the residual
-            # has its largest magnitude. It still competes in this iteration. There are no other stops,
-            # as for the reference IDL.
-            flat = residuals.reshape(n_groups, -1)
-            active &= flat[np.arange(n_groups), np.argmax(np.abs(flat), axis=1)] >= 0
-        else:
+        if not mask_negative_scales:
             # Stop if the largest scale's found component is negative, see `ms_clean`.
             if max_scale == n_groups - 1 and peak < 0:
                 logger.info("Reached negative on largest scale")
@@ -901,6 +923,8 @@ def vis_ms_clean(
     basis: Literal["gaussian", "paraboloid"] = "gaussian",
     scheme: str = "natural",
     mask_negative_scales: bool = False,
+    *,
+    working_shape: Quantity[u.pix] | Literal["auto"] | None = None,
 ) -> Quantity | NDArray[np.float64]:
     r"""
     Clean the visibilities using a multiscale clean method.
@@ -912,7 +936,22 @@ def vis_ms_clean(
     vis :
         The visibilities to clean
     shape :
-        Size of map
+        Size of the returned maps, in pixels, in ``(ny, nx)`` order.
+    working_shape : `~astropy.units.Quantity`, ``"auto"``, or `None`, optional
+        Size of the field on which dirty maps are evaluated and CLEAN components are searched,
+        in pixels, in ``(ny, nx)`` order. A scalar requests a square field. Defaults to `shape`.
+        Each dimension must be at least the output size and differ from it by an even number
+        of pixels, so the output is an exact central crop with the same pixel centers.
+        Pixel size and phase center are unchanged. All returned arrays are cropped after
+        reconstruction and restoration. The residual is normalised by the dirty PSF integral
+        over the full working field. Components outside the output can therefore affect it.
+        For grouped input, ``"auto"`` uses the rule: parabolic bases need
+        ``2 * floor(max(scales) / sqrt(2)) + 1`` pixels, or the output size if larger.
+        Gaussian bases use at least ``2 * shape + 1`` pixels before an approximate 255-arcsec
+        cap, subject to the native basis extent and never shrinking the output. Rules are
+        applied per axis and rounded upward to preserve even/odd parity. When `scales` is
+        `None`, widths are measured on each group's central ``2 * shape + 1`` PSF field before
+        sizing the working field, then kept fixed for reconstruction. Requires `groups`.
     pixel_size :
         The pixel size in arcsec
     map :
@@ -934,22 +973,71 @@ def vis_ms_clean(
 
     {notes_ms_clean}
     """
+    shape = validate_and_expand_kwarg(shape, "shape").to(u.pix)
+    auto_working = isinstance(working_shape, str)
+    if auto_working and working_shape != "auto":
+        raise ValueError("working_shape must be a pixel quantity, 'auto', or None")
+    working_field = (
+        shape
+        if working_shape is None or auto_working
+        else validate_and_expand_kwarg(working_shape, "working_shape").to(u.pix)
+    )
+    for name, dimensions in (("shape", shape), ("working_shape", working_field)):
+        values = dimensions.to_value(u.pix)
+        if np.any(~np.isfinite(values)) or np.any(values <= 0) or np.any(values != np.floor(values)):
+            raise ValueError(f"{name} must contain positive integer pixel counts")
+    output_pixels = shape.to_value(u.pix).astype(int)
+    initial_group_images = None
+    if auto_working:
+        if groups is None:
+            raise ValueError("working_shape='auto' requires visibility groups")
+        if basis not in ("gaussian", "paraboloid"):
+            raise ValueError(f"basis must be 'gaussian' or 'paraboloid', got {basis!r}")
+        pixel_size = validate_and_expand_kwarg(pixel_size, "pixel_size").to(u.arcsec / u.pix)
+        if scales is None:
+            initial_maps, initial_beams = _group_images(vis, groups, shape, pixel_size, scheme)
+            # The beam arrays are oversized for shifting; measure only the same
+            # initial field used by the IDL basis generator, not their full extent.
+            measure_shape = 2 * output_pixels + 1
+            start = (np.array(initial_beams.shape[1:]) - measure_shape) // 2
+            window = tuple(slice(int(lo), int(lo + n)) for lo, n in zip(start, measure_shape, strict=True))
+            widths = np.array([_psf_fwhm(beam[window]) for beam in initial_beams])
+            order = np.argsort(widths, kind="stable")
+            groups = [groups[i] for i in order]
+            if scale_biases is not None:
+                biases = np.asarray(scale_biases, dtype=float)
+                if biases.shape != widths.shape:
+                    raise ValueError(f"scale_biases must have one entry per group ({len(groups)}), got {biases.size}")
+                scale_biases = biases[order].tolist()
+            widths = widths[order]
+            scales = widths.tolist()
+            initial_group_images = initial_maps[order], initial_beams[order]
+        else:
+            widths = np.asarray(scales, dtype=float)
+        if widths.shape != (len(groups),):
+            raise ValueError(f"scales must have one entry per group ({len(groups)}), got {widths.size}")
+        if np.any(~np.isfinite(widths)) or np.any(widths <= 0):
+            raise ValueError("scales must contain positive finite widths for automatic working_shape")
+        working_field = _ms_clean_auto_shape(output_pixels, widths, pixel_size, basis) * u.pix
+    working_pixels = working_field.to_value(u.pix).astype(int)
+    margin = working_pixels - output_pixels
+    if np.any(margin < 0):
+        raise ValueError("working_shape must be at least as large as shape in each dimension")
+    if np.any(margin % 2):
+        raise ValueError("working_shape and shape must have the same even/odd parity in each dimension")
+
     # The paper's algorithm adds the residual to the model directly, there is no clean beam to restore with
     if isinstance(clean_beam_width, str):
         clean_beam_width = 4.0 * u.arcsec if groups is None else None
 
     if groups is None:
-        dirty_map = vis_to_map(vis, shape=shape, pixel_size=pixel_size, scheme=scheme)
-        dirty_beam = vis_psf_image(vis, shape=shape * 3, pixel_size=pixel_size, scheme=scheme)
-        meta = dirty_map.meta
+        dirty_map = vis_to_map(vis, shape=working_field, pixel_size=pixel_size, scheme=scheme)
+        dirty_beam = vis_psf_image(vis, shape=working_field * 3, pixel_size=pixel_size, scheme=scheme)
         dirty_map, dirty_beam = dirty_map.data, dirty_beam.value
+    elif initial_group_images is not None and np.array_equal(working_pixels, output_pixels):
+        dirty_map, dirty_beam = initial_group_images
     else:
-        dirty_map, dirty_beam = _group_images(vis, groups, shape, pixel_size, scheme)
-        meta = generate_header(
-            vis,
-            shape=validate_and_expand_kwarg(shape, "shape"),
-            pixel_size=validate_and_expand_kwarg(pixel_size, "pixel_size"),
-        )
+        dirty_map, dirty_beam = _group_images(vis, groups, working_field, pixel_size, scheme)
     result = ms_clean(
         dirty_map,
         dirty_beam,
@@ -971,9 +1059,12 @@ def vis_ms_clean(
     else:
         model, residual = result
         clean_map = model / _pixel_area(pixel_size) + residual
+    crop = tuple(slice(int(start), int(start + size)) for start, size in zip(margin // 2, output_pixels, strict=True))
+    clean_map, model, residual = (data[crop] for data in (clean_map, model, residual))
     if not map:
         return clean_map, model, residual
 
+    meta = generate_header(vis, shape=shape, pixel_size=validate_and_expand_kwarg(pixel_size, "pixel_size"))
     return [Map((data, meta)) for data in (clean_map, model, residual)]
 
 
