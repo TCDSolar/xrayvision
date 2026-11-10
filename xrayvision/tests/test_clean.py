@@ -15,7 +15,7 @@ from xrayvision.clean import (
     vis_clean,
     vis_ms_clean,
 )
-from xrayvision.imaging import image_to_vis
+from xrayvision.imaging import image_to_vis, vis_psf_image, vis_to_image
 from xrayvision.transform import dft_map, idft_map
 
 
@@ -469,3 +469,124 @@ def test_vis_ms_clean_no_restore_no_map():
     assert model.shape == data.shape
     assert residual.shape == data.shape
     assert_allclose(clean_map, model + residual)
+
+
+@pytest.mark.parametrize("shape", [(9, 9), (10, 11), (11, 10), (10, 12)])
+@pytest.mark.parametrize("corner", [(0, 0), (0, -1), (-1, 0), (-1, -1)])
+def test_clean_minimum_beam_at_corners(shape, corner):
+    dirty = np.zeros(shape)
+    dirty[corner] = 7.0
+    beam = np.zeros(tuple(2 * n - 1 for n in shape))
+    beam[shape[0] - 1, shape[1] - 1] = 1.0
+
+    image, model, residual = clean(dirty, beam, clean_beam_width=None, gain=1.0, niter=1)
+
+    assert_allclose(image, dirty)
+    assert_allclose(model, dirty)
+    assert_allclose(residual, 0.0)
+
+
+@pytest.mark.parametrize("shape", [(9, 9), (10, 11), (11, 10), (10, 12)])
+@pytest.mark.parametrize("width", [None, 0.01, 40.0])
+@pytest.mark.parametrize("convolve_residual", [False, True])
+@pytest.mark.parametrize("scheme", ["natural", "uniform"])
+def test_vis_clean_smaller_beam_matches_previous_support(shape, width, convolve_residual, scheme, monkeypatch):
+    truth = np.zeros(shape)
+    truth[0, -1], truth[-1, 0] = 10.0, 7.0
+    vis = _clean_test_vis(truth)
+    pixel = [0.5, 1.5] * u.arcsec / u.pix
+    map_shape = shape * u.pix
+    old_beam_shape = tuple((3 * n) // 2 * 2 + 1 for n in shape)
+    dirty = vis_to_image(vis, shape=map_shape, pixel_size=pixel, scheme=scheme).value
+    beam = vis_psf_image(vis, shape=old_beam_shape * u.pix, pixel_size=pixel, scheme=scheme).value
+    _, expected_model, expected_residual = clean(dirty, beam, pixel_size=pixel, clean_beam_width=None, niter=30)
+    expected_image = expected_model.copy()
+    if width is not None:
+        sigma = width / np.sqrt(8 * np.log(2))
+        kernel = Gaussian2DKernel(sigma / 1.5, sigma / 0.5, x_size=old_beam_shape[1], y_size=old_beam_shape[0]).array
+        kernel /= kernel.max()
+        expected_residual = expected_residual / (kernel.sum() * 0.75)
+        kernel /= kernel.sum()
+        expected_image = signal.convolve2d(expected_model, kernel, mode="same") / 0.75
+        if convolve_residual:
+            expected_residual = signal.convolve2d(expected_residual, kernel, mode="same")
+    expected_image += expected_residual
+
+    def record_psf(*args, **kwargs):
+        assert_allclose(kwargs["shape"].to_value(u.pix), [2 * n - 1 for n in shape])
+        return vis_psf_image(*args, **kwargs)
+
+    monkeypatch.setattr("xrayvision.clean.vis_psf_image", record_psf)
+    actual = vis_clean(
+        vis,
+        map_shape,
+        pixel,
+        clean_beam_width=None if width is None else width * u.arcsec,
+        convolve_residual=convolve_residual,
+        scheme=scheme,
+        niter=30,
+        map=False,
+    )
+
+    for actual_array, expected in zip(actual, (expected_image, expected_model, expected_residual)):
+        assert_allclose(actual_array, expected, rtol=1e-12, atol=1e-12)
+
+
+@pytest.mark.parametrize("map_output", [False, True])
+def test_vis_clean_scalar_shape(map_output):
+    vis = _clean_test_vis(np.ones((9, 9)))
+    arguments = {"clean_beam_width": 4 * u.arcsec, "niter": 1, "map": map_output}
+    actual = vis_clean(vis, 9 * u.pix, 1 * u.arcsec / u.pix, **arguments)
+    expected = vis_clean(vis, [9, 9] * u.pix, [1, 1] * u.arcsec / u.pix, **arguments)
+    for result, reference in zip(actual, expected):
+        assert (result.data if map_output else result).shape == (9, 9)
+        assert_allclose(result.data if map_output else result, reference.data if map_output else reference)
+
+
+def _clean_test_vis(truth, n_circles=10, per_circle=12, ratio=0.6, first_radius=0.4):
+    # u-v points on circles of geometrically decreasing radius, like the grids of a Fourier-based
+    # hard x-ray imager, so groups of neighbouring circles have beams of very different width
+    radii = first_radius * ratio ** np.arange(n_circles)
+    angle = np.linspace(0, np.pi, per_circle, endpoint=False)
+    uu = np.concatenate([r * np.cos(angle + 0.3 * i) for i, r in enumerate(radii)]) / u.arcsec
+    vv = np.concatenate([r * np.sin(angle + 0.3 * i) for i, r in enumerate(radii)]) / u.arcsec
+    return image_to_vis(truth * u.dimensionless_unscaled, u=uu, v=vv, pixel_size=[1, 1] * u.arcsec / u.pix)
+
+
+@pytest.mark.parametrize("shape", [(9, 12), (10, 11)])
+@pytest.mark.parametrize("beam_shape", [(27, 35), (28, 36)])
+@pytest.mark.parametrize("width", [0.5, 4.0, 40.0])
+@pytest.mark.parametrize("convolve_residual", [False, True])
+def test_clean_restoration_matches_direct_convolution(shape, beam_shape, width, convolve_residual):
+    # A half-gain corner component leaves a nonzero residual. Use direct convolution
+    # as an independent reference with main's existing restoring-beam normalization.
+    dirty = np.random.default_rng(42).normal(size=shape)
+    dirty[0, -1], dirty[-1, 0] = 10.0, 7.0
+    beam = Gaussian2DKernel(2.0, x_size=beam_shape[1], y_size=beam_shape[0]).array
+    pixel = [0.5, 1.5] * u.arcsec / u.pix
+    model = np.zeros(shape)
+    model[0, -1] = 5.0
+    cy, cx = (beam_shape[0] - 1) // 2, (beam_shape[1] - 1) // 2
+    residual = dirty - 5.0 * beam[cy : cy + shape[0], cx - shape[1] + 1 : cx + 1]
+    sigma = width / np.sqrt(8 * np.log(2))
+    kernel = Gaussian2DKernel(sigma / 1.5, sigma / 0.5, x_size=beam_shape[1], y_size=beam_shape[0]).array
+    kernel /= kernel.max()
+    expected_residual = residual / (kernel.sum() * 0.75)
+    kernel /= kernel.sum()
+    if convolve_residual:
+        expected_residual = signal.convolve2d(expected_residual, kernel, mode="same")
+    expected_image = signal.convolve2d(model, kernel, mode="same") / 0.75 + expected_residual
+
+    image, actual_model, actual_residual = clean(
+        dirty,
+        beam,
+        pixel_size=pixel,
+        clean_beam_width=width * u.arcsec,
+        gain=0.5,
+        niter=1,
+        convolve_residual=convolve_residual,
+    )
+
+    assert_allclose(actual_model, model)
+    assert_allclose(image, expected_image, rtol=1e-12, atol=1e-12)
+    assert_allclose(actual_residual, expected_residual, rtol=1e-12, atol=1e-12)
