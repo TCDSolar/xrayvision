@@ -64,6 +64,11 @@ def test_clean_even_shape(n, m):
     assert_allclose(np.abs(resid).max(), 0.0, atol=1e-8)
 
 
+def test_clean_restoration_requires_pixel_size():
+    with pytest.raises(ValueError, match="pixel_size is required"):
+        clean(np.zeros((5, 5)), np.ones((9, 9)), niter=0)
+
+
 @pytest.fixture
 def tapered_cross_beam():
     r"""

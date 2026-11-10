@@ -131,7 +131,7 @@ def clean(
         pixel ``(N - 1) // 2``. Each axis needs at least ``2 * N - 1`` pixels to cover
         every shift over the corresponding ``N``-pixel image axis.
     pixel_size :
-        The pixel size in arcsec
+        The pixel size in arcsec. Required when `clean_beam_width` is not `None`.
     {clean_beam_width}
     {gain}
     {thres}
@@ -198,7 +198,8 @@ def _clean(
         logger.info("Max iterations reached")
 
     if clean_beam_width is not None:
-        pixel_size = cast(Quantity, pixel_size)
+        if pixel_size is None:
+            raise ValueError("pixel_size is required when clean_beam_width is not None")
         # Convert from FWHM to StDev   FWHM = sigma*(8ln2)**0.5 = 2.3548200450309493
         x_stdev = (clean_beam_width / pixel_size[1]).to_value(u.pix) / 2.3548200450309493
         y_stdev = (clean_beam_width / pixel_size[0]).to_value(u.pix) / 2.3548200450309493
