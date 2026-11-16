@@ -27,6 +27,7 @@ __all__ = [
     "Circular",
     "Elliptical",
     "GenericSource",
+    "InvalidSourceParameters",
     "Loop",
     "Source",
     "SourceFactory",
@@ -36,6 +37,10 @@ __all__ = [
     "elliptical_gaussian_img",
     "elliptical_gaussian_vis",
 ]
+
+
+class InvalidSourceParameters(ValueError):
+    """Parameters fall outside the mathematical domain of a source model."""
 
 
 def circular_gaussian_img(
@@ -418,7 +423,7 @@ def _compute_loop_geometry(
 
     # Validate opening angle
     if np.abs(loop_angle) >= 2.0 * np.pi:
-        raise ValueError(
+        raise InvalidSourceParameters(
             f"Loop arc parameter {arc_param} produces opening angle {loop_angle:.3f} rad "
             f"(>= 2π). Reduce arc_param or adjust sigma_max."
         )
@@ -660,6 +665,8 @@ class GenericSource(ABC):
 
     _registry: dict[str, "type[GenericSource]"] = {}
     _param_units: ClassVar[tuple[Any, ...]] = ()
+    # Kept outside the dataclass fields: bounds are metadata, not fit parameters.
+    _custom_bounds: list[list[float]] | None = None
 
     def __init_subclass__(cls, **kwargs: Any) -> None:
         super().__init_subclass__(**kwargs)
@@ -704,6 +711,7 @@ class GenericSource(ABC):
         are interpreted in it. Incompatible quantities raise a units error.
         """
         obj = type(self)._from_canonical(*self.param_list)
+        self._copy_bounds_to(obj, flux_unit)
         if flux_unit is not None and isinstance(obj.amp, Quantity):
             obj.amp = obj.amp.to_value(flux_unit)  # pyright: ignore[reportAttributeAccessIssue]
         return obj
@@ -728,9 +736,58 @@ class GenericSource(ABC):
         return len(self.param_list)
 
     @property
-    @abstractmethod
     def bounds(self) -> list[list[float]]:
-        r"""Return the lower and upper bounds of the source."""
+        """Lower/upper optimisation limits, in parameter order.
+
+        Defaults are calculated from the current parameters. Assign two rows
+        to override them, or ``None`` to restore the defaults. Numeric angular
+        limits use arcseconds/radians; numeric flux limits use the amplitude's
+        unit (or the observation unit for a bare amplitude). Quantity limits
+        are converted to these units. The getter returns an independent copy.
+        These limits do not define Bayesian priors.
+        """
+        return self._default_bounds if self._custom_bounds is None else [row.copy() for row in self._custom_bounds]
+
+    @bounds.setter
+    def bounds(self, values: Sequence[Sequence[FloatOrQuantity]] | NDArray[np.float64] | None) -> None:
+        if values is None:
+            self._custom_bounds = None
+            return
+        if len(values) != 2 or any(len(row) != self.n_params for row in values):
+            raise ValueError(f"bounds must have shape (2, {self.n_params}).")
+        converted = []
+        for row in values:
+            limits = []
+            for value, unit in zip(row, self._param_units):
+                if isinstance(value, Quantity):
+                    if unit is None:
+                        unit = getattr(self.amp, "unit", None)
+                        if unit is None:
+                            raise ValueError("Quantity flux bounds require a quantity-valued source amplitude.")
+                    value = value.to_value(unit)  # pyright: ignore[reportAttributeAccessIssue]
+                limits.append(float(value))
+            converted.append(limits)
+        array = np.asarray(converted)
+        if np.any(np.isnan(array)) or np.any(array[0] >= array[1]):
+            raise ValueError("Bounds must contain no NaNs and each lower limit must be below its upper limit.")
+        self._custom_bounds = converted
+
+    def _copy_bounds_to(self, target: "GenericSource", flux_unit: Any = None) -> None:
+        """Preserve overrides when reconstructing, converting amplitude limits too."""
+        if self._custom_bounds is None:
+            return
+        bounds = [row.copy() for row in self._custom_bounds]
+        source_unit = getattr(self.amp, "unit", None)
+        if source_unit is not None:
+            target_unit = flux_unit if flux_unit is not None else getattr(target.amp, "unit", source_unit)
+            for row in bounds:
+                row[0] = float((row[0] * source_unit).to_value(target_unit))
+        target._custom_bounds = bounds
+
+    @property
+    @abstractmethod
+    def _default_bounds(self) -> list[list[float]]:
+        """Calculate the source's initial-guess-dependent bounds."""
         pass
 
     @property
@@ -772,7 +829,7 @@ class Circular(GenericSource):
         self.amp, self.x0, self.y0, self.sigma = self._canonicalize(amp, x0, y0, sigma)
 
     @property
-    def bounds(self) -> list[list[float]]:
+    def _default_bounds(self) -> list[list[float]]:
         source = self.to_canonical()
         amp = _strip_unit(source.amp)
         return [
@@ -840,7 +897,7 @@ class Elliptical(GenericSource):
         )
 
     @property
-    def bounds(self) -> list[list[float]]:
+    def _default_bounds(self) -> list[list[float]]:
         source = self.to_canonical()
         amp = _strip_unit(source.amp)
         return [
@@ -927,7 +984,7 @@ class Loop(GenericSource):
         )
 
     @property
-    def bounds(self) -> list[list[float]]:
+    def _default_bounds(self) -> list[list[float]]:
         source = self.to_canonical()
         amp = _strip_unit(source.amp)
         # Keep the sigma_min and sigma_max boxes from overlapping, split at their initial
@@ -1042,11 +1099,11 @@ class SourceList(UserList[GenericSource]):
         new_sources = cls()
         for source in sources:
             n_params = source.n_params
-            # Numeric coordinates are canonical; quantity-valued fitted results
+            # Numeric coordinates are canonical, quantity-valued fitted results
             # are converted by the same reconstruction path before reuse.
-            new_sources.append(
-                type(source)._from_canonical(*list(params[j : j + n_params]))  # pyright: ignore[reportPrivateUsage]
-            )
+            rebuilt = type(source)._from_canonical(*list(params[j : j + n_params]))  # pyright: ignore[reportPrivateUsage]
+            source._copy_bounds_to(rebuilt)  # pyright: ignore[reportPrivateUsage]
+            new_sources.append(rebuilt)
             j += n_params
 
         return new_sources
