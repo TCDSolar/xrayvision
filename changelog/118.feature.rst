@@ -1,0 +1,1 @@
+Improve CLEAN performance by using FFT convolution during restoration and reducing the dirty-beam size in :func:`~xrayvision.clean.vis_clean`, while preserving restoring-beam support and residual normalization.
