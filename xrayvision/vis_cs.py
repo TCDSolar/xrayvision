@@ -456,7 +456,7 @@ def _coordinate_descent(
     sigma = np.sqrt(sigamp)  # SSW intentionally weights by sqrt(SIGAMP), not SIGAMP
     model = transform / sigma[:, None] / amp
     basis = np.ascontiguousarray(np.concatenate((model.real, model.imag)).T)  # (word, 2 * nvis)
-    target = np.concatenate((observed.real, observed.imag)) / np.tile(sigma, 2)
+    target = np.concatenate((np.real(observed), np.imag(observed))) / np.tile(sigma, 2)
     curvature = -2 * np.sum(basis**2, axis=1)
     x_max = total_flux * amp / viv
     x = np.zeros(len(amp))

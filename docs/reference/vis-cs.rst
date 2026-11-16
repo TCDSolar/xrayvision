@@ -36,16 +36,16 @@ Gaussians. ``seed`` makes Python runs reproducible. ``n_components`` and
 ``iterations`` can be changed for experiments. Each generation uses eight
 regularisation stages, ending at the requested ``sparseness`` (default 0.5).
 
-Relationship to SolarSoft and the paper
-=======================================
+Notes
+=====
 
-* SSW 2.0 uses Gaussian sigma limits of 1.5--60 arcsec; the paper describes an
+* Gaussian sigma limits of 1.5--60 arcsec, the paper describes an
   upper limit of 40 arcsec. Set ``max_sigma=40*u.arcsec`` for that limit.
 * The port retains SSW's square-root-of-SIGAMP weighting, numerical regularisation
   scale, continuous in-view flux constraint and integration convention. Use the
   same numerical flux units when comparing runs; the SSW penalty is not invariant
   to a change of input flux units.
-* SSW's in-view integral uses shifted bounds beginning at the first pixel center
+* The in-view integral uses shifted bounds beginning at the first pixel center
   and the opposite Gaussian cross-term sign to its renderer. These conventions
   are preserved for compatibility, including for rotated sources near the edge.
   The constraint is applied before pruning. Therefore the rendered, sampled image
@@ -64,23 +64,5 @@ Relationship to SolarSoft and the paper
   Integration uses each Gaussian's own width to resolve narrow peaks in large
   fields of view, while retaining vectorised quadrature for the default axis ratios.
 * ``maxiter`` bounds solver sweeps per stage and warns on nonconvergence.
-
-Validation
-==========
-
-With ``pytest --idl`` and a local SSW IDL install, the test suite runs the
-unmodified SSW routines through hissw on fixed dictionaries; these tests are
-skipped otherwise. Two dictionaries exercise rotated Gaussians,
-unequal amplitude uncertainties, and square and rectangular pixels. Holding
-Fourier coefficients, normalisation and in-view integrals identical isolates the
-solver: maximum coefficient differences were below 1e-13. With each language's
-own integration and rendering, maximum image differences were below 3e-6 in these
-two cases. Independent synthetic reconstructions check flux, position, Fourier
-phase and pixel area, including dictionary refinement, and that a nonzero phase
-center only places the map.
-
-These checks validate the port; they do not reproduce the paper's full RHESSI
-benchmark or imply identical reconstructions from independently randomized
-Python and IDL dictionaries.
 
 .. automodapi:: xrayvision.vis_cs
