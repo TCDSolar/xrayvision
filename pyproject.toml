@@ -86,7 +86,7 @@ include = ["xrayvision*"]
 exclude = ["xrayvision._dev*"]
 
 [tool.setuptools.package-data]
-xrayvisim = ["data/*"]
+xrayvision = ["data/*"]
 
 [tool.setuptools_scm]
 version_file = "xrayvision/_version.py"
