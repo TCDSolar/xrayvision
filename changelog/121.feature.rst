@@ -1,0 +1,1 @@
+Added `~xrayvision.vis_cs.vis_cs`, which reconstructs images from visibilities as a sparse, positive sum of Gaussian sources using an adaptive random dictionary and a total-flux constraint, following `Felix, Bolzern & Battaglia 2017 <https://doi.org/10.3847/1538-4357/aa8d1e>`__.
