@@ -1,5 +1,9 @@
-"""
-Compressed sensing image reconstruction with the finite isotropic wavelet transform (VIS_WV).
+"""VIS_WV reconstruction using compressed sensing with a finite isotropic wavelet transform.
+
+Based on :cite:t:`DuvalPoo2018_vis_wv` and SolarSoft implementation.
+
+The image is found by FISTA deconvolution of the dirty map by the PSF, with an L1 penalty on the coefficients of a
+finite isotropic transform built from the Meyer wavelet.
 """
 
 import numpy as np

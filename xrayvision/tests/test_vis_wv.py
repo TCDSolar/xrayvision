@@ -5,11 +5,10 @@ from scipy.ndimage import center_of_mass
 
 import astropy.units as apu
 
-from xrayvision import wavelet
 from xrayvision.imaging import vis_psf_image
 from xrayvision.simulation.instruments import rhessi_like_uv_coverage
+from xrayvision.vis_wv import _fiwt, _fiwt_spectra, _ifiwt, vis_wv
 from xrayvision.visibility import Visibilities
-from xrayvision.wavelet import _fiwt, _fiwt_spectra, _ifiwt, vis_wv
 
 
 @pytest.fixture
@@ -87,7 +86,7 @@ def test_vis_wv_idl(gaussian_vis, pixel, lam, monkeypatch):
     hissw = pytest.importorskip("hissw")
     # vis_wv.pro centres the PSF with shift(P, 1-center) which leaves its peak one pixel off the FFT origin, so the
     # IDL image is shifted one pixel down in x and y, emulate that here to check the rest of the algorithm matches
-    monkeypatch.setattr(wavelet, "vis_psf_image", lambda *a, **k: np.roll(vis_psf_image(*a, **k), 1, (0, 1)))
+    monkeypatch.setattr("xrayvision.vis_wv.vis_psf_image", lambda *a, **k: np.roll(vis_psf_image(*a, **k), 1, (0, 1)))
     vis, _ = gaussian_vis
     ssw = hissw.Environment(ssw_packages=["hessi"])
     # force_double_precision as IDL parses plain literals as single precision
