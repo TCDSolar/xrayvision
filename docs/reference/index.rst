@@ -10,6 +10,7 @@ Reference
    imaging
    clean
    mem
+   vis-wv
    uv-smooth
    forward_fit
    spectral
