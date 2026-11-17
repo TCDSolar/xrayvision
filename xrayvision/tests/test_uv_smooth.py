@@ -108,7 +108,8 @@ def test_uv_smooth_matches_gaussian(rhessi_like_gaussian_vis):
 
     image_orig, *_ = uv_smooth_idl(vis, niter=50)
     image_new, *nw = uv_smooth(vis, shape=128, uv_pixel_size=0.0005, niter=50)
-    image_auto, *_ = uv_smooth(vis, shape=128, pixel_size=1.0)
+    image_auto, _, pixel_auto = uv_smooth(vis, shape=128, pixel_size=1.0)
+    assert_allclose(pixel_auto, 1.0)
 
     im_new = image_orig.shape[0]
 
@@ -189,4 +190,5 @@ uv_smooth, visin, map, reconstructed_map_visibilities=visout
     assert_allclose(image_orig, image_idl, atol=1e-4)
     dx = np.ravel(out["map"]["dx"])[0]
     assert_allclose(pixel_orig, dx, rtol=1e-5)
-    assert_allclose(pixel_new, dx, rtol=1e-5)
+    # IDL's dx spans 127 of the 128 FFT cells, uv_smooth uses the true FFT pixel size
+    assert_allclose(pixel_new, 1 / (128 * 15 * 0.0005))

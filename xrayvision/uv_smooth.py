@@ -468,9 +468,9 @@ def _sinc_interpolate_to_final_grid(
     y_coords_downsampled = x_coords_downsampled
 
     # Calculate grid spacing in frequency domain
-    total_extent = x_coords_downsampled[-1] - x_coords_downsampled[0]
-    delta_omega = total_extent / downsampled_size  # UV pixel spacing
-    pixel_size = 1 / total_extent  # Image spacing
+    # The FFT grid spans downsampled_size cells, the IDL code uses the first-to-last sample distance (one cell short)
+    delta_omega = downsample_factor * uv_pixel_size  # UV pixel spacing
+    pixel_size = 1 / (downsampled_size * delta_omega)  # Image spacing
     return vis_downsampled, x_coords_downsampled, y_coords_downsampled, delta_omega, pixel_size
 
 
