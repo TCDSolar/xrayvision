@@ -1,0 +1,1 @@
+Fix `~xrayvision.uv_smooth.uv_smooth` damping and shifting sources away from the map centre, and returning a pixel size about 0.8% too large, by sampling the uv grid at the frequencies the FFT uses.
