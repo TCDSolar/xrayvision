@@ -44,9 +44,13 @@ def test_uv_smooth():
         amplitude_uncertainty=vis_data["sigamp"] * vunit,
     )
 
-    image_orig, *_ = uv_smooth_idl(vis)
-    image_new, *_ = uv_smooth(vis, shape=128, uv_pixel_size=0.0005)
-    assert_allclose(image_new, image_orig, atol=5e-5)
+    image_orig, _, pixel_orig = uv_smooth_idl(vis)
+    image_new, _, pixel_new = uv_smooth(vis, shape=128, uv_pixel_size=0.0005)
+    # uv_smooth no longer reproduces the IDL off-by-half-cell uv sampling, which damps flux away from the map centre,
+    # so only the near-centre source is expected to agree
+    assert np.argmax(image_new) == np.argmax(image_orig)
+    assert_allclose(image_new.max(), image_orig.max(), rtol=0.05)
+    assert_allclose(image_new.sum() * pixel_new**2, image_orig.sum() * pixel_orig**2, rtol=0.1)
 
 
 @pytest.fixture
@@ -104,7 +108,8 @@ def test_uv_smooth_matches_gaussian(rhessi_like_gaussian_vis):
 
     image_orig, *_ = uv_smooth_idl(vis, niter=50)
     image_new, *nw = uv_smooth(vis, shape=128, uv_pixel_size=0.0005, niter=50)
-    image_auto, *_ = uv_smooth(vis, shape=128, pixel_size=1.0)
+    image_auto, _, pixel_auto = uv_smooth(vis, shape=128, pixel_size=1.0)
+    assert_allclose(pixel_auto, 1.0)
 
     im_new = image_orig.shape[0]
 
@@ -117,6 +122,38 @@ def test_uv_smooth_matches_gaussian(rhessi_like_gaussian_vis):
     np.testing.assert_allclose(image_orig, ref_image, atol=0.025)
     np.testing.assert_allclose(image_new, ref_image, atol=0.025)
     np.testing.assert_allclose(image_auto, ref_image, atol=0.024)
+
+
+def test_uv_smooth_off_centre(rhessi_like_gaussian_vis, monkeypatch):
+    vis, flux, sigma = rhessi_like_gaussian_vis
+    sigma = sigma.value
+    x0, y0 = 30.0, 20.0
+
+    def gaussian_vis(u, v):
+        return flux * np.exp(-2 * np.pi**2 * sigma**2 * (u**2 + v**2)) * np.exp(2j * np.pi * (x0 * u + y0 * v))
+
+    vis = Visibilities(
+        visibilities=gaussian_vis(vis.u.value, vis.v.value) * vis.visibilities.unit, u=vis.u, v=vis.v, meta=vis.meta
+    )
+
+    # RBF gridding of 160 sparse samples only loosely follows the off-centre phase ramp, but the total flux survives
+    # (before the downsampling fix it was 60)
+    image, _, pixel_size = uv_smooth(vis, shape=128, pixel_size=1.0)
+    assert_allclose(image.sum() * pixel_size**2, flux, rtol=0.05)
+
+    # With exact gridded visibilities the source must come back at the right place with the right amplitude
+    # (before the fix: peak 0.23 at (82, 92), flux 35)
+    monkeypatch.setattr(
+        "xrayvision.uv_smooth.interpolate_visibilities_to_grid",
+        lambda u, v, vis, ugrid, vgrid, **kwargs: gaussian_vis(ugrid, vgrid) / (4 * np.pi**2),
+    )
+    image, _, pixel_size = uv_smooth(vis, shape=128, pixel_size=1.0)
+    centre = image.shape[0] // 2
+    assert_allclose(
+        np.unravel_index(np.argmax(image), image.shape), (centre + y0 / pixel_size, centre + x0 / pixel_size), atol=1
+    )
+    assert_allclose(image.max(), flux / (2 * np.pi * sigma**2), rtol=0.05)
+    assert_allclose(image.sum() * pixel_size**2, flux, rtol=0.05)
 
 
 @pytest.mark.idl
@@ -146,11 +183,12 @@ uv_smooth, visin, map, reconstructed_map_visibilities=visout
         },
     )
     image_orig, _, pixel_orig = uv_smooth_idl(vis, niter=50)
-    image_new, _, pixel_new = uv_smooth(vis, shape=128, uv_pixel_size=0.0005, niter=50)
+    _, _, pixel_new = uv_smooth(vis, shape=128, uv_pixel_size=0.0005, niter=50)
     image_idl = out["map"]["data"][0]
     # IDL's GRID_TPS differs from the exact thin plate spline by ~4e-5 (of a 0.6 peak) on the 320x320 grid
+    # Only uv_smooth_idl images are compared, uv_smooth deliberately fixes the IDL half-cell uv sampling offset
     assert_allclose(image_orig, image_idl, atol=1e-4)
-    assert_allclose(image_new, image_idl, atol=1e-4)
     dx = np.ravel(out["map"]["dx"])[0]
     assert_allclose(pixel_orig, dx, rtol=1e-5)
-    assert_allclose(pixel_new, dx, rtol=1e-5)
+    # IDL's dx spans 127 of the 128 FFT cells, uv_smooth uses the true FFT pixel size
+    assert_allclose(pixel_new, 1 / (128 * 15 * 0.0005))

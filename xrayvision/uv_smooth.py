@@ -241,7 +241,7 @@ def uv_smooth(
     optimal method for band-limited signals. This is implemented efficiently via:
 
     1. **Zero-padding** grid in Fourier space
-    2. **Centered downsampling** by factor obtain output grid
+    2. **Downsampling** by a fixed factor about zero frequency to obtain the output grid
 
     This combination is mathematically equivalent to sinc interpolation:
 
@@ -252,8 +252,8 @@ def uv_smooth(
     theorem guarantees this preserves all information within the signal's bandwidth, making it
     ideal for band-limited signal as with Fourier based X-ray imaging.
 
-    The downsampling uses centered sampling with offset :math:`(factor - 1) / 2` to preserve spatial
-    symmetry around the origin, which is critical for maintaining Fourier transform properties.
+    The downsampled grid is aligned so zero frequency sits at the centre index the FFT expects. Any misalignment
+    multiplies the image by a phase ramp that damps and shifts sources away from the map centre.
 
     **Stage 4: Iterative Landweber Reconstruction**
 
@@ -320,9 +320,8 @@ def uv_smooth(
             shape, pixel_size, PADDING_FACTOR, DOWNSAMPLE_FACTOR
         )
 
-    # Construct regular UV grid for interpolation
-    uv_limit = (uv_grid_size / 2 - 1) * uv_pixel_size + uv_pixel_size / 2
-    uv_sample_coords = -uv_limit + np.arange(uv_grid_size) * uv_pixel_size
+    # Construct regular UV grid for interpolation, zero frequency at index uv_grid_size // 2 (FFT layout)
+    uv_sample_coords = (np.arange(uv_grid_size) - uv_grid_size // 2) * uv_pixel_size
     uu_grid, vv_grid = np.meshgrid(uv_sample_coords, uv_sample_coords)
 
     # Interpolate visibilities onto regular grid using RBF
@@ -404,14 +403,13 @@ def _sinc_interpolate_to_final_grid(
     uv_pixel_size: float,
     padded_uv_grid_size: int,
     downsample_factor: int = 15,
-    downsample_offset: int = 7,
 ) -> tuple[npt.NDArray[Any], npt.NDArray[Any], npt.NDArray[Any], float, float]:
     """
     Resample visibility grid using sinc interpolation (zero-pad + downsample).
 
     This function implements sinc interpolation in the Fourier domain by:
     1. Zero-padding the input grid to a larger size (increases frequency resolution)
-    2. Downsampling by selecting centered samples (implements the sinc kernel)
+    2. Downsampling by selecting every ``downsample_factor`` sample about zero frequency
 
     The combination of zero-padding in Fourier space followed by decimation is
     mathematically equivalent to sinc interpolation, which is the ideal band-limited
@@ -429,8 +427,6 @@ def _sinc_interpolate_to_final_grid(
         Intermediate padded grid size.
     downsample_factor : int, optional
         Downsampling factor for final grid (default: 15).
-    downsample_offset : int, optional
-        Centered sampling offset within each downsampling block (default: 7).
 
     Returns
     -------
@@ -448,42 +444,33 @@ def _sinc_interpolate_to_final_grid(
     -----
     The mathematical relationship:
     - Zero-padding in Fourier domain → sinc interpolation in spatial domain
-    - Centered downsampling → preserves spatial symmetry
+    - Downsampling about zero frequency → matches the FFT frequency layout
     - Combined: ideal band-limited resampling
 
-    The downsample offset uses centered sampling:
-        offset = (downsample_factor - 1) // 2
-    This ensures the center of each sampling block is selected, preserving
-    the spatial symmetry required for accurate Fourier transforms.
+    The samples are taken at ``padded_uv_grid_size // 2 + downsample_factor * (i - downsampled_size // 2)`` so zero
+    frequency lands at index ``downsampled_size // 2``, as `~numpy.fft.fftshift` assumes. The RHESSI IDL code samples
+    at ``downsample_factor * i + 7`` instead (see `~xrayvision.uv_smooth.uv_smooth_idl`), which is half a downsampled
+    cell off and multiplies the image by a phase ramp, damping and shifting off-centre sources.
     """
-    # Zero-pad visibilities to larger grid
-    padded_uv_limit = (padded_uv_grid_size / 2 - 1) * uv_pixel_size + uv_pixel_size / 2
-    padded_x_coords = -padded_uv_limit + np.arange(padded_uv_grid_size) * uv_pixel_size
-    padded_y_coords = padded_x_coords
-
+    # Zero-pad visibilities to larger grid, keeping zero frequency at index padded_uv_grid_size // 2
     vis_zero_padded = np.zeros((padded_uv_grid_size, padded_uv_grid_size), dtype=np.complex128)
-    pad_start = (padded_uv_grid_size - uv_grid_size) // 2
+    pad_start = padded_uv_grid_size // 2 - uv_grid_size // 2
     pad_end = pad_start + uv_grid_size
     vis_zero_padded[pad_start:pad_end, pad_start:pad_end] = vis_gridded
 
-    # Downsample to final image grid
+    # Downsample so that zero frequency lands at index downsampled_size // 2, the layout fftshift assumes. Any other
+    # alignment multiplies the image by a phase ramp which damps and shifts off-centre sources.
     downsampled_size = padded_uv_grid_size // downsample_factor
-    vis_downsampled = np.zeros((downsampled_size, downsampled_size), dtype=np.complex128)
-    x_coords_downsampled = np.zeros(downsampled_size)
-    y_coords_downsampled = np.zeros(downsampled_size)
-
-    for i in range(downsampled_size):
-        x_coords_downsampled[i] = padded_x_coords[downsample_factor * i + downsample_offset]
-        y_coords_downsampled[i] = padded_y_coords[downsample_factor * i + downsample_offset]
-        for j in range(downsampled_size):
-            vis_downsampled[i, j] = vis_zero_padded[
-                downsample_factor * i + downsample_offset, downsample_factor * j + downsample_offset
-            ]
+    offsets = downsample_factor * (np.arange(downsampled_size) - downsampled_size // 2)
+    idx = padded_uv_grid_size // 2 + offsets
+    vis_downsampled = vis_zero_padded[np.ix_(idx, idx)]
+    x_coords_downsampled = offsets * uv_pixel_size
+    y_coords_downsampled = x_coords_downsampled
 
     # Calculate grid spacing in frequency domain
-    total_extent = x_coords_downsampled[-1] - x_coords_downsampled[0]
-    delta_omega = total_extent / downsampled_size  # UV pixel spacing
-    pixel_size = 1 / total_extent  # Image spacing
+    # The FFT grid spans downsampled_size cells, the IDL code uses the first-to-last sample distance (one cell short)
+    delta_omega = downsample_factor * uv_pixel_size  # UV pixel spacing
+    pixel_size = 1 / (downsampled_size * delta_omega)  # Image spacing
     return vis_downsampled, x_coords_downsampled, y_coords_downsampled, delta_omega, pixel_size
 
 
